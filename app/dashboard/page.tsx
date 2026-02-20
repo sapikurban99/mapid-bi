@@ -1,66 +1,175 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, ArrowUpRight, ArrowDownRight, Users, Target, Activity, FileText, FolderOpen, TableProperties } from 'lucide-react';
+import { 
+  Loader2, ArrowUpRight, ArrowDownRight, Users, Target, 
+  Activity, FileText, FolderOpen, TableProperties, Lock, 
+  TrendingUp, BarChart3, Globe, Share2, ArrowRight
+} from 'lucide-react';
 
 export default function MinimalistDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Trends');
-  const [trendView, setTrendView] = useState<'month' | 'quarter' | 'year'>('month'); // Toggle Trends
+  const [trendView, setTrendView] = useState<'month' | 'quarter' | 'year'>('month');
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<any>(null);
 
+  // --- SIMPLE AUTH LOGIC ---
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === 'MAPID2026') { 
+      setIsAuthorized(true);
+    } else {
+      alert('Akses Ditolak: Password Salah!');
+    }
+  };
+
   useEffect(() => {
-    fetch('/api/gas')
-      .then(res => res.json())
-      .then(json => {
-        if (json.isError || json.error) setErrorMsg(json);
-        else setData(json);
-        setLoading(false);
-      })
-      .catch(err => {
-        setErrorMsg({ title: "Network Error", message: err.message });
-        setLoading(false);
-      });
-  }, []);
+    if (isAuthorized) {
+      fetch('/api/gas')
+        .then(res => res.json())
+        .then(json => {
+          if (json.isError || json.error) setErrorMsg(json);
+          else setData(json);
+          setLoading(false);
+        })
+        .catch(err => {
+          setErrorMsg({ title: "Network Error", message: err.message });
+          setLoading(false);
+        });
+    }
+  }, [isAuthorized]);
+
+  // --- HELPER FORMATTERS ---
+  const formatIDR = (value: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(value);
+  };
+
+  const formatDate = (dateInput: string) => {
+    if (!dateInput || dateInput === '#') return '-';
+    try {
+      const date = new Date(dateInput);
+      if (isNaN(date.getTime())) return dateInput;
+      // Menghasilkan format "28 Feb"
+      return new Intl.DateTimeFormat('id-ID', {
+        day: 'numeric',
+        month: 'short',
+      }).format(date);
+    } catch {
+      return dateInput;
+    }
+  };
+
+  const formatTrendLabel = (label: string, view: string) => {
+    if (view === 'year') {
+      // Jika view year, kembalikan teks aslinya (misal "2024", "2025")
+      return label; 
+    }
+    // Jika bukan year, bersihkan format ISO String jika ada
+    if (label && label.includes('T')) {
+      const date = new Date(label);
+      if (!isNaN(date.getTime())) {
+         return new Intl.DateTimeFormat('id-ID', {
+          day: 'numeric',
+          month: 'short',
+        }).format(date).toUpperCase();
+      }
+    }
+    return label;
+  }
+
+  // --- CALCULATIONS ---
+  const totalB2CActual = data?.revenue?.reduce((acc: number, curr: any) => acc + curr.actual, 0) || 0;
+  const totalB2CTarget = data?.revenue?.reduce((acc: number, curr: any) => acc + curr.target, 0) || 0;
+  // Hitung persentase dan batasi hingga 2 desimal
+  const totalB2CAchievement = totalB2CTarget > 0 ? ((totalB2CActual / totalB2CTarget) * 100).toFixed(2) : '0.00';
+  const totalB2BPipeline = data?.pipeline?.reduce((acc: number, curr: any) => acc + (curr.value || 0), 0) || 0;
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-100 font-sans p-6">
+        <form onSubmit={handleLogin} className="bg-white p-10 border border-zinc-200 shadow-2xl w-full max-w-sm text-center rounded-2xl">
+          <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Lock className="text-white" size={24} />
+          </div>
+          <h2 className="text-2xl font-black tracking-tight mb-2 uppercase">BI Access</h2>
+          <p className="text-zinc-400 text-xs mb-8 uppercase tracking-widest font-bold">Internal MAPID Team Only</p>
+          <input 
+            type="password" 
+            placeholder="Passkey" 
+            className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-xl mb-4 text-center focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all font-bold"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button type="submit" className="w-full bg-zinc-900 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg shadow-zinc-200">
+            Unlock Data
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center text-zinc-400 p-8">
-      <Loader2 className="w-8 h-8 animate-spin mb-4" />
-      <p className="text-sm tracking-widest uppercase">Fetching Engine</p>
+      <Loader2 className="w-8 h-8 animate-spin mb-4 text-zinc-900" />
+      <p className="text-xs tracking-widest uppercase font-bold">Syncing SOT Database</p>
     </div>
   );
 
-  if (errorMsg) return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6">
-      <div className="bg-white p-8 border border-red-200 max-w-lg w-full">
-        <h2 className="text-lg font-bold text-red-600 mb-2">Engine Error</h2>
-        <p className="text-sm text-zinc-600 mb-4">{errorMsg.message || errorMsg.error}</p>
-      </div>
-    </div>
-  );
-
-  // Helper Trend Data
+  // --- LOGIC GRAFIK SVG PROPORSIONAL ---
   const currentTrendData = data?.trends?.[trendView] || [];
-  const maxRevenue = currentTrendData.length > 0 ? Math.max(...currentTrendData.map((d: any) => d.revenue)) : 1;
-
-  // Format IDR Rupiah
-  const formatIDR = (value: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+  const validTrendData = currentTrendData.filter((d: any) => d && d.revenue !== undefined);
+  
+  // Mencari nilai max untuk skala vertikal
+  const rawMax = validTrendData.length > 0 ? Math.max(...validTrendData.map((d: any) => d.revenue)) : 1;
+  const maxRevenueValue = rawMax * 1.1; // Tambah buffer 10% di atas agar grafik tidak menabrak atap kontainer
+  
+  // Fungsi untuk membuat path SVG Garis
+  const generateSvgLine = (dataPoints: any[], width: number, height: number) => {
+    if (!dataPoints || dataPoints.length === 0) return "";
+    
+    // Memberikan padding horizontal agar titik awal dan akhir tidak terpotong
+    const paddingX = 40; 
+    const effectiveWidth = width - (paddingX * 2);
+    
+    // Jarak antar titik
+    const stepX = dataPoints.length > 1 ? effectiveWidth / (dataPoints.length - 1) : effectiveWidth;
+    
+    return dataPoints.reduce((acc, point, index) => {
+      const x = paddingX + (index * stepX);
+      // Kalkulasi Y proporsional. SVG Y=0 ada di atas, jadi kita kurangi dari tinggi total.
+      const y = height - ((point.revenue / maxRevenueValue) * height);
+      
+      return acc === "" ? `M ${x},${y}` : `${acc} L ${x},${y}`;
+    }, "");
   };
 
   return (
     <main className="min-h-screen bg-zinc-50 p-6 md:p-12 font-sans pb-24 text-zinc-900">
-      <header className="max-w-6xl mx-auto mb-12">
-        <h1 className="text-3xl font-light tracking-tight">Business Metrics</h1>
-        <p className="text-zinc-500 text-sm mt-1">Real-time SOT Database Tracker</p>
+      
+      <header className="max-w-6xl mx-auto mb-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h1 className="text-4xl font-black tracking-tighter leading-none mb-2">MAPID <span className="text-zinc-300">BI.</span></h1>
+          <p className="text-zinc-500 text-sm font-medium">Executive Performance Intelligence Dashboard</p>
+        </div>
       </header>
 
       {/* TAB NAVIGATION */}
-      <div className="max-w-6xl mx-auto mb-10 border-b border-zinc-200 flex gap-6 overflow-x-auto hide-scrollbar">
-        {['Trends', 'B2C (Growth)', 'B2B (Enterprise)', 'Gallery & Docs'].map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab.split(' ')[0])}
-            className={`pb-3 text-sm font-medium transition-colors whitespace-nowrap ${activeTab === tab.split(' ')[0] ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>
+      <div className="max-w-6xl mx-auto mb-10 border-b border-zinc-200 flex gap-8 overflow-x-auto hide-scrollbar">
+        {['Trends', 'B2C', 'B2B', 'Gallery'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`pb-4 text-sm font-bold tracking-widest uppercase transition-colors whitespace-nowrap ${
+              activeTab === tab ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'
+            }`}
+          >
             {tab}
           </button>
         ))}
@@ -68,54 +177,117 @@ export default function MinimalistDashboard() {
 
       <div className="max-w-6xl mx-auto">
         
-        {/* === TAB: TRENDS === */}
+        {/* === TAB 1: TRENDS === */}
         {activeTab === 'Trends' && (
           <div className="space-y-8 animate-in fade-in">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Revenue & Deal Size</h3>
-               {/* TOGGLE WAKTU */}
-               <div className="flex bg-white border border-zinc-200 p-1 rounded-md">
-                 {['month', 'quarter', 'year'].map(tv => (
-                   <button key={tv} onClick={() => setTrendView(tv as any)}
-                     className={`px-4 py-1.5 text-xs font-semibold capitalize rounded ${trendView === tv ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}>
-                     {tv}
-                   </button>
-                 ))}
-               </div>
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Revenue Performance</h3>
+              <div className="flex bg-zinc-100 p-1 rounded-lg">
+                {(['month', 'quarter', 'year'] as const).map(tv => (
+                  <button key={tv} onClick={() => setTrendView(tv)}
+                    className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition ${trendView === tv ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}>
+                    {tv}
+                  </button>
+                ))}
+              </div>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* CSS Bar Chart Dinamis */}
-              <div className="lg:col-span-2 bg-white border border-zinc-200 p-8 flex flex-col justify-end min-h-[300px]">
-                <div className="flex justify-between items-end mb-8">
-                  <div>
-                    <div className="text-2xl font-light tracking-tight">Total Revenue</div>
-                    <div className="text-xs text-zinc-400 mt-1">View: By {trendView} (in Millions)</div>
-                  </div>
-                </div>
+              
+              {/* --- SVG LINE CHART CONTAINER --- */}
+              <div className="lg:col-span-2 bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col min-h-[450px] relative overflow-hidden">
                 
-                <div className="flex items-end justify-between gap-2 h-48 pt-4 border-b border-zinc-100">
-                  {currentTrendData.map((hist: any, idx: number) => {
-                    const heightPct = (hist.revenue / maxRevenue) * 100;
+                {/* Y-Axis Labels & Dashed Grid Lines */}
+                <div className="absolute inset-x-8 top-12 bottom-16 flex flex-col justify-between pointer-events-none">
+                  {[4, 3, 2, 1, 0].map((i) => {
+                    const lineValue = (maxRevenueValue / 4) * i;
                     return (
-                      <div key={idx} className="flex-1 flex flex-col items-center group cursor-pointer">
-                        <span className="text-[10px] font-bold text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity mb-2">Rp {hist.revenue}M</span>
-                        <div className="w-full max-w-[60px] bg-zinc-800 hover:bg-zinc-600 transition-all rounded-t-sm" style={{ height: `${heightPct}%`, minHeight: '10%' }}></div>
-                        <span className="text-[10px] md:text-xs text-zinc-500 mt-3 whitespace-nowrap">{hist.label}</span>
+                      <div key={i} className="w-full flex items-center relative">
+                        {/* Label Y-Axis (Hanya tampilkan jika nilai > 0 untuk estetika) */}
+                        <span className="absolute -left-2 -translate-x-full text-[9px] font-bold text-zinc-300 w-12 text-right">
+                          {lineValue > 0 ? `Rp${Math.round(lineValue)}M` : '0'}
+                        </span>
+                        <div className="w-full border-t border-zinc-100 border-dashed ml-2"></div>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* The SVG Line Graph */}
+                <div className="flex-1 relative mt-12 mb-10 w-full">
+                  <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                     {/* Define Gradient for aesthetic (optional, tapi membuat mirip gambar referensi) */}
+                    <defs>
+                      <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#3b82f6" /> {/* Warna Biru */}
+                        <stop offset="100%" stopColor="#2563eb" />
+                      </linearGradient>
+                    </defs>
+
+                    {/* Menggambar Garis Path berdasarkan data */}
+                    {validTrendData.length > 0 && (
+                      <path 
+                        d={generateSvgLine(validTrendData, 1000, 250)} // Angka 1000, 250 adalah viewBox viewBox="0 0 1000 250"
+                        fill="none" 
+                        stroke="url(#lineGradient)" 
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="vector-effect-non-scaling-stroke drop-shadow-sm"
+                        vectorEffect="non-scaling-stroke"
+                        transform="scale(1, 1)" // Menyesuaikan viewBox dengan ukuran container via CSS flex-1
+                        // Catatan: Implementasi SVG murni di React yang responsif butuh pendekatan ResizeObserver. 
+                        // Sebagai solusi statis yang aman, kita gunakan viewBox fix dan preserveAspectRatio="none"
+                        viewBox="0 0 1000 250"
+                        style={{ width: '100%', height: '100%' }}
+                      />
+                    )}
+
+                    {/* Menggambar Titik (Dots) dan Tooltip Hover */}
+                    {validTrendData.length > 0 && validTrendData.map((point: any, index: number) => {
+                       // Kalkulasi posisi titik
+                       const paddingX = 4; // Persentase padding horizontal
+                       const effectiveWidth = 100 - (paddingX * 2);
+                       const stepX = validTrendData.length > 1 ? effectiveWidth / (validTrendData.length - 1) : effectiveWidth;
+                       const xPos = paddingX + (index * stepX);
+                       const yPos = 100 - ((point.revenue / maxRevenueValue) * 100);
+
+                       return (
+                        <div 
+                          key={index}
+                          className="absolute w-4 h-4 -ml-2 -mt-2 group cursor-pointer"
+                          style={{ left: `${xPos}%`, top: `${yPos}%` }}
+                        >
+                          {/* Titik Lingkaran */}
+                          <div className="w-full h-full bg-blue-500 border-4 border-white rounded-full shadow-md transition-transform group-hover:scale-125"></div>
+                          
+                          {/* Tooltip Hover Nilai */}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-zinc-900 text-white text-[10px] font-bold px-3 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            Rp {point.revenue}M
+                          </div>
+                        </div>
+                       )
+                    })}
+                  </svg>
+                </div>
+
+                {/* Label X-Axis (Bulan/Tahun) */}
+                <div className="flex justify-between w-full px-[4%] mt-auto border-t border-zinc-200 pt-4">
+                  {validTrendData.map((hist: any, idx: number) => (
+                    <span key={idx} className="text-[10px] font-black text-zinc-400 uppercase tracking-tighter text-center">
+                      {formatTrendLabel(hist.label, trendView)}
+                    </span>
+                  ))}
+                </div>
               </div>
 
-              {/* Deal Size Stats (Menampilkan 2 data terakhir dari time view terpilih) */}
+              {/* Data Summary Cards */}
               <div className="space-y-6">
-                {currentTrendData.slice().reverse().slice(0, 2).map((hist: any, idx: number) => (
-                  <div key={idx} className={`bg-white border border-zinc-200 p-6 ${idx === 0 ? 'border-l-4 border-l-zinc-800' : 'opacity-70'}`}>
-                    <h4 className="text-xs uppercase tracking-wider text-zinc-400 mb-4">{hist.label} Avg Deal Size</h4>
-                    <div className="flex items-center gap-3">
-                      <div className="text-3xl font-light">Rp {hist.dealSize}M</div>
-                    </div>
+                {validTrendData.slice().reverse().slice(0, 2).map((hist: any, idx: number) => (
+                  <div key={idx} className={`bg-white border border-zinc-200 p-6 rounded-2xl ${idx === 0 ? 'ring-2 ring-zinc-900 ring-offset-2 shadow-lg' : 'opacity-60'}`}>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">{formatTrendLabel(hist.label, trendView)} Summary</h4>
+                    <div className="text-3xl font-black tracking-tighter mb-1">Rp {hist.revenue}M</div>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Avg Deal: Rp {hist.dealSize}M</p>
                   </div>
                 ))}
               </div>
@@ -123,159 +295,194 @@ export default function MinimalistDashboard() {
           </div>
         )}
 
-        {/* === TAB: B2C (GROWTH) === */}
+        {/* === TAB 2: B2C === */}
         {activeTab === 'B2C' && (
-           <div className="space-y-12 animate-in fade-in">
-             
-             {/* Section: Social & Community */}
-             <div>
-               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">Social & Community Health</h3>
-               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                 {data?.socials?.map((soc: any, idx: number) => (
-                   <div key={idx} className="bg-white border border-zinc-200 p-4 flex flex-col items-center text-center">
-                     <span className="text-[10px] uppercase font-bold text-zinc-400 mb-2">{soc.platform}</span>
-                     <span className="text-xl font-light text-zinc-900">{soc.value.toLocaleString()}</span>
-                     <div className="flex items-center mt-2 text-[10px] font-bold">
-                       {soc.trend === 'up' ? <span className="text-emerald-500 flex items-center"><ArrowUpRight className="w-3 h-3"/> {soc.growth}</span> 
-                                           : <span className="text-red-500 flex items-center"><ArrowDownRight className="w-3 h-3"/> {soc.growth}</span>}
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             </div>
+          <div className="space-y-12 animate-in fade-in">
+            {/* Social & Community */}
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">Social Media & Community Trend</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {data?.socials?.map((soc: any, idx: number) => (
+                  <div key={idx} className="bg-white border border-zinc-200 p-5 rounded-xl text-center flex flex-col items-center justify-center transition hover:border-zinc-400">
+                    <span className="text-[9px] font-black uppercase text-zinc-400 mb-2 tracking-widest">{soc.platform}</span>
+                    <span className="text-xl font-black tracking-tighter">{soc.value.toLocaleString()}</span>
+                    <span className={`text-[10px] font-bold mt-1 flex items-center ${soc.trend === 'up' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {soc.trend === 'up' ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />} {soc.growth}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-             {/* Section: Campaigns */}
-             <div>
-               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">Activation Campaigns</h3>
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                 {data?.campaigns?.map((camp: any, idx: number) => (
-                   <div key={idx} className="bg-white border border-zinc-200 p-6">
-                     <div className="flex justify-between items-start mb-4">
-                       <h4 className="font-semibold text-zinc-900 line-clamp-1" title={camp.name}>{camp.name}</h4>
-                       <span className={`text-[9px] uppercase font-bold px-2 py-1 border ${camp.status === 'Active' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-zinc-200 text-zinc-500 bg-zinc-50'}`}>{camp.status}</span>
-                     </div>
-                     <div className="flex justify-between items-end border-t border-zinc-100 pt-4">
-                       <div><div className="text-[10px] text-zinc-400 uppercase">Leads</div><div className="text-lg font-light">{camp.leads}</div></div>
-                       <div><div className="text-[10px] text-zinc-400 uppercase">Participants</div><div className="text-lg font-light">{camp.participants}</div></div>
-                       <div className="text-right"><div className="text-[10px] text-zinc-400 uppercase">Conversion</div><div className="text-lg font-semibold text-indigo-600">{camp.conversion}%</div></div>
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             </div>
-             
-             {/* Section: Revenue Status (Tetap Ada) */}
-             <div>
-               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">B2C Revenue Status</h3>
-               <div className="bg-white border border-zinc-200 overflow-x-auto">
-                 <table className="w-full text-sm text-left whitespace-nowrap">
-                   <thead className="bg-zinc-50 text-xs text-zinc-500 border-b border-zinc-200">
-                     <tr><th className="px-6 py-4 font-normal">Sub Product</th><th className="px-6 py-4 font-normal">Actual vs Target</th><th className="px-6 py-4 font-normal">Achievement</th></tr>
-                   </thead>
-                   <tbody className="divide-y divide-zinc-100">
-                     {data?.revenue?.map((rev: any, idx: number) => (
-                       <tr key={idx}>
-                         <td className="px-6 py-4 font-medium">{rev.subProduct}</td>
-                         <td className="px-6 py-4 text-zinc-500 text-xs">Rp {rev.actual.toLocaleString()} <span className="mx-2">/</span> Rp {rev.target.toLocaleString()}</td>
-                         <td className="px-6 py-4">
-                           <div className="flex items-center gap-3">
-                             <div className="w-24 bg-zinc-100 h-1"><div className={`h-1 ${rev.achievement >= 100 ? 'bg-emerald-500' : 'bg-zinc-900'}`} style={{ width: `${Math.min(rev.achievement, 100)}%` }}></div></div>
-                             <span className={`text-xs font-bold ${rev.achievement >= 100 ? 'text-emerald-600' : 'text-zinc-600'}`}>{rev.achievement}%</span>
-                           </div>
-                         </td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               </div>
-             </div>
-           </div>
+            {/* Campaign Activations */}
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">Active Campaigns & Performance</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {data?.campaigns?.map((camp: any, idx: number) => (
+                  <div key={idx} className="bg-white border border-zinc-200 p-6 rounded-2xl transition hover:border-zinc-400">
+                    <div className="flex justify-between items-start mb-6">
+                      <h4 className="font-bold text-zinc-900 text-sm leading-tight">{camp.name}</h4>
+                      <div className={`text-[8px] px-2 py-0.5 font-black uppercase rounded border ${camp.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>
+                        {camp.status}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 border-t border-zinc-100 pt-4">
+                      <div><div className="text-[9px] text-zinc-400 uppercase font-bold">Leads</div><div className="text-xl font-black">{camp.leads}</div></div>
+                      <div className="text-right"><div className="text-[9px] text-zinc-400 uppercase font-bold">Conv. Rate</div><div className="text-xl font-black text-zinc-900">{camp.conversion}%</div></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Revenue Status */}
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">B2C Product Revenue</h3>
+              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                    <tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Actual vs Target</th><th className="px-6 py-4">Progress</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {data?.revenue?.map((rev: any, idx: number) => {
+                       // Format angka desimal pada row tabel agar rapi
+                       const achPct = typeof rev.achievement === 'number' ? rev.achievement.toFixed(2) : rev.achievement;
+                       return (
+                        <tr key={idx} className="hover:bg-zinc-50 transition">
+                          <td className="px-6 py-5 font-bold">{rev.subProduct}</td>
+                          <td className="px-6 py-5 text-zinc-500 font-medium">{formatIDR(rev.actual)} <span className="opacity-30 mx-2">/</span> {formatIDR(rev.target)}</td>
+                          <td className="px-6 py-5">
+                            <div className="flex items-center gap-4">
+                              <div className="w-full max-w-[120px] bg-zinc-100 h-1.5 rounded-full overflow-hidden">
+                                <div className={`h-full ${rev.achievement >= 100 ? 'bg-emerald-500' : 'bg-zinc-900'}`} style={{ width: `${Math.min(rev.achievement, 100)}%` }}></div>
+                              </div>
+                              <span className="text-[10px] font-black">{achPct}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                       )
+                    })}
+                  </tbody>
+                  {/* BARIS TOTAL B2C */}
+                  <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
+                    <tr>
+                      <td className="px-6 py-5 uppercase">Total B2C</td>
+                      <td className="px-6 py-5 font-bold">{formatIDR(totalB2CActual)} <span className="opacity-50 mx-1">/</span> {formatIDR(totalB2CTarget)}</td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-4">
+                          <div className="w-full max-w-[120px] bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" style={{ width: `${Math.min(Number(totalB2CAchievement), 100)}%` }}></div>
+                          </div>
+                          <span className="text-emerald-400">{totalB2CAchievement}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* === TAB: B2B (ENTERPRISE) === */}
+        {/* === TAB 3: B2B === */}
         {activeTab === 'B2B' && (
-           <div className="animate-in fade-in space-y-12">
-             
-             {/* PIPELINE PROGRESS (Data Asli Image) */}
-             <div>
-               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4 flex justify-between">
-                 <span>Pipeline Progress (2026)</span>
-                 <span className="text-zinc-900 font-bold tracking-normal text-sm">Total Est: Rp 7.46 B</span>
-               </h3>
-               <div className="bg-white border border-zinc-200 overflow-x-auto">
-                  <table className="w-full text-sm text-left whitespace-nowrap">
-                    <thead className="bg-zinc-50 text-xs text-zinc-500 border-b border-zinc-200">
+          <div className="space-y-12 animate-in fade-in">
+            {/* Pipeline Progress */}
+            <div>
+              <div className="flex justify-between items-end mb-6">
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Enterprise Pipeline (IDR)</h3>
+              </div>
+              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left whitespace-nowrap">
+                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 font-black uppercase tracking-widest">
                       <tr>
-                        <th className="px-6 py-4 font-normal">Client / Lead</th>
-                        <th className="px-4 py-4 font-normal">Industry</th>
-                        <th className="px-4 py-4 font-normal">Current Stage</th>
-                        <th className="px-4 py-4 font-normal text-right">Est. Value</th>
-                        <th className="px-4 py-4 font-normal">Next Action</th>
-                        <th className="px-4 py-4 font-normal">ETA</th>
+                        <th className="px-6 py-4">Client</th><th className="px-4 py-4">Stage</th><th className="px-4 py-4 text-right">Est. Value</th><th className="px-6 py-4">Action</th><th className="px-4 py-4">ETA</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {data?.pipeline?.map((pipe: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-zinc-50">
-                          <td className="px-6 py-4 font-bold text-zinc-800">{pipe.client}</td>
-                          <td className="px-4 py-4 text-xs text-zinc-500">{pipe.industry}</td>
+                      {data?.pipeline?.map((p: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-zinc-50 transition text-zinc-900">
+                          <td className="px-6 py-4 font-bold">{p.client}</td>
                           <td className="px-4 py-4">
-                            <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${pipe.stage === 'Won' ? 'bg-emerald-100 text-emerald-700' : pipe.stage === 'Negotiation' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-600'}`}>
-                              {pipe.stage}
-                            </span>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${p.stage === 'Won' ? 'bg-emerald-100 text-emerald-700' : p.stage === 'Negotiation' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-500'}`}>{p.stage}</span>
                           </td>
-                          <td className="px-4 py-4 text-right font-medium text-zinc-700">{formatIDR(pipe.value)}</td>
-                          <td className="px-4 py-4 text-xs text-zinc-500">{pipe.action}</td>
-                          <td className="px-4 py-4 text-xs font-semibold">{pipe.eta}</td>
+                          <td className="px-4 py-4 text-right font-mono font-bold">{formatIDR(p.value)}</td>
+                          <td className="px-6 py-4 text-zinc-400 font-medium italic truncate max-w-[200px]">{p.action}</td>
+                          <td className="px-4 py-4 font-bold uppercase tracking-tighter">{formatDate(p.eta)}</td>
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
+                      <tr>
+                        <td colSpan={2} className="px-6 py-6">TOTAL PIPELINE VALUE</td>
+                        <td className="px-4 py-6 text-right text-sm text-emerald-400">{formatIDR(totalB2BPipeline)}</td>
+                        <td colSpan={2} className="px-6 py-6 text-zinc-500 text-right font-normal lowercase tracking-normal italic text-[8px]">
+                          *estimasi lead aktif (exclude won/lost lama)
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
-               </div>
-             </div>
+                </div>
+              </div>
+            </div>
 
-             {/* PROJECT DELIVERY (Dari Versi Lama) */}
-             <div>
-               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">Project Delivery Watchlist</h3>
-               <div className="bg-white border border-zinc-200 overflow-x-auto">
-                  <table className="w-full text-sm text-left whitespace-nowrap">
-                    <thead className="bg-zinc-50 text-xs text-zinc-500 border-b border-zinc-200">
-                      <tr><th className="px-6 py-4 font-normal">Project</th><th className="px-6 py-4 font-normal w-1/4">Progress</th><th className="px-6 py-4 font-normal">Status Notes</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {data?.projects?.map((proj: any, idx: number) => (
-                        <tr key={idx}>
-                          <td className="px-6 py-4 font-medium">{proj.name}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3"><div className="w-full bg-zinc-100 h-1"><div className={`h-1 ${proj.progress < 20 ? 'bg-red-400' : 'bg-zinc-900'}`} style={{ width: `${proj.progress}%` }}></div></div><span className="text-xs font-medium">{proj.progress}%</span></div>
-                          </td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">{proj.issue}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-               </div>
-             </div>
-           </div>
+            {/* Project Delivery */}
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">Live Project Delivery</h3>
+              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                    <tr><th className="px-6 py-4">Project</th><th className="px-6 py-4">Phase</th><th className="px-6 py-4">Progress</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {data?.projects?.map((proj: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-zinc-50 transition">
+                        <td className="px-6 py-5 font-bold">{proj.name}</td>
+                        <td className="px-6 py-5 text-zinc-500 font-medium italic uppercase text-xs tracking-tighter">{proj.phase}</td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-4">
+                            <div className="w-full max-w-[120px] bg-zinc-100 h-1.5 rounded-full overflow-hidden">
+                              <div className={`h-full ${proj.progress < 20 ? 'bg-rose-400' : 'bg-zinc-900'}`} style={{ width: `${proj.progress}%` }}></div>
+                            </div>
+                            <span className="text-[10px] font-bold text-zinc-500">{proj.progress}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* === TAB: GALLERY & DOCS === */}
+        {/* === TAB 4: GALLERY === */}
         {activeTab === 'Gallery' && (
-          <div className="animate-in fade-in space-y-8">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Knowledge Base</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {data?.docs?.map((doc: any, idx: number) => (
-                <div key={idx} className="group bg-white border border-zinc-200 p-6 flex flex-col justify-between hover:border-zinc-400 transition cursor-pointer">
-                  <div>
-                    <div className="flex justify-between items-start mb-4">
-                      {doc.format === 'Folder' ? <FolderOpen className="w-5 h-5 text-zinc-400"/> : doc.format === 'Sheet' ? <TableProperties className="w-5 h-5 text-emerald-500"/> : <FileText className="w-5 h-5 text-indigo-500"/>}
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-50 px-2 py-1 border border-zinc-100">{doc.category}</span>
+          <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-8">
+            <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 font-black">Knowledge Base & Assets</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {data?.docs?.map((doc: any, idx: number) => {
+                const isLinkValid = doc.link && doc.link !== '#';
+                return (
+                  <a key={idx} href={isLinkValid ? doc.link : undefined} target="_blank" rel="noopener noreferrer"
+                    className={`group bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col justify-between transition-all ${isLinkValid ? 'hover:border-zinc-900 hover:shadow-xl cursor-pointer ring-1 ring-transparent hover:ring-zinc-900' : 'opacity-40 cursor-not-allowed'}`}>
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                        <span className="p-3 bg-zinc-50 rounded-xl group-hover:bg-zinc-100 transition text-zinc-900">
+                          {doc.format === 'Folder' ? <FolderOpen size={24}/> : doc.format === 'Sheet' ? <TableProperties size={24}/> : <FileText size={24}/>}
+                        </span>
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-300">{doc.category}</span>
+                      </div>
+                      <h4 className="text-xl font-black tracking-tight mb-2 leading-tight">{doc.title}</h4>
+                      <p className="text-xs text-zinc-400 leading-relaxed mb-8 line-clamp-2 italic">{doc.desc}</p>
                     </div>
-                    <h4 className="font-semibold text-zinc-900 mb-2">{doc.title}</h4>
-                    <p className="text-xs text-zinc-500 mb-6">{doc.desc}</p>
-                  </div>
-                </div>
-              ))}
+                    <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition ${isLinkValid ? 'text-zinc-900' : 'text-zinc-300'}`}>
+                      {isLinkValid ? 'Go to Content' : 'Link not ready'} {isLinkValid && <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />}
+                    </div>
+                  </a>
+                );
+              })}
             </div>
           </div>
         )}

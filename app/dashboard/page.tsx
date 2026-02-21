@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { 
-  Loader2, ArrowUpRight, ArrowDownRight, Users, Target, 
-  Activity, FileText, FolderOpen, TableProperties, Lock, 
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Loader2, ArrowUpRight, ArrowDownRight, Users, Target,
+  Activity, FileText, FolderOpen, TableProperties, Lock,
   TrendingUp, BarChart3, Globe, Share2, ArrowRight
 } from 'lucide-react';
+import { getConfig } from '../lib/config';
+import LoadingProgress from '../components/LoadingProgress';
 
 export default function MinimalistDashboard() {
   const [data, setData] = useState<any>(null);
@@ -16,30 +18,68 @@ export default function MinimalistDashboard() {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<any>(null);
 
+  // --- PROGRESS BAR STATE ---
+  const fetchDone = useRef(false);
+
+  // --- CONFIG ---
+  const [config, setConfigState] = useState(() => getConfig());
+  useEffect(() => { setConfigState(getConfig()); }, []);
+
+  const visibleTabs = Object.entries(config.tabsVisible)
+    .filter(([, visible]) => visible)
+    .map(([name]) => name);
+
   // --- SIMPLE AUTH LOGIC ---
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'MAPID2026') { 
+    if (password === config.biPassword) {
       setIsAuthorized(true);
     } else {
       alert('Akses Ditolak: Password Salah!');
     }
   };
 
+  // --- DATA FETCH ---
   useEffect(() => {
-    if (isAuthorized) {
-      fetch('/api/gas')
-        .then(res => res.json())
-        .then(json => {
-          if (json.isError || json.error) setErrorMsg(json);
-          else setData(json);
-          setLoading(false);
-        })
-        .catch(err => {
+    if (!isAuthorized) return;
+    fetchDone.current = false;
+
+    // Actual data fetch — check admin biData override first
+    const adminBiData = config.biData;
+
+    fetch('/api/gas')
+      .then(res => res.json())
+      .then(json => {
+        if (json.isError || json.error) {
+          if (adminBiData) {
+            setData(adminBiData);
+          } else {
+            setErrorMsg(json);
+          }
+        } else {
+          if (adminBiData && (adminBiData.socials?.length || adminBiData.campaigns?.length || adminBiData.revenue?.length || adminBiData.pipeline?.length)) {
+            setData(adminBiData);
+          } else if (json.adminConfig?.biData) {
+            const gasBiData = json.adminConfig.biData;
+            if (gasBiData && (gasBiData.socials?.length || gasBiData.campaigns?.length || gasBiData.revenue?.length || gasBiData.pipeline?.length)) {
+              setData(gasBiData);
+            } else {
+              setData(json);
+            }
+          } else {
+            setData(json);
+          }
+        }
+        fetchDone.current = true;
+      })
+      .catch(err => {
+        if (adminBiData) {
+          setData(adminBiData);
+        } else {
           setErrorMsg({ title: "Network Error", message: err.message });
-          setLoading(false);
-        });
-    }
+        }
+        fetchDone.current = true;
+      });
   }, [isAuthorized]);
 
   // --- HELPER FORMATTERS ---
@@ -69,13 +109,13 @@ export default function MinimalistDashboard() {
   const formatTrendLabel = (label: string, view: string) => {
     if (view === 'year') {
       // Jika view year, kembalikan teks aslinya (misal "2024", "2025")
-      return label; 
+      return label;
     }
     // Jika bukan year, bersihkan format ISO String jika ada
     if (label && label.includes('T')) {
       const date = new Date(label);
       if (!isNaN(date.getTime())) {
-         return new Intl.DateTimeFormat('id-ID', {
+        return new Intl.DateTimeFormat('id-ID', {
           day: 'numeric',
           month: 'short',
         }).format(date).toUpperCase();
@@ -100,9 +140,9 @@ export default function MinimalistDashboard() {
           </div>
           <h2 className="text-2xl font-black tracking-tight mb-2 uppercase">BI Access</h2>
           <p className="text-zinc-400 text-xs mb-8 uppercase tracking-widest font-bold">Internal MAPID Team Only</p>
-          <input 
-            type="password" 
-            placeholder="Passkey" 
+          <input
+            type="password"
+            placeholder="Passkey"
             className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-xl mb-4 text-center focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all font-bold"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -116,43 +156,52 @@ export default function MinimalistDashboard() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-zinc-400 p-8">
-      <Loader2 className="w-8 h-8 animate-spin mb-4 text-zinc-900" />
-      <p className="text-xs tracking-widest uppercase font-bold">Syncing SOT Database</p>
-    </div>
+    <LoadingProgress
+      isLoading={true}
+      fetchDone={fetchDone.current}
+      title="Syncing SOT Database"
+      stages={[
+        { target: 20, label: 'Connecting to server...' },
+        { target: 35, label: 'Establishing secure link...' },
+        { target: 55, label: 'Fetching data from SOT...' },
+        { target: 70, label: 'Processing response...' },
+        { target: 90, label: 'Building visualizations...' },
+      ]}
+      onComplete={() => setLoading(false)}
+    />
   );
 
   // --- LOGIC GRAFIK SVG PROPORSIONAL ---
   const currentTrendData = data?.trends?.[trendView] || [];
   const validTrendData = currentTrendData.filter((d: any) => d && d.revenue !== undefined);
-  
+
   // Mencari nilai max untuk skala vertikal
   const rawMax = validTrendData.length > 0 ? Math.max(...validTrendData.map((d: any) => d.revenue)) : 1;
   const maxRevenueValue = rawMax * 1.1; // Tambah buffer 10% di atas agar grafik tidak menabrak atap kontainer
-  
+
   // Fungsi untuk membuat path SVG Garis
   const generateSvgLine = (dataPoints: any[], width: number, height: number) => {
     if (!dataPoints || dataPoints.length === 0) return "";
-    
+
     // Memberikan padding horizontal agar titik awal dan akhir tidak terpotong
-    const paddingX = 40; 
+    const paddingX = 40;
     const effectiveWidth = width - (paddingX * 2);
-    
+
     // Jarak antar titik
     const stepX = dataPoints.length > 1 ? effectiveWidth / (dataPoints.length - 1) : effectiveWidth;
-    
+
     return dataPoints.reduce((acc, point, index) => {
       const x = paddingX + (index * stepX);
       // Kalkulasi Y proporsional. SVG Y=0 ada di atas, jadi kita kurangi dari tinggi total.
       const y = height - ((point.revenue / maxRevenueValue) * height);
-      
+
       return acc === "" ? `M ${x},${y}` : `${acc} L ${x},${y}`;
     }, "");
   };
 
   return (
     <main className="min-h-screen bg-zinc-50 p-6 md:p-12 font-sans pb-24 text-zinc-900">
-      
+
       <header className="max-w-6xl mx-auto mb-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h1 className="text-4xl font-black tracking-tighter leading-none mb-2">MAPID <span className="text-zinc-300">BI.</span></h1>
@@ -162,13 +211,12 @@ export default function MinimalistDashboard() {
 
       {/* TAB NAVIGATION */}
       <div className="max-w-6xl mx-auto mb-10 border-b border-zinc-200 flex gap-8 overflow-x-auto hide-scrollbar">
-        {['Trends', 'B2C', 'B2B', 'Gallery'].map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pb-4 text-sm font-bold tracking-widest uppercase transition-colors whitespace-nowrap ${
-              activeTab === tab ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'
-            }`}
+            className={`pb-4 text-sm font-bold tracking-widest uppercase transition-colors whitespace-nowrap ${activeTab === tab ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'
+              }`}
           >
             {tab}
           </button>
@@ -176,7 +224,7 @@ export default function MinimalistDashboard() {
       </div>
 
       <div className="max-w-6xl mx-auto">
-        
+
         {/* === TAB 1: TRENDS === */}
         {activeTab === 'Trends' && (
           <div className="space-y-8 animate-in fade-in">
@@ -191,12 +239,12 @@ export default function MinimalistDashboard() {
                 ))}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
+
               {/* --- SVG LINE CHART CONTAINER --- */}
               <div className="lg:col-span-2 bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col min-h-[450px] relative overflow-hidden">
-                
+
                 {/* Y-Axis Labels & Dashed Grid Lines */}
                 <div className="absolute inset-x-8 top-12 bottom-16 flex flex-col justify-between pointer-events-none">
                   {[4, 3, 2, 1, 0].map((i) => {
@@ -216,7 +264,7 @@ export default function MinimalistDashboard() {
                 {/* The SVG Line Graph */}
                 <div className="flex-1 relative mt-12 mb-10 w-full">
                   <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                     {/* Define Gradient for aesthetic (optional, tapi membuat mirip gambar referensi) */}
+                    {/* Define Gradient for aesthetic (optional, tapi membuat mirip gambar referensi) */}
                     <defs>
                       <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                         <stop offset="0%" stopColor="#3b82f6" /> {/* Warna Biru */}
@@ -226,10 +274,10 @@ export default function MinimalistDashboard() {
 
                     {/* Menggambar Garis Path berdasarkan data */}
                     {validTrendData.length > 0 && (
-                      <path 
+                      <path
                         d={generateSvgLine(validTrendData, 1000, 250)} // Angka 1000, 250 adalah viewBox viewBox="0 0 1000 250"
-                        fill="none" 
-                        stroke="url(#lineGradient)" 
+                        fill="none"
+                        stroke="url(#lineGradient)"
                         strokeWidth="4"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -245,28 +293,28 @@ export default function MinimalistDashboard() {
 
                     {/* Menggambar Titik (Dots) dan Tooltip Hover */}
                     {validTrendData.length > 0 && validTrendData.map((point: any, index: number) => {
-                       // Kalkulasi posisi titik
-                       const paddingX = 4; // Persentase padding horizontal
-                       const effectiveWidth = 100 - (paddingX * 2);
-                       const stepX = validTrendData.length > 1 ? effectiveWidth / (validTrendData.length - 1) : effectiveWidth;
-                       const xPos = paddingX + (index * stepX);
-                       const yPos = 100 - ((point.revenue / maxRevenueValue) * 100);
+                      // Kalkulasi posisi titik
+                      const paddingX = 4; // Persentase padding horizontal
+                      const effectiveWidth = 100 - (paddingX * 2);
+                      const stepX = validTrendData.length > 1 ? effectiveWidth / (validTrendData.length - 1) : effectiveWidth;
+                      const xPos = paddingX + (index * stepX);
+                      const yPos = 100 - ((point.revenue / maxRevenueValue) * 100);
 
-                       return (
-                        <div 
+                      return (
+                        <div
                           key={index}
                           className="absolute w-4 h-4 -ml-2 -mt-2 group cursor-pointer"
                           style={{ left: `${xPos}%`, top: `${yPos}%` }}
                         >
                           {/* Titik Lingkaran */}
                           <div className="w-full h-full bg-blue-500 border-4 border-white rounded-full shadow-md transition-transform group-hover:scale-125"></div>
-                          
+
                           {/* Tooltip Hover Nilai */}
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-zinc-900 text-white text-[10px] font-bold px-3 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                             Rp {point.revenue}M
                           </div>
                         </div>
-                       )
+                      )
                     })}
                   </svg>
                 </div>
@@ -345,9 +393,9 @@ export default function MinimalistDashboard() {
                   </thead>
                   <tbody className="divide-y divide-zinc-100">
                     {data?.revenue?.map((rev: any, idx: number) => {
-                       // Format angka desimal pada row tabel agar rapi
-                       const achPct = typeof rev.achievement === 'number' ? rev.achievement.toFixed(2) : rev.achievement;
-                       return (
+                      // Format angka desimal pada row tabel agar rapi
+                      const achPct = typeof rev.achievement === 'number' ? rev.achievement.toFixed(2) : rev.achievement;
+                      return (
                         <tr key={idx} className="hover:bg-zinc-50 transition">
                           <td className="px-6 py-5 font-bold">{rev.subProduct}</td>
                           <td className="px-6 py-5 text-zinc-500 font-medium">{formatIDR(rev.actual)} <span className="opacity-30 mx-2">/</span> {formatIDR(rev.target)}</td>
@@ -360,7 +408,7 @@ export default function MinimalistDashboard() {
                             </div>
                           </td>
                         </tr>
-                       )
+                      )
                     })}
                   </tbody>
                   {/* BARIS TOTAL B2C */}
@@ -470,7 +518,7 @@ export default function MinimalistDashboard() {
                     <div>
                       <div className="flex justify-between items-start mb-6">
                         <span className="p-3 bg-zinc-50 rounded-xl group-hover:bg-zinc-100 transition text-zinc-900">
-                          {doc.format === 'Folder' ? <FolderOpen size={24}/> : doc.format === 'Sheet' ? <TableProperties size={24}/> : <FileText size={24}/>}
+                          {doc.format === 'Folder' ? <FolderOpen size={24} /> : doc.format === 'Sheet' ? <TableProperties size={24} /> : <FileText size={24} />}
                         </span>
                         <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-300">{doc.category}</span>
                       </div>

@@ -37,7 +37,7 @@ export default function AdminPage() {
     const [loadingConfig, setLoadingConfig] = useState(false);
     const [loadingBiData, setLoadingBiData] = useState(false);
     const [biLoadMsg, setBiLoadMsg] = useState('');
-    const configFetchDone = useRef(false);
+    const [configFetchDone, setConfigFetchDone] = useState(false);
     const biFetchDone = useRef(false);
 
     useEffect(() => {
@@ -48,12 +48,12 @@ export default function AdminPage() {
     useEffect(() => {
         if (isAuthorized) {
             setLoadingConfig(true);
-            configFetchDone.current = false;
+            setConfigFetchDone(false);
             loadConfigFromGAS().then(cfg => {
                 setLocalConfig(cfg);
-                configFetchDone.current = true;
+                setConfigFetchDone(true);
             }).catch(() => {
-                configFetchDone.current = true;
+                setConfigFetchDone(true);
             });
         }
     }, [isAuthorized]);
@@ -301,7 +301,7 @@ export default function AdminPage() {
         return (
             <LoadingProgress
                 isLoading={true}
-                fetchDone={configFetchDone.current}
+                fetchDone={configFetchDone}
                 title="Loading Configuration"
                 stages={[
                     { target: 25, label: 'Connecting to Google Sheets...' },

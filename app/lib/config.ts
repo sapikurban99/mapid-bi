@@ -14,16 +14,18 @@ export interface RACIConfig {
 }
 
 export interface SocialItem {
+    month: string;
+    week: string;
     platform: string;
+    metric: string;
     value: number;
-    trend: 'up' | 'down';
-    growth: string;
 }
 
 export interface CampaignItem {
     name: string;
     status: 'Active' | 'Ended' | 'Planned';
     leads: number;
+    participants: number;
     conversion: number;
 }
 
@@ -62,6 +64,14 @@ export interface TrendPoint {
     dealSize: number;
 }
 
+export interface UserGrowthItem {
+    month: string;
+    week: string;
+    newRegist: number;
+    activeGeoUsers: number;
+    conversion: number;
+}
+
 export interface BIData {
     socials: SocialItem[];
     campaigns: CampaignItem[];
@@ -69,6 +79,7 @@ export interface BIData {
     pipeline: PipelineItem[];
     projects: ProjectItem[];
     docs: DocItem[];
+    userGrowth: UserGrowthItem[];
     trends: {
         month: TrendPoint[];
         quarter: TrendPoint[];
@@ -95,6 +106,7 @@ export interface SiteConfig {
         Trends: boolean;
         B2C: boolean;
         B2B: boolean;
+        UserGrowth: boolean;
         Gallery: boolean;
     };
 
@@ -153,6 +165,7 @@ export const DEFAULT_CONFIG: SiteConfig = {
         Trends: true,
         B2C: true,
         B2B: true,
+        UserGrowth: true,
         Gallery: true,
     },
 

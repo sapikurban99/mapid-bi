@@ -38,6 +38,7 @@ export interface RevenueItem {
 
 export interface PipelineItem {
     client: string;
+    industry?: string;
     stage: string;
     value: number;
     action: string;
@@ -48,6 +49,7 @@ export interface ProjectItem {
     name: string;
     phase: string;
     progress: number;
+    issue?: string;
 }
 
 export interface DocItem {

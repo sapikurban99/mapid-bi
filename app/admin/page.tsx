@@ -29,7 +29,7 @@ const InputField = ({ label, value, onChange, type = 'text', placeholder = '', m
         <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wider">{label}</label>
         <input
             type={type}
-            value={value}
+            value={value ?? (type === 'number' ? 0 : '')}
             onChange={(e) => onChange(type === 'number' ? Number(e.target.value) : e.target.value)}
             placeholder={placeholder}
             disabled={disabled}
@@ -829,7 +829,7 @@ export default function AdminPage() {
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Pipeline Data</h3>
-                                                <button onClick={() => addBiRow('pipeline', { client: '', stage: 'Prospect', value: 0, action: '', eta: '' })}
+                                                <button onClick={() => addBiRow('pipeline', { client: '', industry: '', stage: 'Prospect', value: 0, action: '', eta: '' })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
                                             {config.biData.pipeline.map((p, idx) => (
@@ -850,15 +850,16 @@ export default function AdminPage() {
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Project Data</h3>
-                                                <button onClick={() => addBiRow('projects', { name: '', phase: '', progress: 0 })}
+                                                <button onClick={() => addBiRow('projects', { name: '', phase: '', progress: 0, issue: '' })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
                                             {config.biData.projects.map((p, idx) => (
-                                                <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                                                <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
                                                     <InputField label="Project Name" value={p.name} onChange={(v: string) => updateBiField('projects', idx, 'name', v)} />
                                                     <InputField label="Phase" value={p.phase} onChange={(v: string) => updateBiField('projects', idx, 'phase', v)} />
                                                     <InputField label="Progress %" value={p.progress} type="number" onChange={(v: number) => updateBiField('projects', idx, 'progress', v)} />
-                                                    <button onClick={() => removeBiRow('projects', idx)} className="p-3 text-zinc-300 hover:text-rose-500 transition self-end"><Trash2 size={16} /></button>
+                                                    <InputField label="Issue" value={p.issue} onChange={(v: string) => updateBiField('projects', idx, 'issue', v)} placeholder="Roadblock..." />
+                                                    <button onClick={() => removeBiRow('projects', idx)} className="p-3 text-zinc-300 hover:text-rose-500 transition self-end shrink-0"><Trash2 size={16} /></button>
                                                 </div>
                                             ))}
                                         </div>
@@ -904,7 +905,7 @@ export default function AdminPage() {
                                                     <InputField label="Month" value={g.month} onChange={(v: string) => updateBiField('userGrowth', idx, 'month', v)} placeholder="Feb 2026" />
                                                     <InputField label="Week" value={g.week} onChange={(v: string) => updateBiField('userGrowth', idx, 'week', v)} placeholder="Week 1" />
                                                     <InputField label="New Regist" value={g.newRegist} type="number" onChange={(v: number) => updateBiField('userGrowth', idx, 'newRegist', v)} />
-                                                    <InputField label="Active Geo" value={g.activeGeoUsers} type="number" onChange={(v: number) => updateBiField('userGrowth', idx, 'activeGeoUsers', v)} />
+                                                    <InputField label="Paid User" value={g.activeGeoUsers} type="number" onChange={(v: number) => updateBiField('userGrowth', idx, 'activeGeoUsers', v)} />
                                                     <div className="flex gap-2 w-full max-w-full min-w-0 lg:col-span-2">
                                                         <div className="flex-1 min-w-0">
                                                             <InputField label="Conv. Rate (%)" value={g.conversion} type="number" onChange={(v: number) => updateBiField('userGrowth', idx, 'conversion', v)} disabled />

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Loader2, ArrowUpRight, ArrowDownRight, Users, Target,
   Activity, FileText, FolderOpen, TableProperties, Lock,
-  TrendingUp, BarChart3, Globe, Share2, ArrowRight
+  TrendingUp, BarChart3, Globe, Share2, ArrowRight, Sparkles, MoreVertical
 } from 'lucide-react';
 import { getConfig } from '../lib/config';
 import LoadingProgress from '../components/LoadingProgress';
@@ -178,7 +178,7 @@ export default function MinimalistDashboard() {
   const validTrendData = currentTrendData.filter((d: any) => d && d.revenue !== undefined);
 
   // Mencari nilai max untuk skala vertikal
-  const rawMax = validTrendData.length > 0 ? Math.max(...validTrendData.map((d: any) => d.revenue)) : 1;
+  const rawMax = validTrendData.length > 0 ? Math.max(...validTrendData.map((d: any) => Number(d.revenue) || 0)) : 1;
   const maxRevenueValue = rawMax * 1.1; // Tambah buffer 10% di atas agar grafik tidak menabrak atap kontainer
 
   // Fungsi untuk membuat path SVG Garis
@@ -195,7 +195,7 @@ export default function MinimalistDashboard() {
     return dataPoints.reduce((acc, point, index) => {
       const x = paddingX + (index * stepX);
       // Kalkulasi Y proporsional. SVG Y=0 ada di atas, jadi kita kurangi dari tinggi total.
-      const y = height - ((point.revenue / maxRevenueValue) * height);
+      const y = height - (((Number(point.revenue) || 0) / maxRevenueValue) * height);
 
       return acc === "" ? `M ${x},${y}` : `${acc} L ${x},${y}`;
     }, "");
@@ -245,94 +245,80 @@ export default function MinimalistDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
               {/* --- SVG LINE CHART CONTAINER --- */}
-              <div className="lg:col-span-2 bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col min-h-[450px] relative overflow-hidden">
-
-                {/* Y-Axis Labels & Dashed Grid Lines */}
-                <div className="absolute inset-x-8 top-12 bottom-16 flex flex-col justify-between pointer-events-none">
-                  {[4, 3, 2, 1, 0].map((i) => {
-                    const lineValue = (maxRevenueValue / 4) * i;
-                    return (
-                      <div key={i} className="w-full flex items-center relative">
-                        {/* Label Y-Axis (Hanya tampilkan jika nilai > 0 untuk estetika) */}
-                        <span className="absolute -left-2 -translate-x-full text-[9px] font-bold text-zinc-300 w-12 text-right">
-                          {lineValue > 0 ? `Rp${Math.round(lineValue)}M` : '0'}
-                        </span>
-                        <div className="w-full border-t border-zinc-100 border-dashed ml-2"></div>
+              <div className="lg:col-span-2 bg-white border border-zinc-200 rounded-2xl flex flex-col min-h-[450px] relative overflow-hidden">
+                <div className="p-8 pb-0">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-zinc-900 mb-1">Revenue Performance</h3>
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400">
+                        <span className="w-2 h-2 rounded-full bg-blue-500"></span> Total Revenue
                       </div>
-                    );
-                  })}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button className="flex items-center gap-2 px-3 py-1.5 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-600 hover:bg-zinc-50 transition relative">
+                        <Sparkles className="text-blue-500" size={12} />
+                        Smart Analysis
+                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 border border-white"></span>
+                      </button>
+                      <button className="p-1.5 border border-zinc-200 rounded-lg text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 transition">
+                        <MoreVertical size={14} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
+                <div className="overflow-x-auto hide-scrollbar w-full h-full flex-1">
+                  <div className="min-w-[800px] h-full px-8 pb-8 pt-2 flex flex-col relative w-full">
 
-                {/* The SVG Line Graph */}
-                <div className="flex-1 relative mt-12 mb-10 w-full">
-                  <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                    {/* Define Gradient for aesthetic (optional, tapi membuat mirip gambar referensi) */}
-                    <defs>
-                      <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#3b82f6" /> {/* Warna Biru */}
-                        <stop offset="100%" stopColor="#2563eb" />
-                      </linearGradient>
-                    </defs>
-
-                    {/* Menggambar Garis Path berdasarkan data */}
-                    {validTrendData.length > 0 && (
-                      <path
-                        d={generateSvgLine(validTrendData, 1000, 250)} // Angka 1000, 250 adalah viewBox viewBox="0 0 1000 250"
-                        fill="none"
-                        stroke="url(#lineGradient)"
-                        strokeWidth="4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="vector-effect-non-scaling-stroke drop-shadow-sm"
-                        vectorEffect="non-scaling-stroke"
-                        transform="scale(1, 1)" // Menyesuaikan viewBox dengan ukuran container via CSS flex-1
-                        // Catatan: Implementasi SVG murni di React yang responsif butuh pendekatan ResizeObserver. 
-                        // Sebagai solusi statis yang aman, kita gunakan viewBox fix dan preserveAspectRatio="none"
-                        viewBox="0 0 1000 250"
-                        style={{ width: '100%', height: '100%' }}
-                      />
-                    )}
-
-                    {/* Menggambar Titik (Dots) dan Tooltip Hover */}
-                    {validTrendData.length > 0 && validTrendData.map((point: any, index: number) => {
-                      // Kalkulasi posisi titik
-                      const paddingX = 4; // Persentase padding horizontal
-                      const effectiveWidth = 100 - (paddingX * 2);
-                      const stepX = validTrendData.length > 1 ? effectiveWidth / (validTrendData.length - 1) : effectiveWidth;
-                      const xPos = paddingX + (index * stepX);
-
-                      // Capped calculation to ensure points don't shoot out of the container bounds
-                      const safeRevenue = Math.min(point.revenue || 0, maxRevenueValue);
-                      const yRatio = maxRevenueValue > 0 ? (safeRevenue / maxRevenueValue) : 0;
-                      // Subtracted from 100% since Y goes downwards in CSS/SVG
-                      const yPos = 100 - (yRatio * 100);
-
-                      return (
-                        <div
-                          key={index}
-                          className="absolute w-4 h-4 -ml-2 -mt-2 group cursor-pointer"
-                          style={{ left: `${xPos}%`, top: `${yPos}%` }}
-                        >
-                          {/* Titik Lingkaran */}
-                          <div className="w-full h-full bg-blue-500 border-4 border-white rounded-full shadow-md transition-transform group-hover:scale-125"></div>
-
-                          {/* Tooltip Hover Nilai */}
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-zinc-900 text-white text-[10px] font-bold px-3 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                            Rp {point.revenue}M
+                    {/* Y-Axis Labels & Dashed Grid Lines */}
+                    <div className="absolute inset-x-8 top-12 bottom-16 flex flex-col justify-between pointer-events-none">
+                      {[4, 3, 2, 1, 0].map((i) => {
+                        const lineValue = (maxRevenueValue / 4) * i;
+                        return (
+                          <div key={i} className="w-full flex items-center relative">
+                            {/* Label Y-Axis */}
+                            <span className="absolute -left-2 -translate-x-full text-[10px] font-bold text-zinc-400 w-24 text-right pr-2 bg-white z-10">
+                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 2 }).format(lineValue * 1000000)}
+                            </span>
+                            <div className="w-full border-t border-zinc-100 ml-2"></div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </svg>
-                </div>
+                        );
+                      })}
+                    </div>
 
-                {/* Label X-Axis (Bulan/Tahun) */}
-                <div className="flex justify-between w-full px-[4%] mt-auto border-t border-zinc-200 pt-4">
-                  {validTrendData.map((hist: any, idx: number) => (
-                    <span key={idx} className="text-[10px] font-black text-zinc-400 uppercase tracking-tighter text-center">
-                      {formatTrendLabel(hist.label, trendView)}
-                    </span>
-                  ))}
+                    {/* The Bar Graph */}
+                    <div className="flex-1 relative mt-12 mb-10 w-full flex items-end justify-between px-[4%] gap-4 z-10 pointer-events-none">
+                      {validTrendData.length > 0 && validTrendData.map((point: any, index: number) => {
+                        // Capped calculation to ensure points don't shoot out of the container bounds
+                        const safeRevenue = Math.min(Number(point.revenue) || 0, maxRevenueValue);
+                        const yRatio = maxRevenueValue > 0 ? (safeRevenue / maxRevenueValue) : 0;
+                        const heightPct = yRatio * 100;
+
+                        return (
+                          <div key={index} className="relative flex flex-col justify-end items-center h-full flex-1 w-full pointer-events-auto group">
+                            {/* Bar Form */}
+                            <div
+                              className="w-full max-w-[48px] bg-blue-500 rounded-t-sm hover:opacity-80 transition-opacity"
+                              style={{ height: `${heightPct}%` }}
+                            ></div>
+
+                            {/* Tooltip Nilai Selalu Tampil */}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 text-blue-500 text-[10px] font-medium whitespace-nowrap drop-shadow-sm font-mono">
+                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format((Number(point.revenue) || 0) * 1000000)}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Label X-Axis (Bulan/Tahun) */}
+                    <div className="flex justify-between w-full px-[4%] mt-auto pt-4 relative z-10">
+                      {validTrendData.map((hist: any, idx: number) => (
+                        <span key={idx} className="text-[10px] font-bold text-zinc-400 capitalize tracking-normal text-center bg-white px-2">
+                          {formatTrendLabel(hist.label, trendView)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -552,27 +538,30 @@ export default function MinimalistDashboard() {
             <div>
               <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">Live Project Delivery</h3>
               <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                    <tr><th className="px-6 py-4">Project</th><th className="px-6 py-4">Phase</th><th className="px-6 py-4">Progress</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {data?.projects?.map((proj: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-zinc-50 transition">
-                        <td className="px-6 py-5 font-bold">{proj.name}</td>
-                        <td className="px-6 py-5 text-zinc-500 font-medium italic uppercase text-xs tracking-tighter">{proj.phase}</td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-4">
-                            <div className="w-full max-w-[120px] bg-zinc-100 h-1.5 rounded-full overflow-hidden">
-                              <div className={`h-full ${proj.progress < 20 ? 'bg-rose-400' : 'bg-zinc-900'}`} style={{ width: `${proj.progress}%` }}></div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                      <tr><th className="px-6 py-4">Project</th><th className="px-6 py-4">Phase</th><th className="px-6 py-4">Progress</th><th className="px-6 py-4 min-w-[300px]">Issue</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {data?.projects?.map((proj: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-zinc-50 transition">
+                          <td className="px-6 py-5 font-bold whitespace-nowrap">{proj.name}</td>
+                          <td className="px-6 py-5 text-zinc-500 font-medium italic uppercase text-xs tracking-tighter whitespace-nowrap">{proj.phase}</td>
+                          <td className="px-6 py-5 min-w-[200px]">
+                            <div className="flex items-center gap-4">
+                              <div className="w-full max-w-[120px] bg-zinc-100 h-1.5 rounded-full overflow-hidden shrink-0">
+                                <div className={`h-full ${proj.progress < 20 ? 'bg-rose-400' : 'bg-zinc-900'}`} style={{ width: `${proj.progress}%` }}></div>
+                              </div>
+                              <span className="text-[10px] font-bold text-zinc-500">{proj.progress}%</span>
                             </div>
-                            <span className="text-[10px] font-bold text-zinc-500">{proj.progress}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          </td>
+                          <td className="px-6 py-5 text-xs text-rose-500 italic" title={proj.issue}>{proj.issue || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -642,13 +631,13 @@ export default function MinimalistDashboard() {
                     <div className="h-14 w-[3px] bg-zinc-400 rounded-full"></div>
                   </div>
 
-                  {/* Step 2: Active Geo */}
+                  {/* Step 2: Paid User */}
                   <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex justify-between items-center shadow-sm relative z-20 w-[90%] mx-auto transition hover:shadow-md hover:border-zinc-300">
                     <div className="flex items-center gap-6">
                       <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner"><Target size={28} /></div>
                       <div>
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 2: Activation</h4>
-                        <p className="text-2xl font-black tracking-tight text-zinc-900">Active Geo Users</p>
+                        <p className="text-2xl font-black tracking-tight text-zinc-900">Paid User</p>
                       </div>
                     </div>
                     <div className="text-5xl font-black tracking-tighter">{totalActiveGeo.toLocaleString()}</div>

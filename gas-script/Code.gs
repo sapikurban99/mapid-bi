@@ -231,7 +231,18 @@ function syncBiDataToSheets(biData) {
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet) sheet = ss.insertSheet(sheetName);
     sheet.clear();
-    var allRows = [headers].concat(dataRows);
+    
+    // Safely replace undefined with empty strings so setValues does not crash
+    var maxCols = headers.length;
+    var safeDataRows = dataRows.map(function(row) {
+      var safeRow = [];
+      for (var i = 0; i < maxCols; i++) {
+        safeRow.push(row[i] === undefined ? '' : row[i]);
+      }
+      return safeRow;
+    });
+    
+    var allRows = [headers].concat(safeDataRows);
     sheet.getRange(1, 1, allRows.length, headers.length).setValues(allRows);
   }
 

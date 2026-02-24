@@ -351,19 +351,26 @@ export default function MinimalistDashboard() {
                   (socialSecondaryWeek === 'All' || d.week === socialSecondaryWeek)
                 );
 
-                const primaryMetrics = filteredPrimary.reduce((acc: any, curr: any) => {
-                  if (!acc[curr.platform]) acc[curr.platform] = { value: 0, metric: curr.metric };
-                  acc[curr.platform].value += (Number(curr.value) || 0);
-                  return acc;
-                }, {});
+                // Initialize exact match metric maps using a unique key
+                const metricsMap: Record<string, { platform: string, metric: string, primary: number, secondary: number }> = {};
 
-                const secondaryMetrics = filteredSecondary.reduce((acc: any, curr: any) => {
-                  if (!acc[curr.platform]) acc[curr.platform] = { value: 0 };
-                  acc[curr.platform].value += (Number(curr.value) || 0);
-                  return acc;
-                }, {});
+                filteredPrimary.forEach((d: any) => {
+                  const key = `${d.platform}|${d.metric}`;
+                  if (!metricsMap[key]) {
+                    metricsMap[key] = { platform: d.platform, metric: d.metric, primary: 0, secondary: 0 };
+                  }
+                  metricsMap[key].primary += Number(d.value) || 0;
+                });
 
-                const platforms = Object.keys(primaryMetrics);
+                filteredSecondary.forEach((d: any) => {
+                  const key = `${d.platform}|${d.metric}`;
+                  if (!metricsMap[key]) {
+                    metricsMap[key] = { platform: d.platform, metric: d.metric, primary: 0, secondary: 0 };
+                  }
+                  metricsMap[key].secondary += Number(d.value) || 0;
+                });
+
+                const comparisonRows = Object.values(metricsMap).sort((a, b) => a.platform.localeCompare(b.platform));
 
                 return (
                   <div>
@@ -374,11 +381,11 @@ export default function MinimalistDashboard() {
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Primary</span>
                           <select value={socialPrimaryMonth} onChange={(e) => setSocialPrimaryMonth(e.target.value)}
-                            className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none">
+                            className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
                             {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
                           </select>
                           <select value={socialPrimaryWeek} onChange={(e) => setSocialPrimaryWeek(e.target.value)}
-                            className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none">
+                            className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
                             {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
                           </select>
                         </div>
@@ -387,43 +394,60 @@ export default function MinimalistDashboard() {
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Compare</span>
                           <select value={socialSecondaryMonth} onChange={(e) => setSocialSecondaryMonth(e.target.value)}
-                            className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none">
+                            className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
                             {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
                           </select>
                           <select value={socialSecondaryWeek} onChange={(e) => setSocialSecondaryWeek(e.target.value)}
-                            className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none">
+                            className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
                             {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
                           </select>
                         </div>
                       </div>
                     </div>
 
-                    {platforms.length === 0 ? (
-                      <div className="text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest">No data for selected primary period</div>
+                    {comparisonRows.length === 0 ? (
+                      <div className="text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest">No data for selected periods</div>
                     ) : (
-                      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                        {platforms.map((platform, idx) => {
-                          const val1 = primaryMetrics[platform].value;
-                          const val2 = secondaryMetrics[platform]?.value || 0;
-                          const abs_change = val1 - val2;
-                          const pct_change = val2 > 0 ? ((abs_change / val2) * 100).toFixed(1) : 0;
-                          const isUp = abs_change > 0;
-                          const isDown = abs_change < 0;
+                      <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-left">
+                            <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                              <tr>
+                                <th className="px-6 py-4">Platform</th>
+                                <th className="px-6 py-4">Metric</th>
+                                <th className="px-6 py-4 text-right">Primary Vol.</th>
+                                <th className="px-6 py-4 text-right text-zinc-400">Secondary Vol.</th>
+                                <th className="px-6 py-4 text-right">Variance</th>
+                                <th className="px-6 py-4 text-center">Trend</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100">
+                              {comparisonRows.map((row, idx) => {
+                                const abs_change = row.primary - row.secondary;
+                                const pct_change = row.secondary > 0 ? ((abs_change / row.secondary) * 100).toFixed(1) : ((row.primary > 0) ? '100.0' : '0.0');
+                                const isUp = abs_change > 0;
+                                const isDown = abs_change < 0;
 
-                          return (
-                            <div key={idx} className="bg-white border border-zinc-200 p-5 rounded-2xl text-center flex flex-col items-center justify-between transition hover:border-zinc-400 shadow-sm relative overflow-hidden group">
-                              <span className="text-[10px] font-black uppercase text-zinc-400 mb-2 tracking-widest absolute top-4 left-4">{platform}</span>
-                              <div className="mt-8 mb-4">
-                                <span className="text-3xl font-black tracking-tighter block">{val1.toLocaleString()}</span>
-                                <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">{primaryMetrics[platform].metric}</span>
-                              </div>
-                              <div className={`mt-auto w-[110%] -mb-5 py-3 ${isUp ? 'bg-emerald-50 text-emerald-600' : isDown ? 'bg-rose-50 text-rose-600' : 'bg-zinc-50 text-zinc-400'} flex items-center justify-center gap-2 group-hover:-translate-y-1 transition-transform`}>
-                                {isUp ? <ArrowUpRight size={14} /> : isDown ? <ArrowDownRight size={14} /> : <div className="w-2 h-2 rounded-full bg-zinc-300"></div>}
-                                <span className="text-xs font-black font-mono">{abs_change > 0 ? '+' : ''}{abs_change.toLocaleString()} ({abs_change > 0 ? '+' : ''}{pct_change}%)</span>
-                              </div>
-                            </div>
-                          )
-                        })}
+                                return (
+                                  <tr key={idx} className="hover:bg-zinc-50 transition group">
+                                    <td className="px-6 py-4 font-bold whitespace-nowrap">{row.platform}</td>
+                                    <td className="px-6 py-4 text-zinc-500 font-medium whitespace-nowrap text-xs">{row.metric}</td>
+                                    <td className="px-6 py-4 text-right font-mono text-zinc-900 font-bold text-lg">{row.primary.toLocaleString()}</td>
+                                    <td className="px-6 py-4 text-right font-mono text-zinc-400">{row.secondary.toLocaleString()}</td>
+                                    <td className={`px-6 py-4 text-right font-mono font-bold whitespace-nowrap ${isUp ? 'text-emerald-600' : isDown ? 'text-rose-600' : 'text-zinc-400'}`}>
+                                      {abs_change > 0 ? '+' : ''}{abs_change.toLocaleString()} ({abs_change > 0 ? '+' : ''}{pct_change}%)
+                                    </td>
+                                    <td className="px-6 py-4 text-center flex justify-center">
+                                      {isUp ? <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner"><ArrowUpRight size={14} /></div> :
+                                        isDown ? <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner"><ArrowDownRight size={14} /></div> :
+                                          <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-400 flex items-center justify-center shadow-inner"><div className="w-2 h-2 rounded-full bg-zinc-300"></div></div>}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>

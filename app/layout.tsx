@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "MAPID BI & Strategy",
   description: "Internal Business Intelligence & Strategy Dashboard",
+  icons: {
+    icon: 'https://mapid.co.id/favicon.ico',
+  },
 };
 
 export default function RootLayout({

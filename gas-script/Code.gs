@@ -114,6 +114,14 @@ function setup() {
     sheetGrowth.appendRow(['Feb 2026', 'Week 1', 250, 160, 64]);
     sheetGrowth.appendRow(['Feb 2026', 'Week 2', 300, 200, 66.67]);
 
+    // 8. DATABASE BARU: ACADEMY PERFORMANCE
+    let sheetAcademy = ss.getSheetByName('DB_Academy') || ss.insertSheet('DB_Academy');
+    sheetAcademy.clear();
+    sheetAcademy.appendRow(['Program', 'Batch', 'Registrants', 'Converted']);
+    sheetAcademy.appendRow(['Location Analytics', 'Batch 1', 100, 25]);
+    sheetAcademy.appendRow(['Thematics', 'Batch 1', 50, 10]);
+    sheetAcademy.appendRow(['WebGIS Dev Bootcamp', 'Batch 3', 200, 50]);
+
     Logger.log("✅ Setup Sukses!");
   } catch (error) { Logger.log("❌ Setup Error: " + error.message); }
 }
@@ -141,7 +149,10 @@ function doGet(e) {
       userGrowth: readSheet('DB_UserGrowth').map(r => ({ month: r[0], week: r[1], newRegist: r[2], activeGeoUsers: r[3], conversion: r[4] })),
       
       // TRENDS FLAT ARRAY
-      trends: trendsRaw.map(r => ({ category: r[0], label: r[1], revenue: r[2], dealSize: r[3] }))
+      trends: trendsRaw.map(r => ({ category: r[0], label: r[1], revenue: r[2], dealSize: r[3] })),
+      
+      // ACADEMY
+      academy: readSheet('DB_Academy').map(r => ({ program: r[0], batch: r[1], registrants: r[2], converted: r[3] }))
     };
     
     var adminConfig = getAdminConfig();
@@ -278,6 +289,11 @@ function syncBiDataToSheets(biData) {
   if (biData.trends) {
     var trendRows = biData.trends.map(function(r) { return [r.category || 'Month', r.label, r.revenue, r.dealSize]; });
     writeToSheet('DB_Trends', ['Category', 'Label', 'Revenue_M', 'DealSizeAvg_M'], trendRows);
+  }
+
+  if (biData.academy) {
+    var academyRows = biData.academy.map(function(r) { return [r.program, r.batch, r.registrants, r.converted]; });
+    writeToSheet('DB_Academy', ['Program', 'Batch', 'Registrants', 'Converted'], academyRows);
   }
 
   if (biData.revenue) {

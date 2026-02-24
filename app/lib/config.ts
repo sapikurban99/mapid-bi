@@ -77,6 +77,13 @@ export interface UserGrowthItem {
     conversion: number;
 }
 
+export interface AcademyItem {
+    program: string;
+    batch: string;
+    registrants: number;
+    converted: number;
+}
+
 export interface BIData {
     socials: SocialItem[];
     campaigns: CampaignItem[];
@@ -86,6 +93,7 @@ export interface BIData {
     docs: DocItem[];
     userGrowth: UserGrowthItem[];
     trends: TrendPoint[];
+    academy: AcademyItem[];
 }
 
 export interface SiteConfig {
@@ -107,6 +115,7 @@ export interface SiteConfig {
         Trends: boolean;
         B2C: boolean;
         B2B: boolean;
+        Academy: boolean;
         UserGrowth: boolean;
         Gallery: boolean;
     };
@@ -166,6 +175,7 @@ export const DEFAULT_CONFIG: SiteConfig = {
         Trends: true,
         B2C: true,
         B2B: true,
+        Academy: true,
         UserGrowth: true,
         Gallery: true,
     },

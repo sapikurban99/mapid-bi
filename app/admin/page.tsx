@@ -69,6 +69,12 @@ export default function AdminPage() {
     const [configFetchDone, setConfigFetchDone] = useState(false);
     const biFetchDone = useRef(false);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined' && sessionStorage.getItem('bi_admin_auth') === 'true') {
+            setIsAuthorized(true);
+        }
+    }, []);
+
     const renderBiItems = (list: any, renderFn: (item: any, idx: number) => React.ReactNode) => {
         const safeList = Array.isArray(list) ? list : [];
         return safeList
@@ -103,6 +109,7 @@ export default function AdminPage() {
         e.preventDefault();
         if (password === 'MAPIDBOSS2026') {
             setIsAuthorized(true);
+            sessionStorage.setItem('bi_admin_auth', 'true');
         } else {
             alert('Admin access denied!');
         }
@@ -222,7 +229,7 @@ export default function AdminPage() {
         return {
             socials: [], campaigns: [], revenue: [], pipeline: [],
             projects: [], docs: [], userGrowth: [],
-            trends: []
+            trends: [], academy: []
         };
     };
 
@@ -230,7 +237,7 @@ export default function AdminPage() {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
             if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [] };
+                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [], academy: [] };
             }
             (n.biData as any)[section][index][field] = value;
 
@@ -248,6 +255,10 @@ export default function AdminPage() {
                 const target = Number(row.target) || 0;
                 const actual = Number(row.actual) || 0;
                 row.achievement = target > 0 ? Number(((actual / target) * 100).toFixed(2)) : 0;
+            } else if (section === 'academy' && (field === 'registrants' || field === 'converted')) {
+                const registrants = Number(row.registrants) || 0;
+                const converted = Number(row.converted) || 0;
+                row.conversion = registrants > 0 ? Number(((converted / registrants) * 100).toFixed(2)) : 0;
             }
 
             return n;
@@ -258,7 +269,7 @@ export default function AdminPage() {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
             if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [] };
+                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [], academy: [] };
             }
             (n.biData as any)[section].push(template);
             return n;
@@ -277,7 +288,7 @@ export default function AdminPage() {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
             if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [] };
+                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [], academy: [] };
             }
             if (!Array.isArray(n.biData.trends)) n.biData.trends = [];
             (n.biData.trends as any)[index][field] = value;
@@ -289,7 +300,7 @@ export default function AdminPage() {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
             if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [] };
+                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [], academy: [] };
             }
             if (!Array.isArray(n.biData.trends)) n.biData.trends = [];
             (n.biData.trends as any).push({ category: 'Month', label: '', revenue: 0, dealSize: 0 });
@@ -661,6 +672,7 @@ export default function AdminPage() {
                                                         docs: json.docs || [],
                                                         userGrowth: json.userGrowth || [],
                                                         trends: json.trends || [],
+                                                        academy: json.academy || [],
                                                     };
                                                     updateConfig('biData', biData);
                                                     setBiLoadMsg('✓ Data loaded!');
@@ -719,6 +731,7 @@ export default function AdminPage() {
                                                             docs: json.docs || [],
                                                             userGrowth: json.userGrowth || [],
                                                             trends: json.trends || [],
+                                                            academy: json.academy || [],
                                                         };
                                                         updateConfig('biData', biData);
                                                         setBiLoadMsg('');
@@ -736,7 +749,7 @@ export default function AdminPage() {
                                         <button
                                             onClick={() => updateConfig('biData', {
                                                 socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [],
-                                                trends: []
+                                                trends: [], academy: []
                                             })}
                                             className="flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition">
                                             <Plus size={14} /> Mulai Kosong
@@ -757,6 +770,7 @@ export default function AdminPage() {
                                             { id: 'projects', label: 'Projects', icon: Settings },
                                             { id: 'docs', label: 'Gallery', icon: Home },
                                             { id: 'userGrowth', label: 'User Growth', icon: Users },
+                                            { id: 'academy', label: 'Academy', icon: Users },
                                             { id: 'trends', label: 'Trends', icon: TrendingUp },
                                         ].map(t => (
                                             <button key={t.id} onClick={() => setBiSubTab(t.id)}
@@ -976,6 +990,34 @@ export default function AdminPage() {
                                             )}
                                         </div>
                                     )}
+                                    {/* Academy */}
+                                    {biSubTab === 'academy' && (
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Academy Data</h3>
+                                                <button onClick={() => addBiRow('academy', { program: '', batch: '', registrants: 0, converted: 0, conversion: 0 })}
+                                                    className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
+                                            </div>
+                                            {renderBiItems(config.biData.academy, (a: any, idx: number) => (
+                                                <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+                                                    <InputField label="Program" value={a.program} onChange={(v: string) => updateBiField('academy', idx, 'program', v)} placeholder="Location Analytics" />
+                                                    <InputField label="Batch" value={a.batch} onChange={(v: string) => updateBiField('academy', idx, 'batch', v)} placeholder="Batch 1" />
+                                                    <InputField label="Registrants" value={a.registrants} type="number" onChange={(v: number) => updateBiField('academy', idx, 'registrants', v)} />
+                                                    <InputField label="Converted" value={a.converted} type="number" onChange={(v: number) => updateBiField('academy', idx, 'converted', v)} />
+                                                    <div className="flex gap-2 w-full max-w-full min-w-0 lg:col-span-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <InputField label="Conv. Rate (%)" value={a.conversion || (a.registrants > 0 ? ((a.converted / a.registrants) * 100).toFixed(2) : 0)} type="number" onChange={(v: number) => { }} disabled />
+                                                        </div>
+                                                        <button onClick={() => removeBiRow('academy', idx)} className="p-3 text-zinc-300 hover:text-rose-500 transition self-end shrink-0"><Trash2 size={16} /></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(!config.biData.academy || config.biData.academy.length === 0) && (
+                                                <p className="text-xs text-zinc-400 italic p-4 bg-zinc-50 rounded-xl">No academy program data points yet. Click "Add" to start.</p>
+                                            )}
+                                        </div>
+                                    )}
+
                                 </>
                             )}
                         </div>

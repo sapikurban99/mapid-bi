@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Loader2, ArrowUpRight, ArrowDownRight, Users, Target,
   Activity, FileText, FolderOpen, TableProperties, Lock,
-  TrendingUp, BarChart3, Globe, Share2, ArrowRight, Sparkles, MoreVertical
+  TrendingUp, BarChart3, Globe, Share2, ArrowRight, Sparkles, Maximize2, Minimize2, BookOpen, MoreVertical
 } from 'lucide-react';
 import { getConfig } from '../lib/config';
 import LoadingProgress from '../components/LoadingProgress';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell } from 'recharts';
 
 export default function MinimalistDashboard() {
   const [data, setData] = useState<any>(null);
@@ -17,10 +18,26 @@ export default function MinimalistDashboard() {
   const [galleryCategory, setGalleryCategory] = useState('All');
   const [b2cPeriod, setB2cPeriod] = useState('All');
   const [growthMonth, setGrowthMonth] = useState('All');
+  const [socialPrimaryMonth, setSocialPrimaryMonth] = useState('All');
   const [growthWeek, setGrowthWeek] = useState('All');
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<any>(null);
+
+  // Custom Recharts Tooltip
+  const CustomRechartsTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white border border-zinc-200 p-3 rounded-xl shadow-lg">
+          <p className="text-[10px] font-bold text-zinc-400 mb-1">{formatTrendLabel(label)}</p>
+          <p className="text-sm font-black text-blue-500">
+            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format((Number(payload[0].value) || 0) * 1000000)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   // --- PROGRESS BAR STATE ---
   const fetchDone = useRef(false);
@@ -189,26 +206,6 @@ export default function MinimalistDashboard() {
   const rawMax = validTrendData.length > 0 ? Math.max(...validTrendData.map((d: any) => Number(d.revenue) || 0)) : 1;
   const maxRevenueValue = rawMax * 1.1; // Tambah buffer 10% di atas agar grafik tidak menabrak atap kontainer
 
-  // Fungsi untuk membuat path SVG Garis
-  const generateSvgLine = (dataPoints: any[], width: number, height: number) => {
-    if (!dataPoints || dataPoints.length === 0) return "";
-
-    // Memberikan padding horizontal agar titik awal dan akhir tidak terpotong
-    const paddingX = 40;
-    const effectiveWidth = width - (paddingX * 2);
-
-    // Jarak antar titik
-    const stepX = dataPoints.length > 1 ? effectiveWidth / (dataPoints.length - 1) : effectiveWidth;
-
-    return dataPoints.reduce((acc, point, index) => {
-      const x = paddingX + (index * stepX);
-      // Kalkulasi Y proporsional. SVG Y=0 ada di atas, jadi kita kurangi dari tinggi total.
-      const y = height - (((Number(point.revenue) || 0) / maxRevenueValue) * height);
-
-      return acc === "" ? `M ${x},${y}` : `${acc} L ${x},${y}`;
-    }, "");
-  };
-
   return (
     <main className="min-h-screen bg-zinc-50 p-6 md:p-12 font-sans pb-24 text-zinc-900">
 
@@ -221,16 +218,12 @@ export default function MinimalistDashboard() {
 
       {/* TAB NAVIGATION */}
       <div className="max-w-6xl mx-auto mb-10 border-b border-zinc-200 flex gap-8 overflow-x-auto hide-scrollbar">
-        {visibleTabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-4 text-sm font-bold tracking-widest uppercase transition-colors whitespace-nowrap ${activeTab === tab ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'
-              }`}
-          >
-            {tab}
-          </button>
-        ))}
+        {config.tabsVisible.Trends && <button onClick={() => setActiveTab('Trends')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Trends' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Trends</button>}
+        {config.tabsVisible.B2C && <button onClick={() => setActiveTab('B2C')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'B2C' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>B2C</button>}
+        {config.tabsVisible.B2B && <button onClick={() => setActiveTab('B2B')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'B2B' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>B2B</button>}
+        {config.tabsVisible.UserGrowth && <button onClick={() => setActiveTab('UserGrowth')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'UserGrowth' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>UserGrowth</button>}
+        {config.tabsVisible.Academy && <button onClick={() => setActiveTab('Academy')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Academy' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Academy</button>}
+        {config.tabsVisible.Gallery && <button onClick={() => setActiveTab('Gallery')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Gallery' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Gallery</button>}
       </div>
 
       <div className="max-w-6xl mx-auto">
@@ -272,59 +265,40 @@ export default function MinimalistDashboard() {
                     </div>
                   </div>
                 </div>
-                <div className="overflow-x-auto hide-scrollbar w-full h-full flex-1">
-                  <div className="min-w-[800px] h-full px-8 pb-8 pt-2 flex flex-col relative w-full">
-
-                    {/* Y-Axis Labels & Dashed Grid Lines */}
-                    <div className="absolute inset-x-8 top-12 bottom-16 flex flex-col justify-between pointer-events-none">
-                      {[4, 3, 2, 1, 0].map((i) => {
-                        const lineValue = (maxRevenueValue / 4) * i;
-                        return (
-                          <div key={i} className="w-full flex items-center relative">
-                            {/* Label Y-Axis */}
-                            <span className="absolute -left-2 -translate-x-full text-[10px] font-bold text-zinc-400 w-24 text-right pr-2 bg-white z-10">
-                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 2 }).format(lineValue * 1000000)}
-                            </span>
-                            <div className="w-full border-t border-zinc-100 ml-2"></div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* The Bar Graph */}
-                    <div className="flex-1 relative mt-12 mb-10 w-full flex items-end justify-between px-[4%] gap-4 z-10 pointer-events-none">
-                      {validTrendData.length > 0 && validTrendData.map((point: any, index: number) => {
-                        // Capped calculation to ensure points don't shoot out of the container bounds
-                        const safeRevenue = Math.min(Number(point.revenue) || 0, maxRevenueValue);
-                        const yRatio = maxRevenueValue > 0 ? (safeRevenue / maxRevenueValue) : 0;
-                        const heightPct = yRatio * 100;
-
-                        return (
-                          <div key={index} className="relative flex flex-col justify-end items-center h-full flex-1 w-full pointer-events-auto group">
-                            {/* Bar Form */}
-                            <div
-                              className="w-full max-w-[48px] bg-blue-500 rounded-t-sm hover:opacity-80 transition-opacity"
-                              style={{ height: `${heightPct}%` }}
-                            ></div>
-
-                            {/* Tooltip Nilai Selalu Tampil */}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 text-blue-500 text-[10px] font-medium whitespace-nowrap drop-shadow-sm font-mono">
-                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format((Number(point.revenue) || 0) * 1000000)}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Label X-Axis (Bulan/Tahun) */}
-                    <div className="flex justify-between w-full px-[4%] mt-auto pt-4 relative z-10">
-                      {validTrendData.map((hist: any, idx: number) => (
-                        <span key={idx} className="text-[10px] font-bold text-zinc-400 capitalize tracking-normal text-center bg-white px-2">
-                          {formatTrendLabel(hist.label)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                <div className="w-full h-full flex-1 pt-6 pb-2 pr-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={validTrendData.map((d: any) => ({
+                        rawLabel: d.label,
+                        displayLabel: formatTrendLabel(d.label),
+                        revenue: Number(d.revenue) || 0,
+                      }))}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f4f4f5" />
+                      <XAxis
+                        dataKey="displayLabel"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#a1a1aa', fontSize: 10, fontWeight: 700 }}
+                        dy={10}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value * 1000000)}
+                        tick={{ fill: '#a1a1aa', fontSize: 10, fontWeight: 700 }}
+                        width={90}
+                        dx={-10}
+                      />
+                      <RechartsTooltip cursor={{ fill: 'transparent' }} content={<CustomRechartsTooltip />} />
+                      <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={60}>
+                        {validTrendData.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill="#3b82f6" className="hover:opacity-80 transition-opacity cursor-pointer" />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
 
@@ -589,6 +563,10 @@ export default function MinimalistDashboard() {
 
         {/* === TAB 4: USER GROWTH === */}
         {activeTab === 'UserGrowth' && (() => {
+          // --- DATA TRANSFORMS FOR ACADEMY ---
+          const validAcademyData = config.biData?.academy || [];
+          const academyPrograms = Array.from(new Set(validAcademyData.map(a => a.program))).sort();
+
           const userGrowthData = data?.userGrowth || [];
           const uniqueMonths = ['All', ...Array.from(new Set(userGrowthData.map((d: any) => d.month).filter(Boolean)))];
           const uniqueWeeks = ['All', ...Array.from(new Set(userGrowthData.map((d: any) => d.week).filter(Boolean)))];
@@ -686,7 +664,118 @@ export default function MinimalistDashboard() {
           );
         })()}
 
-        {/* === TAB 5: GALLERY === */}
+        {/* === TAB 5: ACADEMY === */}
+        {activeTab === 'Academy' && (() => {
+          // --- DATA TRANSFORMS FOR ACADEMY ---
+          const validAcademyData = config.biData?.academy || [];
+          const academyPrograms = Array.from(new Set(validAcademyData.map(a => a.program))).sort();
+
+          return (
+            <div className="space-y-12 animate-in fade-in">
+              {academyPrograms.map((program: any) => {
+                const programData = validAcademyData.filter(a => a.program === program);
+
+                // Sort natural by batch (Batch 1, Batch 2... Batch 10)
+                const sortedData = [...programData].sort((a, b) => {
+                  return a.batch.localeCompare(b.batch, undefined, { numeric: true, sensitivity: 'base' });
+                });
+
+                const totalRegistrants = sortedData.reduce((acc, curr) => acc + (Number(curr.registrants) || 0), 0);
+                const totalConverted = sortedData.reduce((acc, curr) => acc + (Number(curr.converted) || 0), 0);
+                const totalConversion = totalRegistrants > 0 ? ((totalConverted / totalRegistrants) * 100).toFixed(2) : '0';
+
+                return (
+                  <div key={program} className="space-y-6">
+                    {/* Program Header Summary */}
+                    <div className="bg-white border text-left border-zinc-200 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0">
+                          <BookOpen size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-zinc-900 tracking-tight">{program}</h3>
+                          <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Overall Performance</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-8 px-2 md:px-6 md:border-l border-zinc-100 min-w-max">
+                        <div>
+                          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-1">Total Registrants</p>
+                          <p className="text-2xl font-black text-zinc-900">{totalRegistrants}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-1">Total Converted</p>
+                          <p className="text-2xl font-black text-emerald-600">{totalConverted}</p>
+                        </div>
+                        <div className="bg-zinc-50 px-4 py-2 border border-zinc-200 rounded-xl text-center">
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Avg Rate</p>
+                          <p className="text-xl font-black text-zinc-900 font-mono">{totalConversion}%</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Batch Breakdowns Table */}
+                    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-zinc-50/50 text-xs text-zinc-400 font-bold tracking-widest uppercase border-b border-zinc-100">
+                            <tr>
+                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/4">Batch Name</th>
+                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/4">Registrants</th>
+                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/4">Converted</th>
+                              <th className="px-6 py-4 text-center">Conversion %</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-100">
+                            {sortedData.map((row, idx) => {
+                              const registrants = Number(row.registrants) || 0;
+                              const converted = Number(row.converted) || 0;
+                              const rate = registrants > 0 ? ((converted / registrants) * 100).toFixed(2) : '0';
+
+                              return (
+                                <tr key={idx} className="hover:bg-zinc-50 transition-colors">
+                                  <td className="px-6 py-4 font-bold text-zinc-900 border-r border-dashed border-zinc-200">
+                                    {row.batch}
+                                  </td>
+                                  <td className="px-6 py-4 text-zinc-600 font-mono border-r border-dashed border-zinc-200">
+                                    {registrants}
+                                  </td>
+                                  <td className="px-6 py-4 text-emerald-600 font-mono border-r border-dashed border-zinc-200">
+                                    +{converted}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center gap-3 w-full max-w-[200px] mx-auto">
+                                      <div className="flex-1 bg-zinc-100 rounded-full h-2 overflow-hidden shadow-inner">
+                                        <div
+                                          className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
+                                          style={{ width: `${Math.min(Number(rate), 100)}%` }}
+                                        ></div>
+                                      </div>
+                                      <span className="text-zinc-900 font-bold w-12 text-right font-mono">{rate}%</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {academyPrograms.length === 0 && (
+                <div className="text-center py-20 bg-white border border-zinc-200 border-dashed rounded-3xl">
+                  <Users className="mx-auto text-zinc-300 mb-4" size={48} />
+                  <h3 className="text-lg font-bold text-zinc-400">No Academy Data yet</h3>
+                  <p className="text-sm text-zinc-400 mt-2">Create some data in the Admin Panel to see the performance.</p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* === TAB 6: GALLERY === */}
         {activeTab === 'Gallery' && (() => {
           const docsData = data?.docs || [];
           const uniqueGalleryCategories = ['All', ...Array.from(new Set(docsData.map((d: any) => d.category).filter(Boolean)))];

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-    Settings, Save, RotateCcw, Lock, Eye, EyeOff,
+    Settings, Save, RotateCcw, Lock, Eye, EyeOff, Search,
     ChevronDown, ChevronRight, Check, X, Plus, Trash2,
     Home, Users, BarChart3, Palette, Shield, Table2, Database,
     Loader2, AlertCircle, Globe, TrendingUp
@@ -65,8 +65,21 @@ export default function AdminPage() {
     const [loadingConfig, setLoadingConfig] = useState(false);
     const [loadingBiData, setLoadingBiData] = useState(false);
     const [biLoadMsg, setBiLoadMsg] = useState('');
+    const [biSearch, setBiSearch] = useState('');
     const [configFetchDone, setConfigFetchDone] = useState(false);
     const biFetchDone = useRef(false);
+
+    const renderBiItems = (list: any, renderFn: (item: any, idx: number) => React.ReactNode) => {
+        const safeList = Array.isArray(list) ? list : [];
+        return safeList
+            .map((item, originalIdx) => ({ item, originalIdx }))
+            .filter(({ item }) =>
+                !biSearch || Object.values(item).some(v =>
+                    String(v).toLowerCase().includes(biSearch.toLowerCase())
+                )
+            )
+            .map(({ item, originalIdx }) => renderFn(item, originalIdx));
+    };
 
     useEffect(() => {
         setLocalConfig(getConfig());
@@ -209,7 +222,7 @@ export default function AdminPage() {
         return {
             socials: [], campaigns: [], revenue: [], pipeline: [],
             projects: [], docs: [], userGrowth: [],
-            trends: { month: [], quarter: [], year: [] }
+            trends: []
         };
     };
 
@@ -217,7 +230,7 @@ export default function AdminPage() {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
             if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: { month: [], quarter: [], year: [] } };
+                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [] };
             }
             (n.biData as any)[section][index][field] = value;
 
@@ -245,7 +258,7 @@ export default function AdminPage() {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
             if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: { month: [], quarter: [], year: [] } };
+                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [] };
             }
             (n.biData as any)[section].push(template);
             return n;
@@ -264,9 +277,10 @@ export default function AdminPage() {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
             if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: { month: [], quarter: [], year: [] } };
+                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [] };
             }
-            (n.biData.trends as any)[view][index][field] = value;
+            if (!Array.isArray(n.biData.trends)) n.biData.trends = [];
+            (n.biData.trends as any)[index][field] = value;
             return n;
         });
     };
@@ -275,9 +289,10 @@ export default function AdminPage() {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
             if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: { month: [], quarter: [], year: [] } };
+                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [] };
             }
-            (n.biData.trends as any)[view].push({ label: '', revenue: 0, dealSize: 0 });
+            if (!Array.isArray(n.biData.trends)) n.biData.trends = [];
+            (n.biData.trends as any).push({ category: 'Month', label: '', revenue: 0, dealSize: 0 });
             return n;
         });
     };
@@ -285,7 +300,10 @@ export default function AdminPage() {
     const removeTrendPoint = (view: string, index: number) => {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
-            if (n.biData) (n.biData.trends as any)[view].splice(index, 1);
+            if (n.biData) {
+                if (!Array.isArray(n.biData.trends)) n.biData.trends = [];
+                (n.biData.trends as any).splice(index, 1);
+            }
             return n;
         });
     };
@@ -338,7 +356,6 @@ export default function AdminPage() {
         { id: 'raci', label: 'RACI Matrix', icon: Table2 },
         { id: 'bi', label: 'BI Settings', icon: BarChart3 },
         { id: 'bidata', label: 'BI Data', icon: Database },
-        { id: 'branding', label: 'Branding', icon: Palette },
     ];
 
     const biData = ensureBiData();
@@ -643,7 +660,7 @@ export default function AdminPage() {
                                                         projects: json.projects || [],
                                                         docs: json.docs || [],
                                                         userGrowth: json.userGrowth || [],
-                                                        trends: json.trends || { month: [], quarter: [], year: [] },
+                                                        trends: json.trends || [],
                                                     };
                                                     updateConfig('biData', biData);
                                                     setBiLoadMsg('✓ Data loaded!');
@@ -701,7 +718,7 @@ export default function AdminPage() {
                                                             projects: json.projects || [],
                                                             docs: json.docs || [],
                                                             userGrowth: json.userGrowth || [],
-                                                            trends: json.trends || { month: [], quarter: [], year: [] },
+                                                            trends: json.trends || [],
                                                         };
                                                         updateConfig('biData', biData);
                                                         setBiLoadMsg('');
@@ -719,7 +736,7 @@ export default function AdminPage() {
                                         <button
                                             onClick={() => updateConfig('biData', {
                                                 socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [],
-                                                trends: { month: [], quarter: [], year: [] }
+                                                trends: []
                                             })}
                                             className="flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition">
                                             <Plus size={14} /> Mulai Kosong
@@ -750,6 +767,20 @@ export default function AdminPage() {
                                         ))}
                                     </div>
 
+                                    {/* Search Filter for active tab */}
+                                    <div className="relative mt-4 mb-2">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <Search size={16} className="text-zinc-400" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder={`Search in ${biSubTab}...`}
+                                            value={biSearch}
+                                            onChange={(e) => setBiSearch(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 text-sm font-bold text-zinc-900 transition"
+                                        />
+                                    </div>
+
                                     {/* Socials */}
                                     {biSubTab === 'socials' && (
                                         <div className="space-y-4">
@@ -758,7 +789,7 @@ export default function AdminPage() {
                                                 <button onClick={() => addBiRow('socials', { month: '', week: '', platform: '', metric: '', value: 0 })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
-                                            {config.biData.socials.map((s, idx) => (
+                                            {renderBiItems(config.biData.socials, (s: any, idx: number) => (
                                                 <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
                                                     <InputField label="Month" value={s.month} onChange={(v: string) => updateBiField('socials', idx, 'month', v)} placeholder="Feb 2026" />
                                                     <InputField label="Week" value={s.week} onChange={(v: string) => updateBiField('socials', idx, 'week', v)} placeholder="Week 1" />
@@ -780,12 +811,13 @@ export default function AdminPage() {
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Campaign Data</h3>
-                                                <button onClick={() => addBiRow('campaigns', { name: '', status: 'Active', leads: 0, participants: 0, conversion: 0 })}
+                                                <button onClick={() => addBiRow('campaigns', { name: '', period: '', status: 'Active', leads: 0, participants: 0, conversion: 0 })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
-                                            {config.biData.campaigns.map((c, idx) => (
-                                                <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+                                            {renderBiItems(config.biData.campaigns, (c: any, idx: number) => (
+                                                <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 lg:grid-cols-7 gap-3 items-end">
                                                     <InputField label="Name" value={c.name} onChange={(v: string) => updateBiField('campaigns', idx, 'name', v)} />
+                                                    <InputField label="Period" value={c.period} onChange={(v: string) => updateBiField('campaigns', idx, 'period', v)} placeholder="e.g. Q1 2026" />
                                                     <SelectField label="Status" value={c.status} onChange={(v: string) => updateBiField('campaigns', idx, 'status', v)} options={['Active', 'Ended', 'Planned']} />
                                                     <InputField label="Leads" value={c.leads} type="number" onChange={(v: number) => updateBiField('campaigns', idx, 'leads', v)} />
                                                     <InputField label="Participants" value={c.participants} type="number" onChange={(v: number) => updateBiField('campaigns', idx, 'participants', v)} />
@@ -805,12 +837,13 @@ export default function AdminPage() {
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Revenue Data</h3>
-                                                <button onClick={() => addBiRow('revenue', { subProduct: '', actual: 0, target: 0, achievement: 0 })}
+                                                <button onClick={() => addBiRow('revenue', { subProduct: '', quarter: '', actual: 0, target: 0, achievement: 0 })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
-                                            {config.biData.revenue.map((r, idx) => (
-                                                <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-                                                    <div className="lg:col-span-2"><InputField label="Product" value={r.subProduct} onChange={(v: string) => updateBiField('revenue', idx, 'subProduct', v)} /></div>
+                                            {renderBiItems(config.biData.revenue, (r: any, idx: number) => (
+                                                <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 xl:grid-cols-6 gap-3 items-end">
+                                                    <InputField label="Product" value={r.subProduct} onChange={(v: string) => updateBiField('revenue', idx, 'subProduct', v)} />
+                                                    <InputField label="Quarter" value={r.quarter} onChange={(v: string) => updateBiField('revenue', idx, 'quarter', v)} placeholder="Q1 2026" />
                                                     <InputField label="Actual (Rp)" value={r.actual} type="number" onChange={(v: number) => updateBiField('revenue', idx, 'actual', v)} />
                                                     <InputField label="Target (Rp)" value={r.target} type="number" onChange={(v: number) => updateBiField('revenue', idx, 'target', v)} />
                                                     <div className="flex gap-2 w-full max-w-full min-w-0">
@@ -832,7 +865,7 @@ export default function AdminPage() {
                                                 <button onClick={() => addBiRow('pipeline', { client: '', industry: '', stage: 'Prospect', value: 0, action: '', eta: '' })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
-                                            {config.biData.pipeline.map((p, idx) => (
+                                            {renderBiItems(config.biData.pipeline, (p: any, idx: number) => (
                                                 <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
                                                     <InputField label="Client" value={p.client} onChange={(v: string) => updateBiField('pipeline', idx, 'client', v)} />
                                                     <SelectField label="Stage" value={p.stage} onChange={(v: string) => updateBiField('pipeline', idx, 'stage', v)} options={['Prospect', 'Proposal', 'Negotiation', 'Won', 'Lost']} />
@@ -853,7 +886,7 @@ export default function AdminPage() {
                                                 <button onClick={() => addBiRow('projects', { name: '', phase: '', progress: 0, issue: '' })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
-                                            {config.biData.projects.map((p, idx) => (
+                                            {renderBiItems(config.biData.projects, (p: any, idx: number) => (
                                                 <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
                                                     <InputField label="Project Name" value={p.name} onChange={(v: string) => updateBiField('projects', idx, 'name', v)} />
                                                     <InputField label="Phase" value={p.phase} onChange={(v: string) => updateBiField('projects', idx, 'phase', v)} />
@@ -873,7 +906,7 @@ export default function AdminPage() {
                                                 <button onClick={() => addBiRow('docs', { title: '', desc: '', link: '', format: 'Doc', category: '' })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
-                                            {config.biData.docs.map((d, idx) => (
+                                            {renderBiItems(config.biData.docs, (d: any, idx: number) => (
                                                 <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 space-y-3">
                                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                         <InputField label="Title" value={d.title} onChange={(v: string) => updateBiField('docs', idx, 'title', v)} />
@@ -900,7 +933,7 @@ export default function AdminPage() {
                                                 <button onClick={() => addBiRow('userGrowth', { month: '', week: '', newRegist: 0, activeGeoUsers: 0, conversion: 0 })}
                                                     className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add</button>
                                             </div>
-                                            {config.biData.userGrowth.map((g, idx) => (
+                                            {renderBiItems(config.biData.userGrowth, (g: any, idx: number) => (
                                                 <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 lg:grid-cols-6 gap-3 items-end">
                                                     <InputField label="Month" value={g.month} onChange={(v: string) => updateBiField('userGrowth', idx, 'month', v)} placeholder="Feb 2026" />
                                                     <InputField label="Week" value={g.week} onChange={(v: string) => updateBiField('userGrowth', idx, 'week', v)} placeholder="Week 1" />
@@ -919,27 +952,28 @@ export default function AdminPage() {
 
                                     {/* Trends */}
                                     {biSubTab === 'trends' && (
-                                        <div className="space-y-8">
-                                            {(['month', 'quarter', 'year'] as const).map(view => (
-                                                <div key={view} className="space-y-4">
-                                                    <div className="flex justify-between items-center">
-                                                        <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">{view} Trend Data</h3>
-                                                        <button onClick={() => addTrendPoint(view)}
-                                                            className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add Point</button>
-                                                    </div>
-                                                    {(config.biData!.trends as any)[view].map((t: TrendPoint, idx: number) => (
-                                                        <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-                                                            <InputField label="Label" value={t.label} onChange={(v: string) => updateTrendField(view, idx, 'label', v)} placeholder={view === 'year' ? '2025' : '2025-01-01'} />
-                                                            <InputField label="Revenue (M)" value={t.revenue} type="number" onChange={(v: number) => updateTrendField(view, idx, 'revenue', v)} />
-                                                            <InputField label="Deal Size (M)" value={t.dealSize} type="number" onChange={(v: number) => updateTrendField(view, idx, 'dealSize', v)} />
-                                                            <button onClick={() => removeTrendPoint(view, idx)} className="p-3 text-zinc-300 hover:text-rose-500 transition self-end"><Trash2 size={16} /></button>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Trend Data</h3>
+                                                <button onClick={() => addTrendPoint('')}
+                                                    className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition"><Plus size={14} /> Add Point</button>
+                                            </div>
+                                            {renderBiItems(config.biData.trends, (t: any, idx: number) => (
+                                                <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-4 grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                                                    <SelectField label="Category" value={t.category} onChange={(v: string) => updateTrendField('', idx, 'category', v)} options={['Month', 'Quarter', 'Year']} />
+                                                    <InputField label="Label" value={t.label} onChange={(v: string) => updateTrendField('', idx, 'label', v)} placeholder="e.g. Q1 2026 or Jan 26" />
+                                                    <InputField label="Revenue (M)" value={t.revenue} type="number" onChange={(v: number) => updateTrendField('', idx, 'revenue', v)} />
+                                                    <div className="flex gap-2 w-full max-w-full min-w-0 lg:col-span-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <InputField label="Deal Size (M)" value={t.dealSize} type="number" onChange={(v: number) => updateTrendField('', idx, 'dealSize', v)} />
                                                         </div>
-                                                    ))}
-                                                    {(config.biData!.trends as any)[view].length === 0 && (
-                                                        <p className="text-xs text-zinc-400 italic p-4 bg-zinc-50 rounded-xl">No data points yet. Click "Add Point" to start.</p>
-                                                    )}
+                                                        <button onClick={() => removeTrendPoint('', idx)} className="p-3 text-zinc-300 hover:text-rose-500 transition self-end shrink-0"><Trash2 size={16} /></button>
+                                                    </div>
                                                 </div>
                                             ))}
+                                            {(!config.biData.trends || (config.biData.trends as any).length === 0) && (
+                                                <p className="text-xs text-zinc-400 italic p-4 bg-zinc-50 rounded-xl">No data points yet. Click "Add Point" to start.</p>
+                                            )}
                                         </div>
                                     )}
                                 </>
@@ -947,33 +981,7 @@ export default function AdminPage() {
                         </div>
                     )}
 
-                    {/* ============ BRANDING ============ */}
-                    {activeSection === 'branding' && (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                            <div className="mb-8">
-                                <h2 className="text-2xl font-black tracking-tight">Branding</h2>
-                                <p className="text-sm text-zinc-400 font-medium mt-1">Global branding and identity settings</p>
-                            </div>
 
-                            <div className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-6">
-                                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Identity</h3>
-                                <div className="space-y-4">
-                                    <InputField label="Sidebar Title" value={config.sidebarTitle} onChange={(v: string) => updateConfig('sidebarTitle', v)} />
-                                    <p className="text-[10px] text-zinc-400 font-medium -mt-2">Teks yang muncul di atas sidebar navigasi</p>
-                                    <InputField label="Site Title" value={config.siteTitle} onChange={(v: string) => updateConfig('siteTitle', v)} />
-                                    <p className="text-[10px] text-zinc-400 font-medium -mt-2">Judul tab browser (metadata)</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-white">
-                                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-4">Live Preview</h3>
-                                <div className="bg-zinc-800 rounded-xl p-4 flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center"><Settings size={14} className="text-white" /></div>
-                                    <span className="font-black text-lg tracking-tight">{config.sidebarTitle}</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                 </div>
             </div>

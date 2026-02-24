@@ -23,8 +23,8 @@ export default function SidebarNav() {
 
     return (
         <nav className="w-full md:w-64 bg-white border-r border-zinc-200 shrink-0 md:min-h-screen p-6 flex flex-col">
-            <div className="flex items-center gap-2 text-zinc-900 font-black text-xl mb-10 tracking-tight">
-                <Activity className="w-5 h-5" /> {sidebarTitle}
+            <div className="flex items-center gap-2 mb-10">
+                <img src="https://mapid.co.id/img/mapid_logo_black.png" alt="Mapid Logo" className="h-8 w-auto px-1" />
             </div>
 
             <div className="flex md:flex-col gap-2 overflow-x-auto pb-4 md:pb-0">

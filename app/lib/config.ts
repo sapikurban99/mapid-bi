@@ -23,6 +23,7 @@ export interface SocialItem {
 
 export interface CampaignItem {
     name: string;
+    period: string;
     status: 'Active' | 'Ended' | 'Planned';
     leads: number;
     participants: number;
@@ -31,6 +32,7 @@ export interface CampaignItem {
 
 export interface RevenueItem {
     subProduct: string;
+    quarter: string; // NEW
     actual: number;
     target: number;
     achievement: number;
@@ -61,6 +63,7 @@ export interface DocItem {
 }
 
 export interface TrendPoint {
+    category: string;  // e.g. "Month", "Quarter", "Year"
     label: string;
     revenue: number;
     dealSize: number;
@@ -82,11 +85,7 @@ export interface BIData {
     projects: ProjectItem[];
     docs: DocItem[];
     userGrowth: UserGrowthItem[];
-    trends: {
-        month: TrendPoint[];
-        quarter: TrendPoint[];
-        year: TrendPoint[];
-    };
+    trends: TrendPoint[];
 }
 
 export interface SiteConfig {

@@ -13,7 +13,9 @@ export default function MinimalistDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Trends');
-  const [trendView, setTrendView] = useState<'month' | 'quarter' | 'year'>('month');
+  const [trendCategory, setTrendCategory] = useState('All');
+  const [galleryCategory, setGalleryCategory] = useState('All');
+  const [b2cPeriod, setB2cPeriod] = useState('All');
   const [growthMonth, setGrowthMonth] = useState('All');
   const [growthWeek, setGrowthWeek] = useState('All');
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -108,12 +110,8 @@ export default function MinimalistDashboard() {
     }
   };
 
-  const formatTrendLabel = (label: string, view: string) => {
-    if (view === 'year') {
-      // Jika view year, kembalikan teks aslinya (misal "2024", "2025")
-      return label;
-    }
-    // Jika bukan year, bersihkan format ISO String jika ada
+  const formatTrendLabel = (label: string) => {
+    // Bersihkan format ISO String jika ada date
     if (label && label.includes('T')) {
       const date = new Date(label);
       if (!isNaN(date.getTime())) {
@@ -127,9 +125,16 @@ export default function MinimalistDashboard() {
   }
 
   // --- CALCULATIONS ---
-  const totalB2CActual = data?.revenue?.reduce((acc: number, curr: any) => acc + curr.actual, 0) || 0;
-  const totalB2CTarget = data?.revenue?.reduce((acc: number, curr: any) => acc + curr.target, 0) || 0;
-  // Hitung persentase dan batasi hingga 2 desimal
+  const b2cPeriods = new Set<string>();
+  (data?.campaigns || []).forEach((c: any) => { if (c.period) b2cPeriods.add(c.period); });
+  (data?.revenue || []).forEach((r: any) => { if (r.quarter) b2cPeriods.add(r.quarter); });
+  const uniqueB2cPeriods = ['All', ...Array.from(b2cPeriods).sort()];
+
+  const filteredCampaigns = (data?.campaigns || []).filter((c: any) => b2cPeriod === 'All' || c.period === b2cPeriod);
+  const filteredB2cRevenue = (data?.revenue || []).filter((r: any) => b2cPeriod === 'All' || r.quarter === b2cPeriod);
+
+  const totalB2CActual = filteredB2cRevenue.reduce((acc: number, curr: any) => acc + curr.actual, 0) || 0;
+  const totalB2CTarget = filteredB2cRevenue.reduce((acc: number, curr: any) => acc + curr.target, 0) || 0;
   const totalB2CAchievement = totalB2CTarget > 0 ? ((totalB2CActual / totalB2CTarget) * 100).toFixed(2) : '0.00';
   const totalB2BPipeline = data?.pipeline?.reduce((acc: number, curr: any) => acc + (curr.value || 0), 0) || 0;
 
@@ -174,8 +179,11 @@ export default function MinimalistDashboard() {
   );
 
   // --- LOGIC GRAFIK SVG PROPORSIONAL ---
-  const currentTrendData = data?.trends?.[trendView] || [];
+  const currentTrendData = (Array.isArray(data?.trends) ? data.trends : [])
+    .filter((d: any) => trendCategory === 'All' || d.category === trendCategory);
   const validTrendData = currentTrendData.filter((d: any) => d && d.revenue !== undefined);
+
+  const uniqueTrendCategories = ['All', ...Array.from(new Set((Array.isArray(data?.trends) ? data.trends : []).map((d: any) => d.category).filter(Boolean)))];
 
   // Mencari nilai max untuk skala vertikal
   const rawMax = validTrendData.length > 0 ? Math.max(...validTrendData.map((d: any) => Number(d.revenue) || 0)) : 1;
@@ -232,13 +240,11 @@ export default function MinimalistDashboard() {
           <div className="space-y-8 animate-in fade-in">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Revenue Performance</h3>
-              <div className="flex bg-zinc-100 p-1 rounded-lg">
-                {(['month', 'quarter', 'year'] as const).map(tv => (
-                  <button key={tv} onClick={() => setTrendView(tv)}
-                    className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition ${trendView === tv ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}>
-                    {tv}
-                  </button>
-                ))}
+              <div className="flex gap-3">
+                <select value={trendCategory} onChange={(e) => setTrendCategory(e.target.value)}
+                  className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
+                  {uniqueTrendCategories.map((c: any) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
+                </select>
               </div>
             </div>
 
@@ -314,7 +320,7 @@ export default function MinimalistDashboard() {
                     <div className="flex justify-between w-full px-[4%] mt-auto pt-4 relative z-10">
                       {validTrendData.map((hist: any, idx: number) => (
                         <span key={idx} className="text-[10px] font-bold text-zinc-400 capitalize tracking-normal text-center bg-white px-2">
-                          {formatTrendLabel(hist.label, trendView)}
+                          {formatTrendLabel(hist.label)}
                         </span>
                       ))}
                     </div>
@@ -326,7 +332,7 @@ export default function MinimalistDashboard() {
               <div className="space-y-6">
                 {validTrendData.slice().reverse().slice(0, 2).map((hist: any, idx: number) => (
                   <div key={idx} className={`bg-white border border-zinc-200 p-6 rounded-2xl ${idx === 0 ? 'ring-2 ring-zinc-900 ring-offset-2 shadow-lg' : 'opacity-60'}`}>
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">{formatTrendLabel(hist.label, trendView)} Summary</h4>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">{formatTrendLabel(hist.label)} Summary</h4>
                     <div className="text-3xl font-black tracking-tighter mb-1">Rp {hist.revenue}M</div>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Avg Deal: Rp {hist.dealSize}M</p>
                   </div>
@@ -421,11 +427,22 @@ export default function MinimalistDashboard() {
               })()}
             </div>
 
+            {/* Filter B2C Campaigns & Revenue */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-zinc-200 pb-4 mb-6 gap-4">
+              <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">B2C Performance Overview</h3>
+              <select value={b2cPeriod} onChange={(e) => setB2cPeriod(e.target.value)}
+                className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
+                {uniqueB2cPeriods.map((p: string) => <option key={p} value={p}>{p === 'All' ? 'All Periods' : p}</option>)}
+              </select>
+            </div>
+
             {/* Campaign Activations */}
             <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">Active Campaigns & Performance</h3>
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6">Active Campaigns & Performance</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {data?.campaigns?.map((camp: any, idx: number) => (
+                {filteredCampaigns.length === 0 ? (
+                  <div className="col-span-full text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest w-full">No campaigns for selected period</div>
+                ) : filteredCampaigns.map((camp: any, idx: number) => (
                   <div key={idx} className="bg-white border border-zinc-200 p-6 rounded-2xl transition hover:border-zinc-400">
                     <div className="flex justify-between items-start mb-6">
                       <h4 className="font-bold text-zinc-900 text-sm leading-tight">{camp.name}</h4>
@@ -448,15 +465,18 @@ export default function MinimalistDashboard() {
               <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                    <tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Actual vs Target</th><th className="px-6 py-4">Progress</th></tr>
+                    <tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Quarter</th><th className="px-6 py-4">Actual vs Target</th><th className="px-6 py-4">Progress</th></tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100">
-                    {data?.revenue?.map((rev: any, idx: number) => {
+                    {filteredB2cRevenue.length === 0 ? (
+                      <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No revenue data for selected period</td></tr>
+                    ) : filteredB2cRevenue.map((rev: any, idx: number) => {
                       // Format angka desimal pada row tabel agar rapi
                       const achPct = typeof rev.achievement === 'number' ? rev.achievement.toFixed(2) : rev.achievement;
                       return (
                         <tr key={idx} className="hover:bg-zinc-50 transition">
                           <td className="px-6 py-5 font-bold">{rev.subProduct}</td>
+                          <td className="px-6 py-5 font-bold text-zinc-500 text-xs">{rev.quarter || '-'}</td>
                           <td className="px-6 py-5 text-zinc-500 font-medium">{formatIDR(rev.actual)} <span className="opacity-30 mx-2">/</span> {formatIDR(rev.target)}</td>
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-4">
@@ -473,7 +493,7 @@ export default function MinimalistDashboard() {
                   {/* BARIS TOTAL B2C */}
                   <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
                     <tr>
-                      <td className="px-6 py-5 uppercase">Total B2C</td>
+                      <td colSpan={2} className="px-6 py-5 uppercase">Total B2C</td>
                       <td className="px-6 py-5 font-bold">{formatIDR(totalB2CActual)} <span className="opacity-50 mx-1">/</span> {formatIDR(totalB2CTarget)}</td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-4">
@@ -667,34 +687,51 @@ export default function MinimalistDashboard() {
         })()}
 
         {/* === TAB 5: GALLERY === */}
-        {activeTab === 'Gallery' && (
-          <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-8">
-            <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 font-black">Knowledge Base & Assets</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {data?.docs?.map((doc: any, idx: number) => {
-                const isLinkValid = doc.link && doc.link !== '#';
-                return (
-                  <a key={idx} href={isLinkValid ? doc.link : undefined} target="_blank" rel="noopener noreferrer"
-                    className={`group bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col justify-between transition-all ${isLinkValid ? 'hover:border-zinc-900 hover:shadow-xl cursor-pointer ring-1 ring-transparent hover:ring-zinc-900' : 'opacity-40 cursor-not-allowed'}`}>
-                    <div>
-                      <div className="flex justify-between items-start mb-6">
-                        <span className="p-3 bg-zinc-50 rounded-xl group-hover:bg-zinc-100 transition text-zinc-900">
-                          {doc.format === 'Folder' ? <FolderOpen size={24} /> : doc.format === 'Sheet' ? <TableProperties size={24} /> : <FileText size={24} />}
-                        </span>
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-300">{doc.category}</span>
+        {activeTab === 'Gallery' && (() => {
+          const docsData = data?.docs || [];
+          const uniqueGalleryCategories = ['All', ...Array.from(new Set(docsData.map((d: any) => d.category).filter(Boolean)))];
+
+          const filteredDocs = docsData.filter((d: any) =>
+            galleryCategory === 'All' || d.category === galleryCategory
+          );
+
+          return (
+            <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-8">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 font-black">Knowledge Base & Assets</h3>
+                <div className="flex gap-3">
+                  <select value={galleryCategory} onChange={(e) => setGalleryCategory(e.target.value)}
+                    className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
+                    {uniqueGalleryCategories.map((c: any) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredDocs.map((doc: any, idx: number) => {
+                  const isLinkValid = doc.link && doc.link !== '#';
+                  return (
+                    <a key={idx} href={isLinkValid ? doc.link : undefined} target="_blank" rel="noopener noreferrer"
+                      className={`group bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col justify-between transition-all ${isLinkValid ? 'hover:border-zinc-900 hover:shadow-xl cursor-pointer ring-1 ring-transparent hover:ring-zinc-900' : 'opacity-40 cursor-not-allowed'}`}>
+                      <div>
+                        <div className="flex justify-between items-start mb-6">
+                          <span className="p-3 bg-zinc-50 rounded-xl group-hover:bg-zinc-100 transition text-zinc-900">
+                            {doc.format === 'Folder' ? <FolderOpen size={24} /> : doc.format === 'Sheet' ? <TableProperties size={24} /> : <FileText size={24} />}
+                          </span>
+                          <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-300">{doc.category}</span>
+                        </div>
+                        <h4 className="text-xl font-black tracking-tight mb-2 leading-tight">{doc.title}</h4>
+                        <p className="text-xs text-zinc-400 leading-relaxed mb-8 line-clamp-2 italic">{doc.desc}</p>
                       </div>
-                      <h4 className="text-xl font-black tracking-tight mb-2 leading-tight">{doc.title}</h4>
-                      <p className="text-xs text-zinc-400 leading-relaxed mb-8 line-clamp-2 italic">{doc.desc}</p>
-                    </div>
-                    <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition ${isLinkValid ? 'text-zinc-900' : 'text-zinc-300'}`}>
-                      {isLinkValid ? 'Go to Content' : 'Link not ready'} {isLinkValid && <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />}
-                    </div>
-                  </a>
-                );
-              })}
+                      <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition ${isLinkValid ? 'text-zinc-900' : 'text-zinc-300'}`}>
+                        {isLinkValid ? 'Go to Content' : 'Link not ready'} {isLinkValid && <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />}
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
       </div>
     </main>

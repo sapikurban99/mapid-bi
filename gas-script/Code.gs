@@ -4,7 +4,7 @@
  * ====================================================
  */
 
-const SHEET_ID = '1SDOF1rVTKJPBd19UxbAatPqhWotGBwQ3PznVhUrbL6A'; // WAJIB GANTI INI!
+const SHEET_ID = '1SDOF1rVTKJPBd19UxbAatPqhWotGBwQ3PznVhUrbL6A'; // WAJIB GANTI INI DENGAN ID SHEET ANDA!
 
 function setup() {
   try {
@@ -31,10 +31,11 @@ function setup() {
     // 3. DATABASE BARU: B2C CAMPAIGNS & CHANNELS
     let sheetCamp = ss.getSheetByName('DB_Campaigns') || ss.insertSheet('DB_Campaigns');
     sheetCamp.clear();
-    sheetCamp.appendRow(['Campaign_Name', 'Status', 'Leads', 'Participants', 'Conversion_Pct']);
-    sheetCamp.appendRow(['Opening Rush Loc Analytics', 'Completed', 150, 65, 43.3]);
-    sheetCamp.appendRow(['Free Class Backgrounds', 'Active', 320, 110, 34.3]);
-    sheetCamp.appendRow(['Business Expansion Testing', 'Planning', 0, 0, 0]);
+    // PERHATIKAN DISINI: 'Period' sudah disisipkan sebelum 'Status'
+    sheetCamp.appendRow(['Campaign_Name', 'Period', 'Status', 'Leads', 'Participants', 'Conversion_Pct']);
+    sheetCamp.appendRow(['Opening Rush Loc Analytics', 'Q1 2026', 'Completed', 150, 65, 43.3]);
+    sheetCamp.appendRow(['Free Class Backgrounds', 'Q1 2026', 'Active', 320, 110, 34.3]);
+    sheetCamp.appendRow(['Business Expansion Testing', 'Q2 2026', 'Planning', 0, 0, 0]);
 
     // 4. DATABASE BARU: SOCIAL MEDIA & COMMUNITY
     let sheetSoc = ss.getSheetByName('DB_Socials') || ss.insertSheet('DB_Socials');
@@ -128,22 +129,19 @@ function doGet(e) {
     const trendsRaw = readSheet('DB_Trends');
     
     const payload = {
-      revenue: readSheet('DB_Revenue').map(r => ({ subProduct: r[1], target: r[2], actual: r[3], achievement: r[4] })),
+      revenue: readSheet('DB_Revenue').map(r => ({ subProduct: r[1], quarter: r[2], target: r[3], actual: r[4], achievement: r[5] })),
       projects: readSheet('DB_Projects').map(r => ({ name: r[0], phase: r[1], progress: r[2], issue: r[3] })),
       docs: readSheet('DB_Docs').map(r => ({ title: r[0], category: r[1], format: r[2], link: r[3], desc: r[4] })),
       
       // DATA BARU
       pipeline: readSheet('DB_Pipeline').map(r => ({ client: r[0], industry: r[1], stage: r[2], value: r[3], action: r[4], eta: r[5] })),
-      campaigns: readSheet('DB_Campaigns').map(r => ({ name: r[0], status: r[1], leads: r[2], participants: r[3], conversion: r[4] })),
+      // BACA DENGAN 'period: r[1]' SEKARANG
+      campaigns: readSheet('DB_Campaigns').map(r => ({ name: r[0], period: r[1], status: r[2], leads: r[3], participants: r[4], conversion: r[5] })),
       socials: readSheet('DB_Socials').map(r => ({ month: r[0], week: r[1], platform: r[2], metric: r[3], value: r[4] })),
       userGrowth: readSheet('DB_UserGrowth').map(r => ({ month: r[0], week: r[1], newRegist: r[2], activeGeoUsers: r[3], conversion: r[4] })),
       
-      // TRENDS DI-GROUP BERDASARKAN TIMEFRAME
-      trends: {
-        month: trendsRaw.filter(r => r[0] === 'month').map(r => ({ label: r[1], revenue: r[2], dealSize: r[3] })),
-        quarter: trendsRaw.filter(r => r[0] === 'quarter').map(r => ({ label: r[1], revenue: r[2], dealSize: r[3] })),
-        year: trendsRaw.filter(r => r[0] === 'year').map(r => ({ label: r[1], revenue: r[2], dealSize: r[3] }))
-      }
+      // TRENDS FLAT ARRAY
+      trends: trendsRaw.map(r => ({ category: r[0], label: r[1], revenue: r[2], dealSize: r[3] }))
     };
     
     var adminConfig = getAdminConfig();
@@ -251,9 +249,10 @@ function syncBiDataToSheets(biData) {
     writeToSheet('DB_Pipeline', ['Client', 'Industry', 'Stage', 'Value_IDR', 'Action', 'ETA'], pipelineRows);
   }
 
+  // DI SINILAH HEADER DAN DATA DISUSAUN ULANG SEBELUM DITULIS KE SHEET
   if (biData.campaigns) {
-    var campaignRows = biData.campaigns.map(function(r) { return [r.name, r.status, r.leads, r.participants, r.conversion]; });
-    writeToSheet('DB_Campaigns', ['Campaign_Name', 'Status', 'Leads', 'Participants', 'Conversion_Pct'], campaignRows);
+    var campaignRows = biData.campaigns.map(function(r) { return [r.name, r.period || '', r.status, r.leads, r.participants, r.conversion]; });
+    writeToSheet('DB_Campaigns', ['Campaign_Name', 'Period', 'Status', 'Leads', 'Participants', 'Conversion_Pct'], campaignRows);
   }
 
   if (biData.socials) {
@@ -277,11 +276,8 @@ function syncBiDataToSheets(biData) {
   }
 
   if (biData.trends) {
-    var trendRows = [];
-    if (biData.trends.month) biData.trends.month.forEach(function(r) { trendRows.push(['month', r.label, r.revenue, r.dealSize]); });
-    if (biData.trends.quarter) biData.trends.quarter.forEach(function(r) { trendRows.push(['quarter', r.label, r.revenue, r.dealSize]); });
-    if (biData.trends.year) biData.trends.year.forEach(function(r) { trendRows.push(['year', r.label, r.revenue, r.dealSize]); });
-    writeToSheet('DB_Trends', ['Timeframe', 'Label', 'Revenue_M', 'DealSizeAvg_M'], trendRows);
+    var trendRows = biData.trends.map(function(r) { return [r.category || 'Month', r.label, r.revenue, r.dealSize]; });
+    writeToSheet('DB_Trends', ['Category', 'Label', 'Revenue_M', 'DealSizeAvg_M'], trendRows);
   }
 
   if (biData.revenue) {
@@ -294,8 +290,8 @@ function syncBiDataToSheets(biData) {
       });
     }
     var revenueRows = biData.revenue.map(function(r) { 
-      return [existingRevMap[r.subProduct] || '-', r.subProduct, r.target, r.actual, r.achievement]; 
+      return [existingRevMap[r.subProduct] || '-', r.subProduct, r.quarter || '', r.target, r.actual, r.achievement]; 
     });
-    writeToSheet('DB_Revenue', ['Category', 'SubProduct', 'Target_Q1', 'Actual', 'Achievement_Pct'], revenueRows);
+    writeToSheet('DB_Revenue', ['Category', 'SubProduct', 'Quarter', 'Target', 'Actual', 'Achievement_Pct'], revenueRows);
   }
 }

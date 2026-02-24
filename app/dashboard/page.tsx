@@ -143,7 +143,7 @@ export default function MinimalistDashboard() {
 
   const formatTrendLabel = (label: string) => {
     // Bersihkan format ISO String jika ada date
-    if (label && label.includes('T')) {
+    if (typeof label === 'string' && label.includes('T')) {
       const date = new Date(label);
       if (!isNaN(date.getTime())) {
         return new Intl.DateTimeFormat('id-ID', {
@@ -153,7 +153,7 @@ export default function MinimalistDashboard() {
       }
     }
     return label;
-  }
+  };
 
   // --- CALCULATIONS ---
   const b2cPeriods = new Set<string>();

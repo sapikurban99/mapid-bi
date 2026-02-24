@@ -60,10 +60,32 @@ export default function MinimalistDashboard() {
     .map(([name]) => name);
 
   // --- SIMPLE AUTH LOGIC ---
+  useEffect(() => {
+    // Check local storage on mount
+    const authRecord = localStorage.getItem('bi_dashboard_auth');
+    if (authRecord) {
+      try {
+        const parsed = JSON.parse(authRecord);
+        if (parsed.authorized && new Date().getTime() < parsed.expiresAt) {
+          setIsAuthorized(true);
+        } else {
+          localStorage.removeItem('bi_dashboard_auth');
+        }
+      } catch (e) {
+        localStorage.removeItem('bi_dashboard_auth');
+      }
+    }
+  }, []);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === config.biPassword) {
       setIsAuthorized(true);
+      // Save session for 24 hours
+      localStorage.setItem('bi_dashboard_auth', JSON.stringify({
+        authorized: true,
+        expiresAt: new Date().getTime() + 24 * 60 * 60 * 1000
+      }));
     } else {
       alert('Akses Ditolak: Password Salah!');
     }

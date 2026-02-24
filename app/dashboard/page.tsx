@@ -659,44 +659,21 @@ export default function MinimalistDashboard() {
                   <h3 className="text-2xl font-black tracking-tight mb-1">User Growth Funnel</h3>
                   <p className="text-xs font-black uppercase tracking-widest text-zinc-400">Acquisition & Activation Mapping</p>
                 </div>
-                <div className="flex flex-col md:flex-row gap-4 bg-zinc-50 p-2 rounded-2xl border border-zinc-200">
-                  {/* Primary Growth Filters */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Primary</span>
-                    <select
-                      value={growthMonth}
-                      onChange={(e) => setGrowthMonth(e.target.value)}
-                      className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
-                    >
-                      {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
-                    </select>
-                    <select
-                      value={growthWeek}
-                      onChange={(e) => setGrowthWeek(e.target.value)}
-                      className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
-                    >
-                      {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                    </select>
-                  </div>
-                  <div className="hidden md:block w-px bg-zinc-200"></div>
-                  {/* Secondary Growth Filters */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Compare</span>
-                    <select
-                      value={growthCompareMonth}
-                      onChange={(e) => setGrowthCompareMonth(e.target.value)}
-                      className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
-                    >
-                      {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
-                    </select>
-                    <select
-                      value={growthCompareWeek}
-                      onChange={(e) => setGrowthCompareWeek(e.target.value)}
-                      className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
-                    >
-                      {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                    </select>
-                  </div>
+                <div className="flex gap-3">
+                  <select
+                    value={growthMonth}
+                    onChange={(e) => setGrowthMonth(e.target.value)}
+                    className="bg-white border border-zinc-200 text-sm font-bold p-2.5 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
+                  >
+                    {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                  </select>
+                  <select
+                    value={growthWeek}
+                    onChange={(e) => setGrowthWeek(e.target.value)}
+                    className="bg-white border border-zinc-200 text-sm font-bold p-2.5 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
+                  >
+                    {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                  </select>
                 </div>
               </div>
 
@@ -709,22 +686,14 @@ export default function MinimalistDashboard() {
 
                   {/* Step 1: New Regist */}
                   <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex justify-between items-center shadow-sm relative z-20 transition hover:shadow-md hover:border-zinc-300">
-                    <div className="flex flex-col md:flex-row justify-between w-full h-full">
-                      <div className="flex items-center gap-6">
-                        <div className="w-14 h-14 bg-blue-50 text-blue-500 flex items-center justify-center rounded-2xl shadow-inner"><Users size={28} /></div>
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 1: Top of Funnel</h4>
-                          <p className="text-2xl font-black tracking-tight text-zinc-900">New Registered Users</p>
-                        </div>
-                      </div>
-                      <div className="text-right mt-4 md:mt-0 flex flex-col items-end justify-center">
-                        <div className="text-5xl font-black tracking-tighter">{totalNewRegist.toLocaleString()}</div>
-                        <div className={`mt-2 flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full ${registChange >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                          {registChange > 0 ? <ArrowUpRight size={14} /> : registChange < 0 ? <ArrowDownRight size={14} /> : null}
-                          {registChange > 0 ? '+' : ''}{registChange.toLocaleString()} ({registChange > 0 ? '+' : ''}{registPctMap}%)
-                        </div>
+                    <div className="flex items-center gap-6">
+                      <div className="w-14 h-14 bg-blue-50 text-blue-500 flex items-center justify-center rounded-2xl shadow-inner"><Users size={28} /></div>
+                      <div>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 1: Top of Funnel</h4>
+                        <p className="text-2xl font-black tracking-tight text-zinc-900">New Registered Users</p>
                       </div>
                     </div>
+                    <div className="text-5xl font-black tracking-tighter">{totalNewRegist.toLocaleString()}</div>
                   </div>
 
                   {/* Arrow Connector */}
@@ -734,22 +703,14 @@ export default function MinimalistDashboard() {
 
                   {/* Step 2: Paid User */}
                   <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex justify-between items-center shadow-sm relative z-20 w-[90%] mx-auto transition hover:shadow-md hover:border-zinc-300">
-                    <div className="flex flex-col md:flex-row justify-between w-full h-full">
-                      <div className="flex items-center gap-6">
-                        <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner"><Target size={28} /></div>
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 2: Activation</h4>
-                          <p className="text-2xl font-black tracking-tight text-zinc-900">Paid User</p>
-                        </div>
-                      </div>
-                      <div className="text-right mt-4 md:mt-0 flex flex-col items-end justify-center">
-                        <div className="text-5xl font-black tracking-tighter">{totalActiveGeo.toLocaleString()}</div>
-                        <div className={`mt-2 flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full ${activeChange >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                          {activeChange > 0 ? <ArrowUpRight size={14} /> : activeChange < 0 ? <ArrowDownRight size={14} /> : null}
-                          {activeChange > 0 ? '+' : ''}{activeChange.toLocaleString()} ({activeChange > 0 ? '+' : ''}{activePctMap}%)
-                        </div>
+                    <div className="flex items-center gap-6">
+                      <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner"><Target size={28} /></div>
+                      <div>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 2: Activation</h4>
+                        <p className="text-2xl font-black tracking-tight text-zinc-900">Paid User</p>
                       </div>
                     </div>
+                    <div className="text-5xl font-black tracking-tighter">{totalActiveGeo.toLocaleString()}</div>
                   </div>
 
                   {/* Arrow Connector */}
@@ -759,26 +720,124 @@ export default function MinimalistDashboard() {
 
                   {/* Step 3: Conversion */}
                   <div className="bg-zinc-900 border border-zinc-800 text-white p-10 rounded-3xl flex justify-between items-center shadow-2xl shadow-zinc-200 relative z-20 w-[80%] mx-auto transform hover:scale-[1.02] transition">
-                    <div className="flex flex-col md:flex-row justify-between w-full h-full">
-                      <div className="flex items-center gap-6">
-                        <div className="w-16 h-16 bg-white/10 flex items-center justify-center rounded-2xl backdrop-blur-sm"><Activity size={32} className="text-emerald-400" /></div>
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 3: Bottom of Funnel</h4>
-                          <p className="text-3xl font-black tracking-tight">Final Conversion</p>
-                        </div>
-                      </div>
-                      <div className="text-right mt-4 md:mt-0 flex flex-col items-end justify-center">
-                        <div className="text-6xl font-black tracking-tighter text-emerald-400 drop-shadow-md">{avgConversion}%</div>
-                        <div className={`mt-2 flex items-center gap-1 text-sm font-bold opacity-80 ${convChange >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
-                          {convChange > 0 ? <ArrowUpRight size={16} /> : convChange < 0 ? <ArrowDownRight size={16} /> : null}
-                          {convChange > 0 ? '+' : ''}{convChange.toFixed(2)}% vs {compareAvgConversion}%
-                        </div>
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 bg-white/10 flex items-center justify-center rounded-2xl backdrop-blur-sm"><Activity size={32} className="text-emerald-400" /></div>
+                      <div>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 3: Bottom of Funnel</h4>
+                        <p className="text-3xl font-black tracking-tight">Final Conversion</p>
                       </div>
                     </div>
+                    <div className="text-6xl font-black tracking-tighter text-emerald-400 drop-shadow-md">{avgConversion}%</div>
                   </div>
 
                 </div>
               )}
+
+              {/* USER GROWTH COMPARISON TABLE */}
+              <div className="mt-16 pt-8 border-t border-zinc-200">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                  <h3 className="text-xl font-black tracking-tight leading-tight">Funnel Performance<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Growth Comparison</span></h3>
+                  <div className="flex flex-col md:flex-row gap-4 bg-zinc-50 p-2 rounded-2xl border border-zinc-200">
+                    {/* Primary Growth Filters */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Primary</span>
+                      <select
+                        value={growthMonth}
+                        onChange={(e) => setGrowthMonth(e.target.value)}
+                        className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
+                      >
+                        {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                      </select>
+                      <select
+                        value={growthWeek}
+                        onChange={(e) => setGrowthWeek(e.target.value)}
+                        className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
+                      >
+                        {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                      </select>
+                    </div>
+                    <div className="hidden md:block w-px bg-zinc-200"></div>
+                    {/* Secondary Growth Filters */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Compare</span>
+                      <select
+                        value={growthCompareMonth}
+                        onChange={(e) => setGrowthCompareMonth(e.target.value)}
+                        className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
+                      >
+                        {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                      </select>
+                      <select
+                        value={growthCompareWeek}
+                        onChange={(e) => setGrowthCompareWeek(e.target.value)}
+                        className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer"
+                      >
+                        {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                        <tr>
+                          <th className="px-6 py-4">Metric</th>
+                          <th className="px-6 py-4 text-right">Primary Vol.</th>
+                          <th className="px-6 py-4 text-right text-zinc-400">Secondary Vol.</th>
+                          <th className="px-6 py-4 text-right">Variance</th>
+                          <th className="px-6 py-4 text-center">Trend</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {/* Row 1: New Regist */}
+                        <tr className="hover:bg-zinc-50 transition group">
+                          <td className="px-6 py-4 font-bold whitespace-nowrap">New Registered Users</td>
+                          <td className="px-6 py-4 text-right font-mono text-zinc-900 font-bold text-lg">{totalNewRegist.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-right font-mono text-zinc-400">{compareNewRegist.toLocaleString()}</td>
+                          <td className={`px-6 py-4 text-right font-mono font-bold whitespace-nowrap ${registChange > 0 ? 'text-emerald-600' : registChange < 0 ? 'text-rose-600' : 'text-zinc-400'}`}>
+                            {registChange > 0 ? '+' : ''}{registChange.toLocaleString()} ({registChange > 0 ? '+' : ''}{registPctMap}%)
+                          </td>
+                          <td className="px-6 py-4 text-center flex justify-center">
+                            {registChange > 0 ? <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner"><ArrowUpRight size={14} /></div> :
+                              registChange < 0 ? <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner"><ArrowDownRight size={14} /></div> :
+                                <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-400 flex items-center justify-center shadow-inner"><div className="w-2 h-2 rounded-full bg-zinc-300"></div></div>}
+                          </td>
+                        </tr>
+                        {/* Row 2: Paid User */}
+                        <tr className="hover:bg-zinc-50 transition group">
+                          <td className="px-6 py-4 font-bold whitespace-nowrap">Paid Users</td>
+                          <td className="px-6 py-4 text-right font-mono text-zinc-900 font-bold text-lg">{totalActiveGeo.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-right font-mono text-zinc-400">{compareActiveGeo.toLocaleString()}</td>
+                          <td className={`px-6 py-4 text-right font-mono font-bold whitespace-nowrap ${activeChange > 0 ? 'text-emerald-600' : activeChange < 0 ? 'text-rose-600' : 'text-zinc-400'}`}>
+                            {activeChange > 0 ? '+' : ''}{activeChange.toLocaleString()} ({activeChange > 0 ? '+' : ''}{activePctMap}%)
+                          </td>
+                          <td className="px-6 py-4 text-center flex justify-center">
+                            {activeChange > 0 ? <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner"><ArrowUpRight size={14} /></div> :
+                              activeChange < 0 ? <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner"><ArrowDownRight size={14} /></div> :
+                                <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-400 flex items-center justify-center shadow-inner"><div className="w-2 h-2 rounded-full bg-zinc-300"></div></div>}
+                          </td>
+                        </tr>
+                        {/* Row 3: Conversion */}
+                        <tr className="hover:bg-zinc-50 transition group">
+                          <td className="px-6 py-4 font-bold whitespace-nowrap">Final Conversion %</td>
+                          <td className="px-6 py-4 text-right font-mono text-zinc-900 font-bold text-lg">{avgConversion}%</td>
+                          <td className="px-6 py-4 text-right font-mono text-zinc-400">{compareAvgConversion}%</td>
+                          <td className={`px-6 py-4 text-right font-mono font-bold whitespace-nowrap ${convChange > 0 ? 'text-emerald-600' : convChange < 0 ? 'text-rose-600' : 'text-zinc-400'}`}>
+                            {convChange > 0 ? '+' : ''}{convChange.toFixed(2)}%
+                          </td>
+                          <td className="px-6 py-4 text-center flex justify-center">
+                            {convChange > 0 ? <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner"><ArrowUpRight size={14} /></div> :
+                              convChange < 0 ? <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner"><ArrowDownRight size={14} /></div> :
+                                <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-400 flex items-center justify-center shadow-inner"><div className="w-2 h-2 rounded-full bg-zinc-300"></div></div>}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
           );
         })()}

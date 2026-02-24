@@ -87,18 +87,23 @@ export default function MinimalistDashboard() {
             setErrorMsg(json);
           }
         } else {
-          if (adminBiData && (adminBiData.socials?.length || adminBiData.campaigns?.length || adminBiData.revenue?.length || adminBiData.pipeline?.length)) {
-            setData(adminBiData);
-          } else if (json.adminConfig?.biData) {
-            const gasBiData = json.adminConfig.biData;
-            if (gasBiData && (gasBiData.socials?.length || gasBiData.campaigns?.length || gasBiData.revenue?.length || gasBiData.pipeline?.length)) {
-              setData(gasBiData);
-            } else {
-              setData(json);
-            }
-          } else {
-            setData(json);
-          }
+          // Prioritize REAL spreadsheet arrays over stringified AdminConfig cache when possible
+          const mergedData = { ...json };
+
+          const fallbackData = json.adminConfig?.biData || adminBiData || {};
+
+          // Overwrite with fallback ONLY IF the live spreadsheet data is completely empty
+          mergedData.socials = mergedData.socials?.length ? mergedData.socials : fallbackData.socials || [];
+          mergedData.campaigns = mergedData.campaigns?.length ? mergedData.campaigns : fallbackData.campaigns || [];
+          mergedData.revenue = mergedData.revenue?.length ? mergedData.revenue : fallbackData.revenue || [];
+          mergedData.pipeline = mergedData.pipeline?.length ? mergedData.pipeline : fallbackData.pipeline || [];
+          mergedData.projects = mergedData.projects?.length ? mergedData.projects : fallbackData.projects || [];
+          mergedData.trends = mergedData.trends?.length ? mergedData.trends : fallbackData.trends || [];
+          mergedData.userGrowth = mergedData.userGrowth?.length ? mergedData.userGrowth : fallbackData.userGrowth || [];
+          mergedData.academy = mergedData.academy?.length ? mergedData.academy : fallbackData.academy || [];
+          mergedData.docs = mergedData.docs?.length ? mergedData.docs : fallbackData.docs || [];
+
+          setData(mergedData);
         }
         fetchDone.current = true;
       })

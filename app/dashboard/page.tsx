@@ -17,9 +17,18 @@ export default function MinimalistDashboard() {
   const [trendCategory, setTrendCategory] = useState('All');
   const [galleryCategory, setGalleryCategory] = useState('All');
   const [b2cPeriod, setB2cPeriod] = useState('All');
+
+  // States for User Growth Comparison
   const [growthMonth, setGrowthMonth] = useState('All');
-  const [socialPrimaryMonth, setSocialPrimaryMonth] = useState('All');
   const [growthWeek, setGrowthWeek] = useState('All');
+  const [growthCompareMonth, setGrowthCompareMonth] = useState('All');
+  const [growthCompareWeek, setGrowthCompareWeek] = useState('All');
+
+  // States for Social & Community Comparison
+  const [socialPrimaryMonth, setSocialPrimaryMonth] = useState('All');
+  const [socialPrimaryWeek, setSocialPrimaryWeek] = useState('All');
+  const [socialSecondaryMonth, setSocialSecondaryMonth] = useState('All');
+  const [socialSecondaryWeek, setSocialSecondaryWeek] = useState('All');
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<any>(null);
@@ -326,71 +335,87 @@ export default function MinimalistDashboard() {
                 const uniqueMonths = ['All', ...Array.from(new Set(socialsData.map((d: any) => d.month).filter(Boolean)))];
                 const uniqueWeeks = ['All', ...Array.from(new Set(socialsData.map((d: any) => d.week).filter(Boolean)))];
 
-                const filteredSocials = socialsData.filter((d: any) =>
-                  (growthMonth === 'All' || d.month === growthMonth) &&
-                  (growthWeek === 'All' || d.week === growthWeek)
+
+                // --- DATA TRANSFORMS FOR B2C SOCIALS ---
+                const filteredPrimary = socialsData.filter((d: any) =>
+                  (socialPrimaryMonth === 'All' || d.month === socialPrimaryMonth) &&
+                  (socialPrimaryWeek === 'All' || d.week === socialPrimaryWeek)
+                );
+                const filteredSecondary = socialsData.filter((d: any) =>
+                  (socialSecondaryMonth === 'All' || d.month === socialSecondaryMonth) &&
+                  (socialSecondaryWeek === 'All' || d.week === socialSecondaryWeek)
                 );
 
-                // Find the latest period metrics (the currently filtered ones) grouped by platform
-                const latestMetrics = filteredSocials.reduce((acc: any, curr: any) => {
-                  const key = curr.platform;
-                  if (!acc[key]) acc[key] = { value: 0, metric: curr.metric };
-                  acc[key].value += Number(curr.value) || 0;
+                const primaryMetrics = filteredPrimary.reduce((acc: any, curr: any) => {
+                  if (!acc[curr.platform]) acc[curr.platform] = { value: 0, metric: curr.metric };
+                  acc[curr.platform].value += (Number(curr.value) || 0);
                   return acc;
                 }, {});
 
-                // Simplified Growth Logic: In a real app we would explicitly find the "previous" month/week.
-                // For now, if "All" is selected, growth is NA. If a specific time is selected, 
-                // we'll find sum of all OTHER periods to act as a baseline, OR we just show the raw value if previous is complex.
-                // To keep it strictly comparing (Current vs Previous), we need chronologically sorted data, 
-                // but for MVP dashboard, we'll calculate Growth over a baseline if exact previous period isn't strictly defined.
-                // For demonstration, let's assume we want to just display the filtered values and a placeholder growth 
-                // if we don't have a reliable previous period, OR we can calculate vs the average.
+                const secondaryMetrics = filteredSecondary.reduce((acc: any, curr: any) => {
+                  if (!acc[curr.platform]) acc[curr.platform] = { value: 0 };
+                  acc[curr.platform].value += (Number(curr.value) || 0);
+                  return acc;
+                }, {});
 
-                // Let's implement a robust "vs Previous Period" if we have exact data, or just show the filtered total.
-                const calculateGrowth = (current: number, previous: number) => {
-                  if (!previous || previous === 0) return { pct: '0%', trend: 'up' };
-                  const diff = ((current - previous) / previous) * 100;
-                  return {
-                    pct: `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`,
-                    trend: diff >= 0 ? 'up' : 'down'
-                  };
-                };
-
-                // Group all raw data by platform to find global previous if possible.
-                // Right now we just display the filtered metrics.
-                const platforms = Object.keys(latestMetrics);
+                const platforms = Object.keys(primaryMetrics);
 
                 return (
                   <div>
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 font-black">Social Media & Community Trend</h3>
-                      <div className="flex gap-3">
-                        <select value={growthMonth} onChange={(e) => setGrowthMonth(e.target.value)}
-                          className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
-                          {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
-                        </select>
-                        <select value={growthWeek} onChange={(e) => setGrowthWeek(e.target.value)}
-                          className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
-                          {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                        </select>
+                      <h3 className="text-xl font-black tracking-tight leading-tight">Social Media & Community<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Growth Comparison</span></h3>
+                      <div className="flex flex-col md:flex-row gap-4 bg-zinc-50 p-2 rounded-2xl border border-zinc-200">
+                        {/* Primary Filters */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Primary</span>
+                          <select value={socialPrimaryMonth} onChange={(e) => setSocialPrimaryMonth(e.target.value)}
+                            className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none">
+                            {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                          </select>
+                          <select value={socialPrimaryWeek} onChange={(e) => setSocialPrimaryWeek(e.target.value)}
+                            className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none">
+                            {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                          </select>
+                        </div>
+                        <div className="hidden md:block w-px bg-zinc-200"></div>
+                        {/* Secondary Filters */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Compare</span>
+                          <select value={socialSecondaryMonth} onChange={(e) => setSocialSecondaryMonth(e.target.value)}
+                            className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none">
+                            {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                          </select>
+                          <select value={socialSecondaryWeek} onChange={(e) => setSocialSecondaryWeek(e.target.value)}
+                            className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none">
+                            {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                          </select>
+                        </div>
                       </div>
                     </div>
 
-                    {filteredSocials.length === 0 ? (
-                      <div className="text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest">No data for selected period</div>
+                    {platforms.length === 0 ? (
+                      <div className="text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest">No data for selected primary period</div>
                     ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                         {platforms.map((platform, idx) => {
-                          const currentVal = latestMetrics[platform].value;
-                          // Dummy up some variance for demonstration since we don't have strictly mapped "last week" logic yet
-                          const isUp = currentVal > 1000;
+                          const val1 = primaryMetrics[platform].value;
+                          const val2 = secondaryMetrics[platform]?.value || 0;
+                          const abs_change = val1 - val2;
+                          const pct_change = val2 > 0 ? ((abs_change / val2) * 100).toFixed(1) : 0;
+                          const isUp = abs_change > 0;
+                          const isDown = abs_change < 0;
 
                           return (
-                            <div key={idx} className="bg-white border border-zinc-200 p-5 rounded-xl text-center flex flex-col items-center justify-center transition hover:border-zinc-400 shadow-sm">
-                              <span className="text-[9px] font-black uppercase text-zinc-400 mb-2 tracking-widest">{platform}</span>
-                              <span className="text-xl font-black tracking-tighter">{currentVal.toLocaleString()}</span>
-                              <span className="text-[9px] text-zinc-300 font-bold mt-1 uppercase tracking-widest">{latestMetrics[platform].metric}</span>
+                            <div key={idx} className="bg-white border border-zinc-200 p-5 rounded-2xl text-center flex flex-col items-center justify-between transition hover:border-zinc-400 shadow-sm relative overflow-hidden group">
+                              <span className="text-[10px] font-black uppercase text-zinc-400 mb-2 tracking-widest absolute top-4 left-4">{platform}</span>
+                              <div className="mt-8 mb-4">
+                                <span className="text-3xl font-black tracking-tighter block">{val1.toLocaleString()}</span>
+                                <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">{primaryMetrics[platform].metric}</span>
+                              </div>
+                              <div className={`mt-auto w-[110%] -mb-5 py-3 ${isUp ? 'bg-emerald-50 text-emerald-600' : isDown ? 'bg-rose-50 text-rose-600' : 'bg-zinc-50 text-zinc-400'} flex items-center justify-center gap-2 group-hover:-translate-y-1 transition-transform`}>
+                                {isUp ? <ArrowUpRight size={14} /> : isDown ? <ArrowDownRight size={14} /> : <div className="w-2 h-2 rounded-full bg-zinc-300"></div>}
+                                <span className="text-xs font-black font-mono">{abs_change > 0 ? '+' : ''}{abs_change.toLocaleString()} ({abs_change > 0 ? '+' : ''}{pct_change}%)</span>
+                              </div>
                             </div>
                           )
                         })}
@@ -580,6 +605,24 @@ export default function MinimalistDashboard() {
           const totalActiveGeo = filteredData.reduce((acc: number, curr: any) => acc + Number(curr.activeGeoUsers), 0) || 0;
           const avgConversion = totalNewRegist > 0 ? ((totalActiveGeo / totalNewRegist) * 100).toFixed(2) : 0;
 
+          // Comparison Data
+          const comparisonData = userGrowthData.filter((d: any) =>
+            (growthCompareMonth === 'All' || d.month === growthCompareMonth) &&
+            (growthCompareWeek === 'All' || d.week === growthCompareWeek)
+          );
+
+          const compareNewRegist = comparisonData.reduce((acc: number, curr: any) => acc + Number(curr.newRegist), 0) || 0;
+          const compareActiveGeo = comparisonData.reduce((acc: number, curr: any) => acc + Number(curr.activeGeoUsers), 0) || 0;
+          const compareAvgConversion = compareNewRegist > 0 ? ((compareActiveGeo / compareNewRegist) * 100).toFixed(2) : 0;
+
+          const registChange = totalNewRegist - compareNewRegist;
+          const registPctMap = compareNewRegist > 0 ? ((registChange / compareNewRegist) * 100).toFixed(1) : 0;
+
+          const activeChange = totalActiveGeo - compareActiveGeo;
+          const activePctMap = compareActiveGeo > 0 ? ((activeChange / compareActiveGeo) * 100).toFixed(1) : 0;
+
+          const convChange = Number(avgConversion) - Number(compareAvgConversion);
+
           return (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 pb-6 mb-8">
@@ -587,21 +630,44 @@ export default function MinimalistDashboard() {
                   <h3 className="text-2xl font-black tracking-tight mb-1">User Growth Funnel</h3>
                   <p className="text-xs font-black uppercase tracking-widest text-zinc-400">Acquisition & Activation Mapping</p>
                 </div>
-                <div className="flex gap-3">
-                  <select
-                    value={growthMonth}
-                    onChange={(e) => setGrowthMonth(e.target.value)}
-                    className="bg-white border border-zinc-200 text-sm font-bold p-2.5 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
-                  >
-                    {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
-                  </select>
-                  <select
-                    value={growthWeek}
-                    onChange={(e) => setGrowthWeek(e.target.value)}
-                    className="bg-white border border-zinc-200 text-sm font-bold p-2.5 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
-                  >
-                    {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                  </select>
+                <div className="flex flex-col md:flex-row gap-4 bg-zinc-50 p-2 rounded-2xl border border-zinc-200">
+                  {/* Primary Growth Filters */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Primary</span>
+                    <select
+                      value={growthMonth}
+                      onChange={(e) => setGrowthMonth(e.target.value)}
+                      className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
+                    >
+                      {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                    </select>
+                    <select
+                      value={growthWeek}
+                      onChange={(e) => setGrowthWeek(e.target.value)}
+                      className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
+                    >
+                      {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                    </select>
+                  </div>
+                  <div className="hidden md:block w-px bg-zinc-200"></div>
+                  {/* Secondary Growth Filters */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Compare</span>
+                    <select
+                      value={growthCompareMonth}
+                      onChange={(e) => setGrowthCompareMonth(e.target.value)}
+                      className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
+                    >
+                      {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                    </select>
+                    <select
+                      value={growthCompareWeek}
+                      onChange={(e) => setGrowthCompareWeek(e.target.value)}
+                      className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none"
+                    >
+                      {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -614,14 +680,22 @@ export default function MinimalistDashboard() {
 
                   {/* Step 1: New Regist */}
                   <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex justify-between items-center shadow-sm relative z-20 transition hover:shadow-md hover:border-zinc-300">
-                    <div className="flex items-center gap-6">
-                      <div className="w-14 h-14 bg-blue-50 text-blue-500 flex items-center justify-center rounded-2xl shadow-inner"><Users size={28} /></div>
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 1: Top of Funnel</h4>
-                        <p className="text-2xl font-black tracking-tight text-zinc-900">New Registered Users</p>
+                    <div className="flex flex-col md:flex-row justify-between w-full h-full">
+                      <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 bg-blue-50 text-blue-500 flex items-center justify-center rounded-2xl shadow-inner"><Users size={28} /></div>
+                        <div>
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 1: Top of Funnel</h4>
+                          <p className="text-2xl font-black tracking-tight text-zinc-900">New Registered Users</p>
+                        </div>
+                      </div>
+                      <div className="text-right mt-4 md:mt-0 flex flex-col items-end justify-center">
+                        <div className="text-5xl font-black tracking-tighter">{totalNewRegist.toLocaleString()}</div>
+                        <div className={`mt-2 flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full ${registChange >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                          {registChange > 0 ? <ArrowUpRight size={14} /> : registChange < 0 ? <ArrowDownRight size={14} /> : null}
+                          {registChange > 0 ? '+' : ''}{registChange.toLocaleString()} ({registChange > 0 ? '+' : ''}{registPctMap}%)
+                        </div>
                       </div>
                     </div>
-                    <div className="text-5xl font-black tracking-tighter">{totalNewRegist.toLocaleString()}</div>
                   </div>
 
                   {/* Arrow Connector */}
@@ -631,14 +705,22 @@ export default function MinimalistDashboard() {
 
                   {/* Step 2: Paid User */}
                   <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex justify-between items-center shadow-sm relative z-20 w-[90%] mx-auto transition hover:shadow-md hover:border-zinc-300">
-                    <div className="flex items-center gap-6">
-                      <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner"><Target size={28} /></div>
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 2: Activation</h4>
-                        <p className="text-2xl font-black tracking-tight text-zinc-900">Paid User</p>
+                    <div className="flex flex-col md:flex-row justify-between w-full h-full">
+                      <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner"><Target size={28} /></div>
+                        <div>
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 2: Activation</h4>
+                          <p className="text-2xl font-black tracking-tight text-zinc-900">Paid User</p>
+                        </div>
+                      </div>
+                      <div className="text-right mt-4 md:mt-0 flex flex-col items-end justify-center">
+                        <div className="text-5xl font-black tracking-tighter">{totalActiveGeo.toLocaleString()}</div>
+                        <div className={`mt-2 flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full ${activeChange >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                          {activeChange > 0 ? <ArrowUpRight size={14} /> : activeChange < 0 ? <ArrowDownRight size={14} /> : null}
+                          {activeChange > 0 ? '+' : ''}{activeChange.toLocaleString()} ({activeChange > 0 ? '+' : ''}{activePctMap}%)
+                        </div>
                       </div>
                     </div>
-                    <div className="text-5xl font-black tracking-tighter">{totalActiveGeo.toLocaleString()}</div>
                   </div>
 
                   {/* Arrow Connector */}
@@ -648,14 +730,22 @@ export default function MinimalistDashboard() {
 
                   {/* Step 3: Conversion */}
                   <div className="bg-zinc-900 border border-zinc-800 text-white p-10 rounded-3xl flex justify-between items-center shadow-2xl shadow-zinc-200 relative z-20 w-[80%] mx-auto transform hover:scale-[1.02] transition">
-                    <div className="flex items-center gap-6">
-                      <div className="w-16 h-16 bg-white/10 flex items-center justify-center rounded-2xl backdrop-blur-sm"><Activity size={32} className="text-emerald-400" /></div>
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 3: Bottom of Funnel</h4>
-                        <p className="text-3xl font-black tracking-tight">Final Conversion</p>
+                    <div className="flex flex-col md:flex-row justify-between w-full h-full">
+                      <div className="flex items-center gap-6">
+                        <div className="w-16 h-16 bg-white/10 flex items-center justify-center rounded-2xl backdrop-blur-sm"><Activity size={32} className="text-emerald-400" /></div>
+                        <div>
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 3: Bottom of Funnel</h4>
+                          <p className="text-3xl font-black tracking-tight">Final Conversion</p>
+                        </div>
+                      </div>
+                      <div className="text-right mt-4 md:mt-0 flex flex-col items-end justify-center">
+                        <div className="text-6xl font-black tracking-tighter text-emerald-400 drop-shadow-md">{avgConversion}%</div>
+                        <div className={`mt-2 flex items-center gap-1 text-sm font-bold opacity-80 ${convChange >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
+                          {convChange > 0 ? <ArrowUpRight size={16} /> : convChange < 0 ? <ArrowDownRight size={16} /> : null}
+                          {convChange > 0 ? '+' : ''}{convChange.toFixed(2)}% vs {compareAvgConversion}%
+                        </div>
                       </div>
                     </div>
-                    <div className="text-6xl font-black tracking-tighter text-emerald-400 drop-shadow-md">{avgConversion}%</div>
                   </div>
 
                 </div>

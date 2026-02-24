@@ -236,9 +236,10 @@ export default function AdminPage() {
     const updateBiField = (section: string, index: number, field: string, value: any) => {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
-            if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [], academy: [] };
-            }
+            if (!n.biData) n.biData = {};
+            if (!Array.isArray((n.biData as any)[section])) (n.biData as any)[section] = [];
+
+            if (!(n.biData as any)[section][index]) return n;
             (n.biData as any)[section][index][field] = value;
 
             // Auto calculations
@@ -268,9 +269,9 @@ export default function AdminPage() {
     const addBiRow = (section: string, template: any) => {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
-            if (!n.biData) {
-                n.biData = { socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [], trends: [], academy: [] };
-            }
+            if (!n.biData) n.biData = {};
+            if (!Array.isArray((n.biData as any)[section])) (n.biData as any)[section] = [];
+
             (n.biData as any)[section].push(template);
             return n;
         });
@@ -279,7 +280,9 @@ export default function AdminPage() {
     const removeBiRow = (section: string, index: number) => {
         setLocalConfig(prev => {
             const n = JSON.parse(JSON.stringify(prev));
-            if (n.biData) (n.biData as any)[section].splice(index, 1);
+            if (n.biData && Array.isArray((n.biData as any)[section])) {
+                (n.biData as any)[section].splice(index, 1);
+            }
             return n;
         });
     };
@@ -761,7 +764,7 @@ export default function AdminPage() {
                             {config.biData && (
                                 <>
                                     {/* Sub-tabs */}
-                                    <div className="border-b border-zinc-200 flex gap-4 overflow-x-auto">
+                                    <div className="border-b border-zinc-200 flex gap-4 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                         {[
                                             { id: 'socials', label: 'Socials', icon: Globe },
                                             { id: 'campaigns', label: 'Campaigns', icon: TrendingUp },

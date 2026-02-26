@@ -22,12 +22,12 @@ export default function SidebarNav() {
     ];
 
     return (
-        <nav className="w-full md:w-64 bg-white border-r border-zinc-200 shrink-0 md:min-h-screen p-6 flex flex-col">
+        <nav className="w-full lg:w-64 bg-white border-r border-zinc-200 shrink-0 lg:min-h-screen p-6 flex flex-col">
             <div className="flex items-center gap-2 mb-10">
                 <img src="https://mapid.co.id/img/mapid_logo_black.png" alt="Mapid Logo" className="h-8 w-auto px-1" />
             </div>
 
-            <div className="flex md:flex-col gap-2 overflow-x-auto pb-4 md:pb-0">
+            <div className="flex lg:flex-col gap-2 overflow-x-auto pb-4 lg:pb-0">
                 {links.map(link => (
                     <Link
                         key={link.href}

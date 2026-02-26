@@ -409,9 +409,9 @@ export default function AdminPage() {
                 </div>
             </header>
 
-            <div className="max-w-6xl mx-auto px-6 lg:px-8 py-8 flex gap-8">
+            <div className="max-w-6xl mx-auto px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
                 {/* SECTION NAV */}
-                <aside className="w-56 shrink-0 hidden md:block">
+                <aside className="w-56 shrink-0 hidden lg:block">
                     <nav className="sticky top-28 space-y-1">
                         {sections.map(sec => (
                             <button key={sec.id} onClick={() => setActiveSection(sec.id)}
@@ -424,7 +424,7 @@ export default function AdminPage() {
                 </aside>
 
                 {/* MOBILE NAV */}
-                <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-200 z-30 flex overflow-x-auto">
+                <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-200 z-30 flex overflow-x-auto shadow-[0_-4px_24px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
                     {sections.map(sec => (
                         <button key={sec.id} onClick={() => setActiveSection(sec.id)}
                             className={`flex-1 flex flex-col items-center gap-1 py-3 text-[9px] font-bold uppercase tracking-wider transition min-w-[60px] ${activeSection === sec.id ? 'text-zinc-900' : 'text-zinc-400'
@@ -435,7 +435,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* MAIN CONTENT */}
-                <div className="flex-1 space-y-8 pb-24 md:pb-8">
+                <div className="flex-1 space-y-8 pb-24 lg:pb-8 min-w-0">
 
                     {/* ============ HOME PAGE ============ */}
                     {activeSection === 'home' && (
@@ -536,12 +536,12 @@ export default function AdminPage() {
                     {/* ============ RACI MATRIX ============ */}
                     {activeSection === 'raci' && (
                         <div className="space-y-6 animate-in fade-in duration-300">
-                            <div className="flex justify-between items-end mb-8">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-8">
                                 <div>
                                     <h2 className="text-2xl font-black tracking-tight">RACI Matrix</h2>
                                     <p className="text-sm text-zinc-400 font-medium mt-1">Click any cell to change its RACI value</p>
                                 </div>
-                                <button onClick={addRaciRow} className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition shadow-lg shadow-zinc-200">
+                                <button onClick={addRaciRow} className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold w-fit uppercase tracking-wider bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition shadow-lg shadow-zinc-200">
                                     <Plus size={14} /> Add Activity
                                 </button>
                             </div>
@@ -650,12 +650,12 @@ export default function AdminPage() {
                     {/* ============ BI DATA ============ */}
                     {activeSection === 'bidata' && (
                         <div className="space-y-6 animate-in fade-in duration-300">
-                            <div className="flex justify-between items-start mb-4">
+                            <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4 mb-4">
                                 <div>
                                     <h2 className="text-2xl font-black tracking-tight">BI Data Management</h2>
                                     <p className="text-sm text-zinc-400 font-medium mt-1">Edit all dashboard data directly — no spreadsheet needed</p>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-wrap items-center gap-3">
                                     <button
                                         onClick={async () => {
                                             setLoadingBiData(true);

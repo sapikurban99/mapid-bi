@@ -177,6 +177,19 @@ export default function MinimalistDashboard() {
     return label;
   };
 
+  const formatMonthDropdown = (label: string) => {
+    if (typeof label === 'string' && label.includes('T')) {
+      const date = new Date(label);
+      if (!isNaN(date.getTime())) {
+        return new Intl.DateTimeFormat('en-GB', {
+          month: 'short',
+          year: 'numeric'
+        }).format(date);
+      }
+    }
+    return label;
+  };
+
   // --- CALCULATIONS ---
   const b2cPeriods = new Set<string>();
   (data?.campaigns || []).forEach((c: any) => { if (c.period) b2cPeriods.add(c.period); });
@@ -401,10 +414,10 @@ export default function MinimalistDashboard() {
                       <div className="flex flex-col md:flex-row gap-4 bg-zinc-50 p-2 rounded-2xl border border-zinc-200">
                         {/* Primary Filters */}
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Primary</span>
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Now</span>
                           <select value={socialPrimaryMonth} onChange={(e) => setSocialPrimaryMonth(e.target.value)}
                             className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                            {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                            {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
                           </select>
                           <select value={socialPrimaryWeek} onChange={(e) => setSocialPrimaryWeek(e.target.value)}
                             className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
@@ -414,10 +427,10 @@ export default function MinimalistDashboard() {
                         <div className="hidden md:block w-px bg-zinc-200"></div>
                         {/* Secondary Filters */}
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Compare</span>
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Then</span>
                           <select value={socialSecondaryMonth} onChange={(e) => setSocialSecondaryMonth(e.target.value)}
                             className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                            {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                            {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
                           </select>
                           <select value={socialSecondaryWeek} onChange={(e) => setSocialSecondaryWeek(e.target.value)}
                             className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
@@ -513,49 +526,51 @@ export default function MinimalistDashboard() {
             <div>
               <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">B2C Product Revenue</h3>
               <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                    <tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Quarter</th><th className="px-6 py-4">Actual vs Target</th><th className="px-6 py-4">Progress</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {filteredB2cRevenue.length === 0 ? (
-                      <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No revenue data for selected period</td></tr>
-                    ) : filteredB2cRevenue.map((rev: any, idx: number) => {
-                      // Format angka desimal pada row tabel agar rapi
-                      const achPct = typeof rev.achievement === 'number' ? rev.achievement.toFixed(2) : rev.achievement;
-                      return (
-                        <tr key={idx} className="hover:bg-zinc-50 transition">
-                          <td className="px-6 py-5 font-bold">{rev.subProduct}</td>
-                          <td className="px-6 py-5 font-bold text-zinc-500 text-xs">{rev.quarter || '-'}</td>
-                          <td className="px-6 py-5 text-zinc-500 font-medium">{formatIDR(rev.actual)} <span className="opacity-30 mx-2">/</span> {formatIDR(rev.target)}</td>
-                          <td className="px-6 py-5">
-                            <div className="flex items-center gap-4">
-                              <div className="w-full max-w-[120px] bg-zinc-100 h-1.5 rounded-full overflow-hidden">
-                                <div className={`h-full ${rev.achievement >= 100 ? 'bg-emerald-500' : 'bg-zinc-900'}`} style={{ width: `${Math.min(rev.achievement, 100)}%` }}></div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left whitespace-nowrap">
+                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                      <tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Quarter</th><th className="px-6 py-4">Actual vs Target</th><th className="px-6 py-4">Progress</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {filteredB2cRevenue.length === 0 ? (
+                        <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No revenue data for selected period</td></tr>
+                      ) : filteredB2cRevenue.map((rev: any, idx: number) => {
+                        // Format angka desimal pada row tabel agar rapi
+                        const achPct = typeof rev.achievement === 'number' ? rev.achievement.toFixed(2) : rev.achievement;
+                        return (
+                          <tr key={idx} className="hover:bg-zinc-50 transition">
+                            <td className="px-6 py-5 font-bold">{rev.subProduct}</td>
+                            <td className="px-6 py-5 font-bold text-zinc-500 text-xs">{rev.quarter || '-'}</td>
+                            <td className="px-6 py-5 text-zinc-500 font-medium">{formatIDR(rev.actual)} <span className="opacity-30 mx-2">/</span> {formatIDR(rev.target)}</td>
+                            <td className="px-6 py-5">
+                              <div className="flex items-center gap-4">
+                                <div className="w-full max-w-[120px] bg-zinc-100 h-1.5 rounded-full overflow-hidden">
+                                  <div className={`h-full ${rev.achievement >= 100 ? 'bg-emerald-500' : 'bg-zinc-900'}`} style={{ width: `${Math.min(rev.achievement, 100)}%` }}></div>
+                                </div>
+                                <span className="text-[10px] font-black">{achPct}%</span>
                               </div>
-                              <span className="text-[10px] font-black">{achPct}%</span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    {/* BARIS TOTAL B2C */}
+                    <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
+                      <tr>
+                        <td colSpan={2} className="px-6 py-5 uppercase">Total B2C</td>
+                        <td className="px-6 py-5 font-bold">{formatIDR(totalB2CActual)} <span className="opacity-50 mx-1">/</span> {formatIDR(totalB2CTarget)}</td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-4">
+                            <div className="w-full max-w-[120px] bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" style={{ width: `${Math.min(Number(totalB2CAchievement), 100)}%` }}></div>
                             </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                  {/* BARIS TOTAL B2C */}
-                  <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
-                    <tr>
-                      <td colSpan={2} className="px-6 py-5 uppercase">Total B2C</td>
-                      <td className="px-6 py-5 font-bold">{formatIDR(totalB2CActual)} <span className="opacity-50 mx-1">/</span> {formatIDR(totalB2CTarget)}</td>
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-4">
-                          <div className="w-full max-w-[120px] bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" style={{ width: `${Math.min(Number(totalB2CAchievement), 100)}%` }}></div>
+                            <span className="text-emerald-400">{totalB2CAchievement}%</span>
                           </div>
-                          <span className="text-emerald-400">{totalB2CAchievement}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -687,7 +702,7 @@ export default function MinimalistDashboard() {
                     onChange={(e) => setGrowthMonth(e.target.value)}
                     className="bg-white border border-zinc-200 text-sm font-bold p-2.5 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
                   >
-                    {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                    {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
                   </select>
                   <select
                     value={growthWeek}
@@ -707,8 +722,8 @@ export default function MinimalistDashboard() {
                 <div className="flex flex-col gap-4 max-w-4xl mx-auto py-8">
 
                   {/* Step 1: New Regist */}
-                  <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex justify-between items-center shadow-sm relative z-20 transition hover:shadow-md hover:border-zinc-300">
-                    <div className="flex items-center gap-6">
+                  <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-sm relative z-20 transition hover:shadow-md hover:border-zinc-300">
+                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
                       <div className="w-14 h-14 bg-blue-50 text-blue-500 flex items-center justify-center rounded-2xl shadow-inner"><Users size={28} /></div>
                       <div>
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 1: Top of Funnel</h4>
@@ -724,8 +739,8 @@ export default function MinimalistDashboard() {
                   </div>
 
                   {/* Step 2: Paid User */}
-                  <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex justify-between items-center shadow-sm relative z-20 w-[90%] mx-auto transition hover:shadow-md hover:border-zinc-300">
-                    <div className="flex items-center gap-6">
+                  <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-sm relative z-20 w-[90%] mx-auto transition hover:shadow-md hover:border-zinc-300">
+                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
                       <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner"><Target size={28} /></div>
                       <div>
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 2: Activation</h4>
@@ -741,8 +756,8 @@ export default function MinimalistDashboard() {
                   </div>
 
                   {/* Step 3: Conversion */}
-                  <div className="bg-zinc-900 border border-zinc-800 text-white p-10 rounded-3xl flex justify-between items-center shadow-2xl shadow-zinc-200 relative z-20 w-[80%] mx-auto transform hover:scale-[1.02] transition">
-                    <div className="flex items-center gap-6">
+                  <div className="bg-zinc-900 border border-zinc-800 text-white p-10 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-2xl shadow-zinc-200 relative z-20 w-[80%] mx-auto transform hover:scale-[1.02] transition">
+                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
                       <div className="w-16 h-16 bg-white/10 flex items-center justify-center rounded-2xl backdrop-blur-sm"><Activity size={32} className="text-emerald-400" /></div>
                       <div>
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 3: Bottom of Funnel</h4>
@@ -762,13 +777,13 @@ export default function MinimalistDashboard() {
                   <div className="flex flex-col md:flex-row gap-4 bg-zinc-50 p-2 rounded-2xl border border-zinc-200">
                     {/* Primary Growth Filters */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Primary</span>
+                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Now</span>
                       <select
                         value={growthMonth}
                         onChange={(e) => setGrowthMonth(e.target.value)}
                         className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
                       >
-                        {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                        {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
                       </select>
                       <select
                         value={growthWeek}
@@ -781,13 +796,13 @@ export default function MinimalistDashboard() {
                     <div className="hidden md:block w-px bg-zinc-200"></div>
                     {/* Secondary Growth Filters */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Compare</span>
+                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Then</span>
                       <select
                         value={growthCompareMonth}
                         onChange={(e) => setGrowthCompareMonth(e.target.value)}
                         className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
                       >
-                        {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>)}
+                        {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
                       </select>
                       <select
                         value={growthCompareWeek}

@@ -20,13 +20,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="scroll-smooth">
-      <body className={`${inter.className} bg-zinc-50 text-zinc-900 flex flex-col md:flex-row min-h-screen`}>
+      <body className={`${inter.className} bg-zinc-50 text-zinc-900 flex flex-col lg:flex-row min-h-screen`}>
 
         {/* SIDEBAR NAVIGATION */}
         <SidebarNav />
 
         {/* KONTEN HALAMAN UTAMA */}
-        <div className="flex-1 overflow-x-hidden">
+        <div className="flex-1 min-w-0 overflow-x-hidden">
           {children}
         </div>
 

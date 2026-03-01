@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Target, Zap, ChevronRight, X } from 'lucide-react';
+import { ArrowRight, Target, Zap, ChevronRight, X, ChevronDown, ChevronUp, Layers, Briefcase } from 'lucide-react';
 import { getConfig, DEFAULT_CONFIG, SiteConfig } from './lib/config';
-
-
 
 export default function StrategyHome() {
   const [activeRole, setActiveRole] = useState<string | null>(null);
   const [config, setConfigState] = useState<SiteConfig>(DEFAULT_CONFIG);
+
+  // State untuk Hide/Show RACI Matrix
+  const [showRaci, setShowRaci] = useState<boolean>(true);
 
   useEffect(() => {
     setConfigState(getConfig());
@@ -20,11 +21,11 @@ export default function StrategyHome() {
   // Helper untuk render badge RACI
   const renderRACI = (type: string) => {
     switch (type) {
-      case 'R': return <span className="font-black text-blue-600 bg-blue-50 px-2 py-1 rounded">R</span>; // Responsible
-      case 'A': return <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded">A</span>; // Accountable
-      case 'R/A': return <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded">R/A</span>; // Resp & Acc
-      case 'C': return <span className="font-black text-amber-600 bg-amber-50 px-2 py-1 rounded">C</span>; // Consulted
-      default: return <span className="text-zinc-300 font-medium">I</span>; // Informed
+      case 'R': return <span className="font-black text-blue-600 bg-blue-50 px-2 py-1 rounded">R</span>;
+      case 'A': return <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded">A</span>;
+      case 'R/A': return <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded">R/A</span>;
+      case 'C': return <span className="font-black text-amber-600 bg-amber-50 px-2 py-1 rounded">C</span>;
+      default: return <span className="text-zinc-300 font-medium">I</span>;
     }
   };
 
@@ -97,7 +98,7 @@ export default function StrategyHome() {
                   className={`border-2 p-8 w-full text-center cursor-pointer transition-all rounded-2xl ${activeRole === 'hob' ? 'bg-zinc-900 text-white border-zinc-900 scale-105 shadow-xl' : 'bg-white border-zinc-200 hover:border-zinc-900 hover:shadow-lg'}`}
                 >
                   <h3 className="font-black text-xl mb-1">Head of Business</h3>
-                  <p className={`text-xs font-bold tracking-widest ${activeRole === 'hob' ? 'text-zinc-400' : 'text-zinc-400'} uppercase`}>Growth & Ops</p>
+                  <p className={`text-xs font-bold tracking-widest ${activeRole === 'hob' ? 'text-zinc-400' : 'text-zinc-400'} uppercase`}>Hadi</p>
                 </div>
 
                 <div className="w-[2px] bg-zinc-200 h-8"></div>
@@ -144,7 +145,7 @@ export default function StrategyHome() {
                   className={`border-2 p-8 w-full text-center cursor-pointer transition-all rounded-2xl ${activeRole === 'enterprise_lead' ? 'bg-zinc-900 text-white border-zinc-900 scale-105 shadow-xl' : 'bg-white border-zinc-200 hover:border-zinc-900 hover:shadow-lg'}`}
                 >
                   <h3 className="font-black text-xl mb-1">Enterprise Lead</h3>
-                  <p className={`text-xs font-bold tracking-widest ${activeRole === 'enterprise_lead' ? 'text-zinc-400' : 'text-zinc-400'} uppercase`}>Commercial</p>
+                  <p className={`text-xs font-bold tracking-widest ${activeRole === 'enterprise_lead' ? 'text-zinc-400' : 'text-zinc-400'} uppercase`}>Andrew</p>
                 </div>
 
                 <div className="w-[2px] bg-zinc-200 h-8"></div>
@@ -154,44 +155,117 @@ export default function StrategyHome() {
                   className={`border-2 p-6 w-full max-w-[240px] text-center cursor-pointer transition-all rounded-xl ${activeRole === 'sales_enterprise' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white border-zinc-200 hover:border-zinc-900'}`}
                 >
                   <h4 className="text-sm font-black mb-1">Sales Enterprise</h4>
-                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Hunter Team</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Rani & Titan</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* RACI MATRIX */}
-        <section className="mb-24">
-          <div className="flex justify-between items-end mb-8">
+        {/* RACI MATRIX WITH HIDE/SHOW TOGGLE */}
+        <section className="mb-32">
+          <div className="flex justify-between items-center border-b border-zinc-200 pb-4 mb-8">
             <h2 className="text-2xl font-black tracking-tight">RACI Matrix Alignment</h2>
+            <button
+              onClick={() => setShowRaci(!showRaci)}
+              className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors bg-zinc-100 hover:bg-zinc-200 px-4 py-2 rounded-lg"
+            >
+              {showRaci ? 'Hide Matrix' : 'Show Matrix'}
+              {showRaci ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
           </div>
-          <div className="bg-white border border-zinc-200 overflow-x-auto rounded-2xl shadow-sm">
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-zinc-900 text-[10px] uppercase tracking-[0.2em] text-white">
-                <tr>
-                  <th className="px-6 py-5 font-black">Activity Function</th>
-                  {config.raci.columns.map(col => (
-                    <th key={col.key} className="px-4 py-5 text-center font-bold">{col.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {config.raci.rows.map((row, ridx) => (
-                  <tr key={ridx} className="hover:bg-zinc-50 transition">
-                    <td className="px-6 py-5 font-bold text-zinc-900">{row.activity}</td>
+
+          {/* Transition wrapper for hide/show */}
+          <div className={`transition-all duration-500 ease-in-out overflow-hidden ${showRaci ? 'opacity-100 max-h-[1000px]' : 'opacity-0 max-h-0'}`}>
+            <div className="bg-white border border-zinc-200 overflow-x-auto rounded-2xl shadow-sm">
+              <table className="w-full text-sm text-left whitespace-nowrap">
+                <thead className="bg-zinc-900 text-[10px] uppercase tracking-[0.2em] text-white">
+                  <tr>
+                    <th className="px-6 py-5 font-black">Activity Function</th>
                     {config.raci.columns.map(col => (
-                      <td key={col.key} className="text-center">{renderRACI(row.values[col.key] || 'I')}</td>
+                      <th key={col.key} className="px-4 py-5 text-center font-bold">{col.label}</th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="p-4 bg-zinc-50 text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex gap-6 justify-center">
-              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div> (R) Responsible</span>
-              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> (A) Accountable</span>
-              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500"></div> (C) Consulted</span>
-              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-zinc-300"></div> (I) Informed</span>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {config.raci.rows.map((row, ridx) => (
+                    <tr key={ridx} className="hover:bg-zinc-50 transition">
+                      <td className="px-6 py-5 font-bold text-zinc-900">{row.activity}</td>
+                      {config.raci.columns.map(col => (
+                        <td key={col.key} className="text-center">{renderRACI(row.values[col.key] || 'I')}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="p-4 bg-zinc-50 text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex gap-6 justify-center border-t border-zinc-200">
+                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div> (R) Responsible</span>
+                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> (A) Accountable</span>
+                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500"></div> (C) Consulted</span>
+                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-zinc-300"></div> (I) Informed</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* BUSINESS MODEL & PRODUCT OVERVIEW */}
+        <section className="mb-24">
+          <div className="mb-12 border-b border-zinc-200 pb-6 flex justify-between items-end">
+            <div>
+              <h2 className="text-3xl font-black tracking-tight mb-2">Business Core</h2>
+              <p className="text-zinc-500 font-medium">Overview of the main revenue streams and product architecture.</p>
+            </div>
+            {/* Edit Button Placeholder - This indicates it's editable */}
+            <button className="text-xs font-bold uppercase tracking-widest text-zinc-500 border border-zinc-300 px-4 py-2 rounded-lg hover:bg-zinc-900 hover:text-white hover:border-zinc-900 transition-all">
+              Edit Core
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Core 1: B2B */}
+            <div className="bg-white border border-zinc-200 p-8 rounded-2xl shadow-sm group hover:border-zinc-900 transition-colors">
+              <div className="flex items-center gap-4 mb-6 pb-6 border-b border-zinc-100">
+                <div className="p-3 bg-zinc-100 rounded-xl group-hover:bg-zinc-900 group-hover:text-white transition-colors">
+                  <Briefcase size={24} />
+                </div>
+                <div>
+                  <h3 className="font-black text-xl">Enterprise Solutions (B2B)</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">High-Value Contracts</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+                  <h4 className="font-bold text-sm mb-1 text-zinc-900">Custom Implementation</h4>
+                  <p className="text-xs text-zinc-500 leading-relaxed">Tailored geospatial solutions involving full SDLC, custom dashboard creation, and data integration tailored for BUMN/Enterprise.</p>
+                </div>
+                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+                  <h4 className="font-bold text-sm mb-1 text-zinc-900">Pilot & Renewal</h4>
+                  <p className="text-xs text-zinc-500 leading-relaxed">Initial PoC projects scaling into annual recurring maintenance and license renewal contracts.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Core 2: B2C & Academy */}
+            <div className="bg-white border border-zinc-200 p-8 rounded-2xl shadow-sm group hover:border-zinc-900 transition-colors">
+              <div className="flex items-center gap-4 mb-6 pb-6 border-b border-zinc-100">
+                <div className="p-3 bg-zinc-100 rounded-xl group-hover:bg-zinc-900 group-hover:text-white transition-colors">
+                  <Layers size={24} />
+                </div>
+                <div>
+                  <h3 className="font-black text-xl">Platform & Academy (B2C)</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Volume & Community Growth</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+                  <h4 className="font-bold text-sm mb-1 text-zinc-900">Personal License & Business Expansion Package</h4>
+                  <p className="text-xs text-zinc-500 leading-relaxed">Self-serve subscriptions via the platform targeting individual professionals, researchers, and small businesses.</p>
+                </div>
+                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+                  <h4 className="font-bold text-sm mb-1 text-zinc-900">Academy Training</h4>
+                  <p className="text-xs text-zinc-500 leading-relaxed">Monetized curriculum including WebGIS and Location Analytics courses, acting as both revenue generator and product adoption funnel.</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>

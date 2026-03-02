@@ -707,12 +707,106 @@ export default function AdminPage() {
                             <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4 mb-4">
                                 <div>
                                     <h2 className="text-2xl font-black tracking-tight">BI Data Management</h2>
-                                    <p className="text-sm text-zinc-400 font-medium mt-1">Sistem List & Modal untuk input yang lebih responsif</p>
+                                    <p className="text-sm text-zinc-400 font-medium mt-1">Edit all dashboard data directly — no spreadsheet needed</p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={async () => { /* Load dari Spreadsheet logic */ }} className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg"><Globe size={14} className="inline mr-1" /> Fetch Data</button>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <button
+                                        onClick={async () => {
+                                            setLoadingBiData(true);
+                                            setBiLoadMsg('');
+                                            try {
+                                                const res = await fetch('/api/gas');
+                                                const json = await res.json();
+                                                if (json.isError || json.error) {
+                                                    setBiLoadMsg('Gagal fetch: ' + (json.message || json.title));
+                                                } else {
+                                                    const biData: BIData = {
+                                                        socials: json.socials || [],
+                                                        campaigns: json.campaigns || [],
+                                                        revenue: json.revenue || [],
+                                                        pipeline: json.pipeline || [],
+                                                        projects: json.projects || [],
+                                                        docs: json.docs || [],
+                                                        userGrowth: json.userGrowth || [],
+                                                        trends: json.trends || [],
+                                                        academy: json.academy || [],
+                                                    };
+                                                    updateConfig('biData', biData);
+                                                    setBiLoadMsg('✓ Data loaded!');
+                                                    setTimeout(() => setBiLoadMsg(''), 2000);
+                                                }
+                                            } catch (err: any) {
+                                                setBiLoadMsg('Error: ' + err.message);
+                                            }
+                                            setLoadingBiData(false);
+                                        }}
+                                        disabled={loadingBiData}
+                                        className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition shrink-0 ${loadingBiData ? 'bg-zinc-300 text-white cursor-wait' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-100'}`}>
+                                        {loadingBiData ? <><Loader2 size={14} className="animate-spin" /> Loading...</> : <><Globe size={14} /> Fetch Data</>}
+                                    </button>
                                 </div>
                             </div>
+
+                            {biLoadMsg && (
+                                <p className={`text-xs font-bold mb-2 ${biLoadMsg.startsWith('✓') ? 'text-emerald-600' : 'text-amber-600'}`}>{biLoadMsg}</p>
+                            )}
+
+                            {!config.biData && (
+                                <div className="bg-white border border-zinc-200 rounded-2xl p-8 text-center">
+                                    <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Database className="text-zinc-400" size={24} />
+                                    </div>
+                                    <h3 className="text-lg font-black tracking-tight mb-2">Load Data dari Spreadsheet</h3>
+                                    <p className="text-sm text-zinc-400 font-medium mb-6 max-w-md mx-auto">Ambil data yang sudah ada di Google Sheets, lalu edit langsung dari sini. Tidak perlu buka spreadsheet lagi.</p>
+                                    {biLoadMsg && (
+                                        <p className="text-xs font-bold text-amber-600 mb-4">{biLoadMsg}</p>
+                                    )}
+                                    <div className="flex gap-3 justify-center">
+                                        <button
+                                            onClick={async () => {
+                                                setLoadingBiData(true);
+                                                setBiLoadMsg('');
+                                                try {
+                                                    const res = await fetch('/api/gas');
+                                                    const json = await res.json();
+                                                    if (json.isError || json.error) {
+                                                        setBiLoadMsg('Gagal fetch dari GAS: ' + (json.message || json.title));
+                                                    } else {
+                                                        const biData: BIData = {
+                                                            socials: json.socials || [],
+                                                            campaigns: json.campaigns || [],
+                                                            revenue: json.revenue || [],
+                                                            pipeline: json.pipeline || [],
+                                                            projects: json.projects || [],
+                                                            docs: json.docs || [],
+                                                            userGrowth: json.userGrowth || [],
+                                                            trends: json.trends || [],
+                                                            academy: json.academy || [],
+                                                        };
+                                                        updateConfig('biData', biData);
+                                                        setBiLoadMsg('');
+                                                    }
+                                                } catch (err: any) {
+                                                    setBiLoadMsg('Network error: ' + err.message);
+                                                }
+                                                setLoadingBiData(false);
+                                            }}
+                                            disabled={loadingBiData}
+                                            className={`flex items-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg ${loadingBiData ? 'bg-zinc-400 text-white cursor-wait' : 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-zinc-200'
+                                                }`}>
+                                            {loadingBiData ? <><Loader2 size={14} className="animate-spin" /> Fetching...</> : <><Globe size={14} /> Fetch Data</>}
+                                        </button>
+                                        <button
+                                            onClick={() => updateConfig('biData', {
+                                                socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [],
+                                                trends: [], academy: []
+                                            })}
+                                            className="flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition">
+                                            <Plus size={14} /> Mulai Kosong
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {config.biData && (
                                 <>

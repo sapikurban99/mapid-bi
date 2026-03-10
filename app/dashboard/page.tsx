@@ -11,26 +11,25 @@ import LoadingProgress from '../components/LoadingProgress';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell } from 'recharts';
 
 export default function MinimalistDashboard() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Trends');
   const [trendCategory, setTrendCategory] = useState('All');
   const [galleryCategory, setGalleryCategory] = useState('All');
   const [b2cPeriod, setB2cPeriod] = useState('All');
+  const [b2bQuarter, setB2bQuarter] = useState('All');
 
-  // States for User Growth Comparison
-  const [growthMonth, setGrowthMonth] = useState('All');
-  const [growthWeek, setGrowthWeek] = useState('All');
-  const [growthCompareMonth, setGrowthCompareMonth] = useState('All');
-  const [growthCompareWeek, setGrowthCompareWeek] = useState('All');
+  // Pagination states
+  const [pipelinePage, setPipelinePage] = useState(1);
+  const [revenuePage, setRevenuePage] = useState(1);
+  const [projectPage, setProjectPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+
 
   // States for Social & Community Comparison
   const [socialPrimaryMonth, setSocialPrimaryMonth] = useState('All');
   const [socialPrimaryWeek, setSocialPrimaryWeek] = useState('All');
   const [socialSecondaryMonth, setSocialSecondaryMonth] = useState('All');
   const [socialSecondaryWeek, setSocialSecondaryWeek] = useState('All');
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<any>(null);
 
   // Custom Recharts Tooltip
@@ -48,96 +47,24 @@ export default function MinimalistDashboard() {
     return null;
   };
 
-  // --- PROGRESS BAR STATE ---
-  const fetchDone = useRef(false);
-
-  // --- CONFIG ---
   const [config, setConfigState] = useState(() => getConfig());
-  useEffect(() => { setConfigState(getConfig()); }, []);
+  useEffect(() => {
+    // Wait briefly for global data provider to finish
+    // then get config
+    const interval = setInterval(() => {
+      const c = getConfig();
+      if (c.biData && Object.keys(c.biData).length > 0) {
+        setConfigState(c);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const data = config.biData; // Use globally cached data
 
   const visibleTabs = Object.entries(config.tabsVisible)
     .filter(([, visible]) => visible)
     .map(([name]) => name);
-
-  // --- SIMPLE AUTH LOGIC ---
-  useEffect(() => {
-    // Check local storage on mount
-    const authRecord = localStorage.getItem('bi_dashboard_auth');
-    if (authRecord) {
-      try {
-        const parsed = JSON.parse(authRecord);
-        if (parsed.authorized && new Date().getTime() < parsed.expiresAt) {
-          setIsAuthorized(true);
-        } else {
-          localStorage.removeItem('bi_dashboard_auth');
-        }
-      } catch (e) {
-        localStorage.removeItem('bi_dashboard_auth');
-      }
-    }
-  }, []);
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === config.biPassword) {
-      setIsAuthorized(true);
-      // Save session for 24 hours
-      localStorage.setItem('bi_dashboard_auth', JSON.stringify({
-        authorized: true,
-        expiresAt: new Date().getTime() + 24 * 60 * 60 * 1000
-      }));
-    } else {
-      alert('Akses Ditolak: Password Salah!');
-    }
-  };
-
-  // --- DATA FETCH ---
-  useEffect(() => {
-    if (!isAuthorized) return;
-    fetchDone.current = false;
-
-    // Actual data fetch — check admin biData override first
-    const adminBiData = config.biData;
-
-    fetch('/api/gas')
-      .then(res => res.json())
-      .then(json => {
-        if (json.isError || json.error) {
-          if (adminBiData) {
-            setData(adminBiData);
-          } else {
-            setErrorMsg(json);
-          }
-        } else {
-          // Prioritize REAL spreadsheet arrays over stringified AdminConfig cache when possible
-          const mergedData = { ...json };
-
-          const fallbackData = json.adminConfig?.biData || adminBiData || {};
-
-          // Overwrite with fallback ONLY IF the live spreadsheet data is completely empty
-          mergedData.socials = mergedData.socials?.length ? mergedData.socials : fallbackData.socials || [];
-          mergedData.campaigns = mergedData.campaigns?.length ? mergedData.campaigns : fallbackData.campaigns || [];
-          mergedData.revenue = mergedData.revenue?.length ? mergedData.revenue : fallbackData.revenue || [];
-          mergedData.pipeline = mergedData.pipeline?.length ? mergedData.pipeline : fallbackData.pipeline || [];
-          mergedData.projects = mergedData.projects?.length ? mergedData.projects : fallbackData.projects || [];
-          mergedData.trends = mergedData.trends?.length ? mergedData.trends : fallbackData.trends || [];
-          mergedData.userGrowth = mergedData.userGrowth?.length ? mergedData.userGrowth : fallbackData.userGrowth || [];
-          mergedData.academy = mergedData.academy?.length ? mergedData.academy : fallbackData.academy || [];
-          mergedData.docs = mergedData.docs?.length ? mergedData.docs : fallbackData.docs || [];
-
-          setData(mergedData);
-        }
-        fetchDone.current = true;
-      })
-      .catch(err => {
-        if (adminBiData) {
-          setData(adminBiData);
-        } else {
-          setErrorMsg({ title: "Network Error", message: err.message });
-        }
-        fetchDone.current = true;
-      });
-  }, [isAuthorized]);
 
   // --- HELPER FORMATTERS ---
   const formatIDR = (value: number) => {
@@ -202,47 +129,9 @@ export default function MinimalistDashboard() {
   const totalB2CActual = filteredB2cRevenue.reduce((acc: number, curr: any) => acc + curr.actual, 0) || 0;
   const totalB2CTarget = filteredB2cRevenue.reduce((acc: number, curr: any) => acc + curr.target, 0) || 0;
   const totalB2CAchievement = totalB2CTarget > 0 ? ((totalB2CActual / totalB2CTarget) * 100).toFixed(2) : '0.00';
-  const totalB2BPipeline = data?.pipeline?.reduce((acc: number, curr: any) => acc + (curr.value || 0), 0) || 0;
 
-  if (!isAuthorized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-100 font-sans p-6">
-        <form onSubmit={handleLogin} className="bg-white p-10 border border-zinc-200 shadow-2xl w-full max-w-sm text-center rounded-2xl">
-          <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Lock className="text-white" size={24} />
-          </div>
-          <h2 className="text-2xl font-black tracking-tight mb-2 uppercase">BI Access</h2>
-          <p className="text-zinc-400 text-xs mb-8 uppercase tracking-widest font-bold">Internal MAPID Team Only</p>
-          <input
-            type="password"
-            placeholder="Passkey"
-            className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-xl mb-4 text-center focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all font-bold"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button type="submit" className="w-full bg-zinc-900 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg shadow-zinc-200">
-            Unlock Data
-          </button>
-        </form>
-      </div>
-    );
-  }
-
-  if (loading) return (
-    <LoadingProgress
-      isLoading={true}
-      fetchDone={fetchDone.current}
-      title="Syncing SOT Database"
-      stages={[
-        { target: 20, label: 'Connecting to server...' },
-        { target: 35, label: 'Establishing secure link...' },
-        { target: 55, label: 'Fetching data from SOT...' },
-        { target: 70, label: 'Processing response...' },
-        { target: 90, label: 'Building visualizations...' },
-      ]}
-      onComplete={() => setLoading(false)}
-    />
-  );
+  const activePipeline = (data?.pipeline || []).filter((p: any) => p.stage !== 'Won');
+  const totalB2BPipeline = activePipeline.reduce((acc: number, curr: any) => acc + (curr.value || 0), 0) || 0;
 
   // --- LOGIC GRAFIK SVG PROPORSIONAL ---
   const currentTrendData = (Array.isArray(data?.trends) ? data.trends : [])
@@ -270,7 +159,6 @@ export default function MinimalistDashboard() {
         {config.tabsVisible.Trends && <button onClick={() => setActiveTab('Trends')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Trends' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Trends</button>}
         {config.tabsVisible.B2C && <button onClick={() => setActiveTab('B2C')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'B2C' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>B2C</button>}
         {config.tabsVisible.B2B && <button onClick={() => setActiveTab('B2B')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'B2B' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>B2B</button>}
-        {config.tabsVisible.UserGrowth && <button onClick={() => setActiveTab('UserGrowth')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'UserGrowth' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>UserGrowth</button>}
         {config.tabsVisible.Academy && <button onClick={() => setActiveTab('Academy')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Academy' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Academy</button>}
         {config.tabsVisible.Gallery && <button onClick={() => setActiveTab('Gallery')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Gallery' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Gallery</button>}
       </div>
@@ -361,6 +249,69 @@ export default function MinimalistDashboard() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* BUDGET DISBURSEMENT SECTION */}
+            <div className="pt-8 border-t border-zinc-200 mt-12 mb-6">
+              <h3 className="text-xl font-black tracking-tight leading-tight mb-6">Budget Disbursement<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</span></h3>
+              {(() => {
+                const disbursementData = data?.disbursement || [];
+                const totalSpent = disbursementData.reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
+
+                // Group by Category
+                const spentByCategory = disbursementData.reduce((acc: any, item: any) => {
+                  const cat = item.category || 'Other';
+                  acc[cat] = (acc[cat] || 0) + (Number(item.amount) || 0);
+                  return acc;
+                }, {});
+
+                // Sort categories by highest spent
+                const sortedCategories = Object.entries(spentByCategory).sort((a: any, b: any) => b[1] - a[1]);
+
+                return (
+                  <div className="space-y-8">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-zinc-900 text-white p-6 rounded-2xl shadow-xl">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Total Budget Spent</h4>
+                        <div className="text-2xl font-black tracking-tighter text-emerald-400">{formatIDR(totalSpent)}</div>
+                      </div>
+                      {sortedCategories.slice(0, 3).map(([cat, amount]: any, idx) => (
+                        <div key={cat} className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm transition hover:border-zinc-300">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">{cat}</h4>
+                          <div className="text-xl font-black tracking-tighter text-zinc-900">{formatIDR(amount)}</div>
+                          <div className="text-[10px] font-bold text-zinc-400 mt-1 text-right">{totalSpent > 0 ? ((amount / totalSpent) * 100).toFixed(1) : 0}% of Total</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Disbursement History Table */}
+                    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                            <tr><th className="px-6 py-4">Date</th><th className="px-6 py-4">Category</th><th className="px-6 py-4 min-w-[200px]">Description</th><th className="px-6 py-4 text-right">Amount (IDR)</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-100">
+                            {disbursementData.length === 0 ? (
+                              <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending recorded</td></tr>
+                            ) : (
+                              disbursementData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-zinc-50 transition">
+                                  <td className="px-6 py-5 font-bold whitespace-nowrap">{formatDate(row.date)}</td>
+                                  <td className="px-6 py-5"><span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span></td>
+                                  <td className="px-6 py-5 text-zinc-500 font-medium italic">{row.description || '-'}</td>
+                                  <td className="px-6 py-5 text-right font-mono font-bold text-zinc-900">{formatIDR(row.amount)}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -593,7 +544,7 @@ export default function MinimalistDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {data?.pipeline?.map((p: any, idx: number) => (
+                      {activePipeline.slice((pipelinePage - 1) * ITEMS_PER_PAGE, pipelinePage * ITEMS_PER_PAGE).map((p: any, idx: number) => (
                         <tr key={idx} className="hover:bg-zinc-50 transition text-zinc-900">
                           <td className="px-6 py-4 font-bold">{p.client}</td>
                           <td className="px-4 py-4">
@@ -610,14 +561,95 @@ export default function MinimalistDashboard() {
                         <td colSpan={2} className="px-6 py-6">TOTAL PIPELINE VALUE</td>
                         <td className="px-4 py-6 text-right text-sm text-emerald-400">{formatIDR(totalB2BPipeline)}</td>
                         <td colSpan={2} className="px-6 py-6 text-zinc-500 text-right font-normal lowercase tracking-normal italic text-[8px]">
-                          *estimasi lead aktif (exclude won/lost lama)
+                          *estimasi lead aktif (exclude won)
                         </td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
+                {activePipeline.length > ITEMS_PER_PAGE && (
+                  <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
+                    <button onClick={() => setPipelinePage(p => Math.max(1, p - 1))} disabled={pipelinePage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
+                    <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {pipelinePage} of {Math.ceil(activePipeline.length / ITEMS_PER_PAGE)}</span>
+                    <button onClick={() => setPipelinePage(p => Math.min(Math.ceil(activePipeline.length / ITEMS_PER_PAGE), p + 1))} disabled={pipelinePage === Math.ceil(activePipeline.length / ITEMS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* B2B Revenue Realization */}
+            {(() => {
+              const wonPipeline = (data?.pipeline || []).filter((p: any) => p.stage === 'Won');
+
+              const getQuarter = (dateStr: string) => {
+                if (!dateStr || dateStr === '#') return 'Unknown';
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return 'Unknown';
+                const month = d.getMonth();
+                return `Q${Math.floor(month / 3) + 1}`;
+              };
+
+              const revenueData = wonPipeline.map((p: any) => ({
+                ...p,
+                quarter: getQuarter(p.eta)
+              }));
+
+              const uniqueQuarters = ['All', ...(Array.from(new Set(revenueData.map((d: any) => d.quarter).filter(Boolean))) as string[]).sort()];
+
+              const filteredRevenue = revenueData.filter((d: any) => b2bQuarter === 'All' || d.quarter === b2bQuarter);
+              const totalRevenue = filteredRevenue.reduce((acc: number, curr: any) => acc + (Number(curr.value) || 0), 0);
+
+              return (
+                <div className="pt-8 border-t border-zinc-200 mt-12 mb-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-zinc-200 pb-4 mb-6 gap-4">
+                    <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">B2B Revenue Realization <span className="text-zinc-400 font-medium text-xs ml-2">(Closed Won)</span></h3>
+                    <select value={b2bQuarter} onChange={(e) => setB2bQuarter(e.target.value)}
+                      className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
+                      {uniqueQuarters.map((q: string) => <option key={q} value={q}>{q === 'All' ? 'All Quarters' : q}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left whitespace-nowrap">
+                        <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 font-black uppercase tracking-widest">
+                          <tr>
+                            <th className="px-6 py-4">Client Name</th>
+                            <th className="px-4 py-4 text-right">Project Value</th>
+                            <th className="px-6 py-4">Close Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                          {filteredRevenue.length === 0 ? (
+                            <tr><td colSpan={3} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No revenue data for selected quarter</td></tr>
+                          ) : filteredRevenue.slice((revenuePage - 1) * ITEMS_PER_PAGE, revenuePage * ITEMS_PER_PAGE).map((p: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-zinc-50 transition text-zinc-900">
+                              <td className="px-6 py-4 font-bold">{p.client}</td>
+                              <td className="px-4 py-4 text-right font-mono font-bold">{formatIDR(p.value)}</td>
+                              <td className="px-6 py-4 font-bold uppercase tracking-tighter text-emerald-600">{formatDate(p.eta)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
+                          <tr>
+                            <td className="px-6 py-6 font-bold text-zinc-400 uppercase tracking-widest">Total Realized Revenue</td>
+                            <td className="px-4 py-6 text-right text-sm text-emerald-400">{formatIDR(totalRevenue)}</td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    {filteredRevenue.length > ITEMS_PER_PAGE && (
+                      <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
+                        <button onClick={() => setRevenuePage(p => Math.max(1, p - 1))} disabled={revenuePage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
+                        <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {revenuePage} of {Math.ceil(filteredRevenue.length / ITEMS_PER_PAGE)}</span>
+                        <button onClick={() => setRevenuePage(p => Math.min(Math.ceil(filteredRevenue.length / ITEMS_PER_PAGE), p + 1))} disabled={revenuePage === Math.ceil(filteredRevenue.length / ITEMS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Project Delivery */}
             <div>
@@ -629,7 +661,7 @@ export default function MinimalistDashboard() {
                       <tr><th className="px-6 py-4">Project</th><th className="px-6 py-4">Phase</th><th className="px-6 py-4">Progress</th><th className="px-6 py-4 min-w-[300px]">Issue</th></tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {data?.projects?.map((proj: any, idx: number) => (
+                      {(data?.projects || []).slice((projectPage - 1) * ITEMS_PER_PAGE, projectPage * ITEMS_PER_PAGE).map((proj: any, idx: number) => (
                         <tr key={idx} className="hover:bg-zinc-50 transition">
                           <td className="px-6 py-5 font-bold whitespace-nowrap">{proj.name}</td>
                           <td className="px-6 py-5 text-zinc-500 font-medium italic uppercase text-xs tracking-tighter whitespace-nowrap">{proj.phase}</td>
@@ -647,237 +679,19 @@ export default function MinimalistDashboard() {
                     </tbody>
                   </table>
                 </div>
+                {(data?.projects || []).length > ITEMS_PER_PAGE && (
+                  <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
+                    <button onClick={() => setProjectPage(p => Math.max(1, p - 1))} disabled={projectPage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
+                    <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {projectPage} of {Math.ceil((data?.projects || []).length / ITEMS_PER_PAGE)}</span>
+                    <button onClick={() => setProjectPage(p => Math.min(Math.ceil((data?.projects || []).length / ITEMS_PER_PAGE), p + 1))} disabled={projectPage === Math.ceil((data?.projects || []).length / ITEMS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* === TAB 4: USER GROWTH === */}
-        {activeTab === 'UserGrowth' && (() => {
-          // --- DATA TRANSFORMS FOR ACADEMY ---
-          const validAcademyData = config.biData?.academy || [];
-          const academyPrograms = Array.from(new Set(validAcademyData.map(a => a.program))).sort();
 
-          const userGrowthData = data?.userGrowth || [];
-          const uniqueMonths = ['All', ...Array.from(new Set(userGrowthData.map((d: any) => d.month).filter(Boolean)))];
-          const uniqueWeeks = ['All', ...Array.from(new Set(userGrowthData.map((d: any) => d.week).filter(Boolean)))];
-
-          const filteredData = userGrowthData.filter((d: any) =>
-            (growthMonth === 'All' || d.month === growthMonth) &&
-            (growthWeek === 'All' || d.week === growthWeek)
-          );
-
-          const totalNewRegist = filteredData.reduce((acc: number, curr: any) => acc + Number(curr.newRegist), 0) || 0;
-          const totalActiveGeo = filteredData.reduce((acc: number, curr: any) => acc + Number(curr.activeGeoUsers), 0) || 0;
-          const avgConversion = totalNewRegist > 0 ? ((totalActiveGeo / totalNewRegist) * 100).toFixed(2) : 0;
-
-          // Comparison Data
-          const comparisonData = userGrowthData.filter((d: any) =>
-            (growthCompareMonth === 'All' || d.month === growthCompareMonth) &&
-            (growthCompareWeek === 'All' || d.week === growthCompareWeek)
-          );
-
-          const compareNewRegist = comparisonData.reduce((acc: number, curr: any) => acc + Number(curr.newRegist), 0) || 0;
-          const compareActiveGeo = comparisonData.reduce((acc: number, curr: any) => acc + Number(curr.activeGeoUsers), 0) || 0;
-          const compareAvgConversion = compareNewRegist > 0 ? ((compareActiveGeo / compareNewRegist) * 100).toFixed(2) : 0;
-
-          const registChange = totalNewRegist - compareNewRegist;
-          const registPctMap = compareNewRegist > 0 ? ((registChange / compareNewRegist) * 100).toFixed(1) : 0;
-
-          const activeChange = totalActiveGeo - compareActiveGeo;
-          const activePctMap = compareActiveGeo > 0 ? ((activeChange / compareActiveGeo) * 100).toFixed(1) : 0;
-
-          const convChange = Number(avgConversion) - Number(compareAvgConversion);
-
-          return (
-            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 pb-6 mb-8">
-                <div>
-                  <h3 className="text-2xl font-black tracking-tight mb-1">User Growth Funnel</h3>
-                  <p className="text-xs font-black uppercase tracking-widest text-zinc-400">Acquisition & Activation Mapping</p>
-                </div>
-                <div className="flex gap-3">
-                  <select
-                    value={growthMonth}
-                    onChange={(e) => setGrowthMonth(e.target.value)}
-                    className="bg-white border border-zinc-200 text-sm font-bold p-2.5 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
-                  >
-                    {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
-                  </select>
-                  <select
-                    value={growthWeek}
-                    onChange={(e) => setGrowthWeek(e.target.value)}
-                    className="bg-white border border-zinc-200 text-sm font-bold p-2.5 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
-                  >
-                    {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {filteredData.length === 0 ? (
-                <div className="text-center p-12 bg-white border border-zinc-200 rounded-3xl">
-                  <p className="text-zinc-500 font-bold">No data matches the selected filters.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4 max-w-4xl mx-auto py-8">
-
-                  {/* Step 1: New Regist */}
-                  <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-sm relative z-20 transition hover:shadow-md hover:border-zinc-300">
-                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
-                      <div className="w-14 h-14 bg-blue-50 text-blue-500 flex items-center justify-center rounded-2xl shadow-inner"><Users size={28} /></div>
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 1: Top of Funnel</h4>
-                        <p className="text-2xl font-black tracking-tight text-zinc-900">New Registered Users</p>
-                      </div>
-                    </div>
-                    <div className="text-5xl font-black tracking-tighter">{totalNewRegist.toLocaleString()}</div>
-                  </div>
-
-                  {/* Arrow Connector */}
-                  <div className="flex justify-center -my-6 relative z-10 opacity-30">
-                    <div className="h-14 w-[3px] bg-zinc-400 rounded-full"></div>
-                  </div>
-
-                  {/* Step 2: Paid User */}
-                  <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-sm relative z-20 w-[90%] mx-auto transition hover:shadow-md hover:border-zinc-300">
-                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
-                      <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner"><Target size={28} /></div>
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 2: Activation</h4>
-                        <p className="text-2xl font-black tracking-tight text-zinc-900">Paid User</p>
-                      </div>
-                    </div>
-                    <div className="text-5xl font-black tracking-tighter">{totalActiveGeo.toLocaleString()}</div>
-                  </div>
-
-                  {/* Arrow Connector */}
-                  <div className="flex justify-center -my-6 relative z-10 opacity-30">
-                    <div className="h-14 w-[3px] bg-zinc-400 rounded-full"></div>
-                  </div>
-
-                  {/* Step 3: Conversion */}
-                  <div className="bg-zinc-900 border border-zinc-800 text-white p-10 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-2xl shadow-zinc-200 relative z-20 w-[80%] mx-auto transform hover:scale-[1.02] transition">
-                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
-                      <div className="w-16 h-16 bg-white/10 flex items-center justify-center rounded-2xl backdrop-blur-sm"><Activity size={32} className="text-emerald-400" /></div>
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 3: Bottom of Funnel</h4>
-                        <p className="text-3xl font-black tracking-tight">Final Conversion</p>
-                      </div>
-                    </div>
-                    <div className="text-6xl font-black tracking-tighter text-emerald-400 drop-shadow-md">{avgConversion}%</div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* USER GROWTH COMPARISON TABLE */}
-              <div className="mt-16 pt-8 border-t border-zinc-200">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                  <h3 className="text-xl font-black tracking-tight leading-tight">Funnel Performance<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Growth Comparison</span></h3>
-                  <div className="flex flex-col md:flex-row gap-4 bg-zinc-50 p-2 rounded-2xl border border-zinc-200">
-                    {/* Primary Growth Filters */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Now</span>
-                      <select
-                        value={growthMonth}
-                        onChange={(e) => setGrowthMonth(e.target.value)}
-                        className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
-                      >
-                        {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
-                      </select>
-                      <select
-                        value={growthWeek}
-                        onChange={(e) => setGrowthWeek(e.target.value)}
-                        className="bg-white border border-zinc-200 text-xs font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
-                      >
-                        {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                      </select>
-                    </div>
-                    <div className="hidden md:block w-px bg-zinc-200"></div>
-                    {/* Secondary Growth Filters */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Then</span>
-                      <select
-                        value={growthCompareMonth}
-                        onChange={(e) => setGrowthCompareMonth(e.target.value)}
-                        className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none cursor-pointer"
-                      >
-                        {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
-                      </select>
-                      <select
-                        value={growthCompareWeek}
-                        onChange={(e) => setGrowthCompareWeek(e.target.value)}
-                        className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer"
-                      >
-                        {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                        <tr>
-                          <th className="px-6 py-4">Metric</th>
-                          <th className="px-6 py-4 text-right">Primary Vol.</th>
-                          <th className="px-6 py-4 text-right text-zinc-400">Secondary Vol.</th>
-                          <th className="px-6 py-4 text-right">Variance</th>
-                          <th className="px-6 py-4 text-center">Trend</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-100">
-                        {/* Row 1: New Regist */}
-                        <tr className="hover:bg-zinc-50 transition group">
-                          <td className="px-6 py-4 font-bold whitespace-nowrap">New Registered Users</td>
-                          <td className="px-6 py-4 text-right font-mono text-zinc-900 font-bold text-lg">{totalNewRegist.toLocaleString()}</td>
-                          <td className="px-6 py-4 text-right font-mono text-zinc-400">{compareNewRegist.toLocaleString()}</td>
-                          <td className={`px-6 py-4 text-right font-mono font-bold whitespace-nowrap ${registChange > 0 ? 'text-emerald-600' : registChange < 0 ? 'text-rose-600' : 'text-zinc-400'}`}>
-                            {registChange > 0 ? '+' : ''}{registChange.toLocaleString()} ({registChange > 0 ? '+' : ''}{registPctMap}%)
-                          </td>
-                          <td className="px-6 py-4 text-center flex justify-center">
-                            {registChange > 0 ? <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner"><ArrowUpRight size={14} /></div> :
-                              registChange < 0 ? <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner"><ArrowDownRight size={14} /></div> :
-                                <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-400 flex items-center justify-center shadow-inner"><div className="w-2 h-2 rounded-full bg-zinc-300"></div></div>}
-                          </td>
-                        </tr>
-                        {/* Row 2: Paid User */}
-                        <tr className="hover:bg-zinc-50 transition group">
-                          <td className="px-6 py-4 font-bold whitespace-nowrap">Paid Users</td>
-                          <td className="px-6 py-4 text-right font-mono text-zinc-900 font-bold text-lg">{totalActiveGeo.toLocaleString()}</td>
-                          <td className="px-6 py-4 text-right font-mono text-zinc-400">{compareActiveGeo.toLocaleString()}</td>
-                          <td className={`px-6 py-4 text-right font-mono font-bold whitespace-nowrap ${activeChange > 0 ? 'text-emerald-600' : activeChange < 0 ? 'text-rose-600' : 'text-zinc-400'}`}>
-                            {activeChange > 0 ? '+' : ''}{activeChange.toLocaleString()} ({activeChange > 0 ? '+' : ''}{activePctMap}%)
-                          </td>
-                          <td className="px-6 py-4 text-center flex justify-center">
-                            {activeChange > 0 ? <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner"><ArrowUpRight size={14} /></div> :
-                              activeChange < 0 ? <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner"><ArrowDownRight size={14} /></div> :
-                                <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-400 flex items-center justify-center shadow-inner"><div className="w-2 h-2 rounded-full bg-zinc-300"></div></div>}
-                          </td>
-                        </tr>
-                        {/* Row 3: Conversion */}
-                        <tr className="hover:bg-zinc-50 transition group">
-                          <td className="px-6 py-4 font-bold whitespace-nowrap">Final Conversion %</td>
-                          <td className="px-6 py-4 text-right font-mono text-zinc-900 font-bold text-lg">{avgConversion}%</td>
-                          <td className="px-6 py-4 text-right font-mono text-zinc-400">{compareAvgConversion}%</td>
-                          <td className={`px-6 py-4 text-right font-mono font-bold whitespace-nowrap ${convChange > 0 ? 'text-emerald-600' : convChange < 0 ? 'text-rose-600' : 'text-zinc-400'}`}>
-                            {convChange > 0 ? '+' : ''}{convChange.toFixed(2)}%
-                          </td>
-                          <td className="px-6 py-4 text-center flex justify-center">
-                            {convChange > 0 ? <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner"><ArrowUpRight size={14} /></div> :
-                              convChange < 0 ? <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner"><ArrowDownRight size={14} /></div> :
-                                <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-400 flex items-center justify-center shadow-inner"><div className="w-2 h-2 rounded-full bg-zinc-300"></div></div>}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* === TAB 5: ACADEMY === */}
         {activeTab === 'Academy' && (() => {

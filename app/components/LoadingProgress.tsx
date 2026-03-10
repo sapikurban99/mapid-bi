@@ -71,7 +71,7 @@ export default function LoadingProgress({
     const milestones = [0, 25, 50, 75, 100];
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-zinc-50 font-sans">
+        <div className="w-screen h-screen fixed top-0 left-0 z-[999] flex flex-col items-center justify-center p-8 bg-zinc-50 font-sans">
             <div className="w-full max-w-md text-center">
                 {/* Title */}
                 <p className="text-[10px] tracking-[0.3em] uppercase font-black text-zinc-400 mb-8">{title}</p>
@@ -90,8 +90,8 @@ export default function LoadingProgress({
                 <div className="relative w-full h-2 bg-zinc-200 rounded-full overflow-hidden mb-4">
                     <div
                         className={`h-full rounded-full transition-all duration-300 ease-out ${progress >= 100
-                                ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
-                                : 'bg-gradient-to-r from-zinc-900 to-zinc-700'
+                            ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
+                            : 'bg-gradient-to-r from-zinc-900 to-zinc-700'
                             }`}
                         style={{ width: `${progress}%` }}
                     />

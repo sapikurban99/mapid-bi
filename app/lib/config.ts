@@ -13,6 +13,13 @@ export interface RACIConfig {
     rows: RACIRow[];
 }
 
+export interface DisbursementItem {
+    category: string;
+    amount: number;
+    date: string;
+    description: string;
+}
+
 export interface SocialItem {
     month: string;
     week: string;
@@ -94,6 +101,7 @@ export interface BIData {
     userGrowth: UserGrowthItem[];
     trends: TrendPoint[];
     academy: AcademyItem[];
+    disbursement: DisbursementItem[];
 }
 
 export interface SiteConfig {

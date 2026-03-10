@@ -36,10 +36,6 @@ export default function StrategyHome() {
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-zinc-200 shadow-sm">
         <nav className="max-w-6xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
           <span className="font-black text-2xl tracking-tighter italic">MAPID 2026.</span>
-          <Link href="/dashboard" className="group flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] border-b-2 border-transparent hover:border-zinc-900 pb-1 transition-all">
-            Enter BI Engine
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
         </nav>
       </header>
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import SidebarNav from "./components/SidebarNav";
+import { GlobalDataProvider } from "./components/GlobalDataProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,15 +21,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="scroll-smooth">
-      <body className={`${inter.className} bg-zinc-50 text-zinc-900 flex flex-col lg:flex-row min-h-screen`}>
+      <body className={`${inter.className} bg-zinc-50 text-zinc-900 flex flex-col lg:flex-row min-h-screen relative`}>
 
-        {/* SIDEBAR NAVIGATION */}
-        <SidebarNav />
+        <GlobalDataProvider>
+          {/* SIDEBAR NAVIGATION */}
+          <SidebarNav />
 
-        {/* KONTEN HALAMAN UTAMA */}
-        <div className="flex-1 min-w-0 overflow-x-hidden">
-          {children}
-        </div>
+          {/* KONTEN HALAMAN UTAMA */}
+          <div className="flex-1 min-w-0 min-h-screen">
+            {children}
+          </div>
+        </GlobalDataProvider>
 
       </body>
     </html>

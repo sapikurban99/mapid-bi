@@ -13,6 +13,7 @@ import {
     RACIRow, SocialItem, CampaignItem, RevenueItem, PipelineItem, ProjectItem, DocItem, TrendPoint, BIData
 } from '../lib/config';
 import LoadingProgress from '../components/LoadingProgress';
+import { useGlobalData } from '../components/GlobalDataProvider';
 
 const RACI_OPTIONS = ['R', 'A', 'C', 'I', 'R/A'];
 const RACI_COLORS: Record<string, string> = {
@@ -144,21 +145,45 @@ const BI_CONFIG: Record<string, any> = {
             { key: 'label', label: 'Label (e.g. Q1 2026)', type: 'text' },
             { key: 'revenue', label: 'Revenue (in Millions)', type: 'number' }, { key: 'dealSize', label: 'Avg Deal Size (in Millions)', type: 'number' }
         ]
+    },
+    disbursement: {
+        title: 'Budget Disbursement',
+        empty: { category: 'Operational', amount: 0, date: '', description: '' },
+        cols: [{ key: 'category', label: 'Category' }, { key: 'amount', label: 'Amount (Rp)' }, { key: 'date', label: 'Date' }],
+        fields: [
+            { key: 'category', label: 'Category', type: 'select', options: ['Ads Spend', 'Event', 'Operational', 'Software/Licenses', 'Other'] },
+            { key: 'amount', label: 'Amount (Rp)', type: 'number' },
+            { key: 'date', label: 'Date', type: 'text', placeholder: 'YYYY-MM-DD' },
+            { key: 'description', label: 'Description', type: 'text' }
+        ]
     }
 };
 
 const ITEMS_PER_PAGE = 10;
 
 export default function AdminPage() {
-    const [isAuthorized, setIsAuthorized] = useState(false);
-    const [password, setPassword] = useState('');
-    const [config, setLocalConfig] = useState<SiteConfig>(DEFAULT_CONFIG);
+    const { syncData, isLoading: globalIsLoading } = useGlobalData();
+    // Inisialisasi awal langsung dari cache/global state
+    const [config, setLocalConfig] = useState<SiteConfig>(() => getConfig());
     const [activeSection, setActiveSection] = useState('home');
 
     // BI Tab State
     const [biSubTab, setBiSubTab] = useState('socials');
     const [biSearch, setBiSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
+
+    // Feature C: Filter & Grouping State
+    const [biFilterKey, setBiFilterKey] = useState('');
+    const [biFilterValue, setBiFilterValue] = useState('All');
+    const [biGroupBy, setBiGroupBy] = useState('');
+
+    useEffect(() => {
+        setBiSearch('');
+        setCurrentPage(1);
+        setBiFilterKey('');
+        setBiFilterValue('All');
+        setBiGroupBy('');
+    }, [biSubTab]);
 
     // Modal State
     const [modal, setModal] = useState<{ isOpen: boolean; section: string; index: number; data: any }>({
@@ -170,46 +195,8 @@ export default function AdminPage() {
     const [saveMsg, setSaveMsg] = useState('');
     const [expandedRole, setExpandedRole] = useState<string | null>(null);
     const [editingRaci, setEditingRaci] = useState<{ row: number; col: string } | null>(null);
-    const [loadingConfig, setLoadingConfig] = useState(false);
     const [loadingBiData, setLoadingBiData] = useState(false);
     const [biLoadMsg, setBiLoadMsg] = useState('');
-    const [configFetchDone, setConfigFetchDone] = useState(false);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined' && sessionStorage.getItem('bi_admin_auth') === 'true') {
-            setIsAuthorized(true);
-        }
-    }, []);
-
-    // Load from GAS on auth
-    useEffect(() => {
-        if (isAuthorized) {
-            setLoadingConfig(true);
-            setConfigFetchDone(false);
-            loadConfigFromGAS().then(cfg => {
-                setLocalConfig(cfg);
-                setConfigFetchDone(true);
-            }).catch(() => {
-                setConfigFetchDone(true);
-            });
-        }
-    }, [isAuthorized]);
-
-    // Reset pagination when subtab changes
-    useEffect(() => {
-        setCurrentPage(1);
-        setBiSearch('');
-    }, [biSubTab]);
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (password === 'MAPIDBOSS2026') {
-            setIsAuthorized(true);
-            sessionStorage.setItem('bi_admin_auth', 'true');
-        } else {
-            alert('Admin access denied!');
-        }
-    };
 
     const handleSave = async () => {
         setSaving(true);
@@ -385,47 +372,9 @@ export default function AdminPage() {
         }
     };
 
-    // --- AUTH SCREEN ---
-    if (!isAuthorized) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-zinc-100 font-sans p-6">
-                <form onSubmit={handleLogin} className="bg-white p-10 border border-zinc-200 shadow-2xl w-full max-w-sm text-center rounded-2xl">
-                    <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Shield className="text-white" size={24} />
-                    </div>
-                    <h2 className="text-2xl font-black tracking-tight mb-2 uppercase">Admin Panel</h2>
-                    <p className="text-zinc-400 text-xs mb-8 uppercase tracking-widest font-bold">Authorized Personnel Only</p>
-                    <input
-                        type="password"
-                        placeholder="Admin Passkey"
-                        className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-xl mb-4 text-center focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all font-bold"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <button type="submit" className="w-full bg-zinc-900 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg shadow-zinc-200">
-                        Unlock Admin
-                    </button>
-                </form>
-            </div>
-        );
-    }
 
-    if (loadingConfig) {
-        return (
-            <LoadingProgress
-                isLoading={true}
-                fetchDone={configFetchDone}
-                title="Loading Configuration"
-                stages={[
-                    { target: 25, label: 'Connecting to Google Sheets...' },
-                    { target: 50, label: 'Fetching admin config...' },
-                    { target: 75, label: 'Syncing settings...' },
-                    { target: 90, label: 'Preparing editor...' },
-                ]}
-                onComplete={() => setLoadingConfig(false)}
-            />
-        );
-    }
+
+
 
     const sections = [
         { id: 'home', label: 'Home Page', icon: Home },
@@ -438,22 +387,30 @@ export default function AdminPage() {
     // Helper rendering Data Table list
     const getFilteredAndPaginatedData = () => {
         const sourceData = (config.biData?.[biSubTab as keyof BIData] as any[]) || [];
-        const filtered = sourceData.map((item, originalIdx) => ({ item, originalIdx })).filter(({ item }) =>
+        let filtered = sourceData.map((item, originalIdx) => ({ item, originalIdx })).filter(({ item }) =>
             !biSearch || Object.values(item).some(v => String(v).toLowerCase().includes(biSearch.toLowerCase()))
         );
+
+        if (biFilterKey && biFilterValue !== 'All') {
+            filtered = filtered.filter(({ item }) => String(item[biFilterKey]) === String(biFilterValue));
+        }
+
         const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
         const currentData = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-        return { currentData, totalPages, totalItems: filtered.length };
+        return { sourceData, currentData, filtered, totalPages, totalItems: filtered.length };
     };
 
-    const { currentData, totalPages, totalItems } = activeSection === 'bidata' ? getFilteredAndPaginatedData() : { currentData: [], totalPages: 1, totalItems: 0 };
+    const { sourceData, currentData, filtered, totalPages, totalItems } = activeSection === 'bidata' ? getFilteredAndPaginatedData() : { sourceData: [], currentData: [], filtered: [], totalPages: 1, totalItems: 0 };
     const biConf = BI_CONFIG[biSubTab];
+
+    const filterKeys = ['status', 'stage', 'phase', 'quarter', 'month', 'format', 'category', 'industry'].filter(k => biConf?.fields.some((f: any) => f.key === k));
+    const uniqueFilterValues = biFilterKey ? Array.from(new Set(sourceData.map(d => String(d[biFilterKey] || '')))).filter(Boolean) : [];
 
     return (
         <main className="min-h-screen bg-zinc-50 font-sans pb-24">
             {/* ADMIN HEADER */}
-            <header className="bg-white border-b border-zinc-200 sticky top-0 z-30">
-                <div className="max-w-6xl mx-auto px-6 lg:px-8 py-4 flex justify-between items-center">
+            <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 sticky top-0 z-40 p-4 transition-all">
+                <div className="max-w-6xl mx-auto px-6 lg:px-8 py-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center">
                             <Settings className="text-white" size={18} />
@@ -462,13 +419,13 @@ export default function AdminPage() {
                             <h1 className="text-xl font-black tracking-tight">Admin Panel</h1>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         {saveMsg && <span className={`text-xs font-bold ${saved ? 'text-emerald-600' : 'text-amber-600'}`}>{saveMsg}</span>}
-                        <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition hidden md:flex">
-                            <RotateCcw size={14} /> Reset
+                        <button onClick={handleReset} className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition hidden md:flex">
+                            <RotateCcw size={14} /> <span className="hidden sm:inline">Reset</span>
                         </button>
                         <button onClick={handleSave} disabled={saving}
-                            className={`flex items-center gap-2 px-6 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition shadow-lg ${saving ? 'bg-zinc-400 text-white cursor-wait' : saved ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-zinc-200'}`}>
+                            className={`flex flex-1 md:flex-none items-center justify-center gap-2 px-6 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition shadow-lg ${saving ? 'bg-zinc-400 text-white cursor-wait' : saved ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-zinc-200'}`}>
                             {saving ? <><Loader2 size={14} className="animate-spin" /> Saving</> : saved ? <><Check size={14} /> Saved</> : <><Save size={14} /> Save</>}
                         </button>
                     </div>
@@ -714,35 +671,21 @@ export default function AdminPage() {
                                         onClick={async () => {
                                             setLoadingBiData(true);
                                             setBiLoadMsg('');
-                                            try {
-                                                const res = await fetch('/api/gas');
-                                                const json = await res.json();
-                                                if (json.isError || json.error) {
-                                                    setBiLoadMsg('Gagal fetch: ' + (json.message || json.title));
-                                                } else {
-                                                    const biData: BIData = {
-                                                        socials: json.socials || [],
-                                                        campaigns: json.campaigns || [],
-                                                        revenue: json.revenue || [],
-                                                        pipeline: json.pipeline || [],
-                                                        projects: json.projects || [],
-                                                        docs: json.docs || [],
-                                                        userGrowth: json.userGrowth || [],
-                                                        trends: json.trends || [],
-                                                        academy: json.academy || [],
-                                                    };
-                                                    updateConfig('biData', biData);
-                                                    setBiLoadMsg('✓ Data loaded!');
-                                                    setTimeout(() => setBiLoadMsg(''), 2000);
-                                                }
-                                            } catch (err: any) {
-                                                setBiLoadMsg('Error: ' + err.message);
+                                            await syncData();
+                                            // Ensure local config updates after global sync updates localStorage
+                                            const updatedConfig = getConfig();
+                                            if (updatedConfig.biData) {
+                                                setLocalConfig(updatedConfig);
+                                                setBiLoadMsg('✓ Data loaded!');
+                                            } else {
+                                                setBiLoadMsg('No data returned.');
                                             }
+                                            setTimeout(() => setBiLoadMsg(''), 2000);
                                             setLoadingBiData(false);
                                         }}
-                                        disabled={loadingBiData}
-                                        className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition shrink-0 ${loadingBiData ? 'bg-zinc-300 text-white cursor-wait' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-100'}`}>
-                                        {loadingBiData ? <><Loader2 size={14} className="animate-spin" /> Loading...</> : <><Globe size={14} /> Fetch Data</>}
+                                        disabled={loadingBiData || globalIsLoading}
+                                        className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition shrink-0 ${loadingBiData || globalIsLoading ? 'bg-zinc-300 text-white cursor-wait' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-100'}`}>
+                                        {loadingBiData || globalIsLoading ? <><Loader2 size={14} className="animate-spin" /> Loading...</> : <><Globe size={14} /> Fetch Data</>}
                                     </button>
                                 </div>
                             </div>
@@ -766,40 +709,26 @@ export default function AdminPage() {
                                             onClick={async () => {
                                                 setLoadingBiData(true);
                                                 setBiLoadMsg('');
-                                                try {
-                                                    const res = await fetch('/api/gas');
-                                                    const json = await res.json();
-                                                    if (json.isError || json.error) {
-                                                        setBiLoadMsg('Gagal fetch dari GAS: ' + (json.message || json.title));
-                                                    } else {
-                                                        const biData: BIData = {
-                                                            socials: json.socials || [],
-                                                            campaigns: json.campaigns || [],
-                                                            revenue: json.revenue || [],
-                                                            pipeline: json.pipeline || [],
-                                                            projects: json.projects || [],
-                                                            docs: json.docs || [],
-                                                            userGrowth: json.userGrowth || [],
-                                                            trends: json.trends || [],
-                                                            academy: json.academy || [],
-                                                        };
-                                                        updateConfig('biData', biData);
-                                                        setBiLoadMsg('');
-                                                    }
-                                                } catch (err: any) {
-                                                    setBiLoadMsg('Network error: ' + err.message);
+                                                await syncData();
+                                                const updatedConfig = getConfig();
+                                                if (updatedConfig.biData) {
+                                                    setLocalConfig(updatedConfig);
+                                                    setBiLoadMsg('✓ Data loaded!');
+                                                } else {
+                                                    setBiLoadMsg('No data returned.');
                                                 }
+                                                setTimeout(() => setBiLoadMsg(''), 2000);
                                                 setLoadingBiData(false);
                                             }}
-                                            disabled={loadingBiData}
-                                            className={`flex items-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg ${loadingBiData ? 'bg-zinc-400 text-white cursor-wait' : 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-zinc-200'
+                                            disabled={loadingBiData || globalIsLoading}
+                                            className={`flex items-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg ${loadingBiData || globalIsLoading ? 'bg-zinc-400 text-white cursor-wait' : 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-zinc-200'
                                                 }`}>
-                                            {loadingBiData ? <><Loader2 size={14} className="animate-spin" /> Fetching...</> : <><Globe size={14} /> Fetch Data</>}
+                                            {loadingBiData || globalIsLoading ? <><Loader2 size={14} className="animate-spin" /> Fetching...</> : <><Globe size={14} /> Fetch Data</>}
                                         </button>
                                         <button
                                             onClick={() => updateConfig('biData', {
                                                 socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [],
-                                                trends: [], academy: []
+                                                trends: [], academy: [], disbursement: []
                                             })}
                                             className="flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition">
                                             <Plus size={14} /> Mulai Kosong
@@ -820,14 +749,44 @@ export default function AdminPage() {
                                         ))}
                                     </div>
 
-                                    {/* Header & Search */}
-                                    <div className="flex flex-col sm:flex-row justify-between gap-4 items-center bg-white p-4 rounded-xl border border-zinc-200">
-                                        <div className="relative w-full sm:max-w-xs">
-                                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                                            <input type="text" placeholder={`Search ${biConf.title}...`} value={biSearch} onChange={(e) => setBiSearch(e.target.value)}
-                                                className="w-full pl-9 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-zinc-900 focus:outline-none" />
+                                    {/* Header & Search & Filters */}
+                                    <div className="flex flex-col lg:flex-row justify-between gap-4 items-start lg:items-center bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
+                                        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto flex-wrap">
+                                            {/* Search */}
+                                            <div className="relative w-full sm:w-60">
+                                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                                <input type="text" placeholder={`Search ${biConf.title}...`} value={biSearch} onChange={(e) => setBiSearch(e.target.value)}
+                                                    className="w-full pl-9 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-zinc-900 focus:outline-none transition" />
+                                            </div>
+
+                                            {/* Filter Dropdowns */}
+                                            {filterKeys.length > 0 && (
+                                                <div className="flex items-center gap-2">
+                                                    <select value={biFilterKey} onChange={(e) => { setBiFilterKey(e.target.value); setBiFilterValue('All'); }} className="py-2.5 px-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition h-[38px]">
+                                                        <option value="">No Filter</option>
+                                                        {filterKeys.map(k => <option key={k} value={k}>Filter by {k}</option>)}
+                                                    </select>
+                                                    {biFilterKey && (
+                                                        <select value={biFilterValue} onChange={(e) => setBiFilterValue(e.target.value)} className="py-2.5 px-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition h-[38px] max-w-[150px] truncate">
+                                                            <option value="All">All {biFilterKey}</option>
+                                                            {uniqueFilterValues.map(v => <option key={v} value={v}>{v}</option>)}
+                                                        </select>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Grouping Dropdown */}
+                                            {filterKeys.length > 0 && (
+                                                <div className="flex items-center gap-2">
+                                                    <select value={biGroupBy} onChange={(e) => setBiGroupBy(e.target.value)} className="py-2.5 px-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition h-[38px]">
+                                                        <option value="">No Grouping</option>
+                                                        {filterKeys.map(k => <option key={k} value={k}>Group by {k}</option>)}
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
-                                        <button onClick={() => openModal(biSubTab)} className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-zinc-900 text-white text-xs font-black uppercase tracking-wider rounded-lg hover:bg-zinc-800 transition shadow-md shadow-zinc-200">
+
+                                        <button onClick={() => openModal(biSubTab)} className="w-full lg:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-900 text-white text-xs font-black uppercase tracking-wider rounded-lg hover:bg-zinc-800 transition shadow-md shadow-zinc-200">
                                             <Plus size={14} /> Add Data
                                         </button>
                                     </div>
@@ -843,28 +802,58 @@ export default function AdminPage() {
                                                         <th className="px-6 py-4 font-black text-right">Actions</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-zinc-100">
-                                                    {currentData.length > 0 ? currentData.map(({ item, originalIdx }, idx) => (
-                                                        <tr key={originalIdx} className="hover:bg-zinc-50 transition">
-                                                            <td className="px-6 py-4 text-xs font-bold text-zinc-400">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
-                                                            {biConf.cols.map((col: any) => (
-                                                                <td key={col.key} className="px-4 py-4 font-medium text-zinc-700 truncate max-w-[200px]">
-                                                                    {String(item[col.key] ?? '-')}
+
+                                                {biGroupBy ? (
+                                                    Object.entries(
+                                                        filtered.reduce((acc: any, curr: any) => {
+                                                            const groupVal = String(curr.item[biGroupBy] || 'Ungrouped');
+                                                            if (!acc[groupVal]) acc[groupVal] = [];
+                                                            acc[groupVal].push(curr);
+                                                            return acc;
+                                                        }, {})
+                                                    ).map(([groupName, groupItems]: [string, any]) => (
+                                                        <tbody key={groupName} className="divide-y divide-zinc-100">
+                                                            <tr className="bg-indigo-50/50">
+                                                                <td colSpan={biConf.cols.length + 2} className="px-6 py-3 text-xs font-black text-indigo-900 uppercase tracking-widest border-y border-indigo-100">
+                                                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> {groupName} <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full ml-2">{groupItems.length} records</span></div>
                                                                 </td>
+                                                            </tr>
+                                                            {groupItems.map(({ item, originalIdx }: any, idx: number) => (
+                                                                <tr key={originalIdx} className="hover:bg-zinc-50 transition">
+                                                                    <td className="px-6 py-4 text-xs font-bold text-zinc-400">{idx + 1}</td>
+                                                                    {biConf.cols.map((col: any) => (
+                                                                        <td key={col.key} className="px-4 py-4 font-medium text-zinc-700 truncate max-w-[200px]">
+                                                                            {String(item[col.key] ?? '-')}
+                                                                        </td>
+                                                                    ))}
+                                                                    <td className="px-6 py-4 text-right space-x-2">
+                                                                        <button onClick={() => openModal(biSubTab, originalIdx)} className="p-2 text-zinc-400 hover:text-blue-600 bg-white border border-zinc-200 rounded-lg hover:border-blue-200 transition"><Edit2 size={14} /></button>
+                                                                        <button onClick={() => deleteBiItem(biSubTab, originalIdx)} className="p-2 text-zinc-400 hover:text-rose-600 bg-white border border-zinc-200 rounded-lg hover:border-rose-200 transition"><Trash2 size={14} /></button>
+                                                                    </td>
+                                                                </tr>
                                                             ))}
-                                                            <td className="px-6 py-4 text-right space-x-2">
-                                                                <button onClick={() => openModal(biSubTab, originalIdx)} className="p-2 text-zinc-400 hover:text-blue-600 bg-white border border-zinc-200 rounded-lg hover:border-blue-200 transition">
-                                                                    <Edit2 size={14} />
-                                                                </button>
-                                                                <button onClick={() => deleteBiItem(biSubTab, originalIdx)} className="p-2 text-zinc-400 hover:text-rose-600 bg-white border border-zinc-200 rounded-lg hover:border-rose-200 transition">
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    )) : (
-                                                        <tr><td colSpan={biConf.cols.length + 2} className="px-6 py-8 text-center text-zinc-400 italic text-xs">No data found. Click "Add Data" to create one.</td></tr>
-                                                    )}
-                                                </tbody>
+                                                        </tbody>
+                                                    ))
+                                                ) : (
+                                                    <tbody className="divide-y divide-zinc-100">
+                                                        {currentData.length > 0 ? currentData.map(({ item, originalIdx }, idx) => (
+                                                            <tr key={originalIdx} className="hover:bg-zinc-50 transition">
+                                                                <td className="px-6 py-4 text-xs font-bold text-zinc-400">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
+                                                                {biConf.cols.map((col: any) => (
+                                                                    <td key={col.key} className="px-4 py-4 font-medium text-zinc-700 truncate max-w-[200px]">
+                                                                        {String(item[col.key] ?? '-')}
+                                                                    </td>
+                                                                ))}
+                                                                <td className="px-6 py-4 text-right space-x-2">
+                                                                    <button onClick={() => openModal(biSubTab, originalIdx)} className="p-2 text-zinc-400 hover:text-blue-600 bg-white border border-zinc-200 rounded-lg hover:border-blue-200 transition"><Edit2 size={14} /></button>
+                                                                    <button onClick={() => deleteBiItem(biSubTab, originalIdx)} className="p-2 text-zinc-400 hover:text-rose-600 bg-white border border-zinc-200 rounded-lg hover:border-rose-200 transition"><Trash2 size={14} /></button>
+                                                                </td>
+                                                            </tr>
+                                                        )) : (
+                                                            <tr><td colSpan={biConf.cols.length + 2} className="px-6 py-8 text-center text-zinc-400 italic text-xs">No data found. Click "Add Data" to create one.</td></tr>
+                                                        )}
+                                                    </tbody>
+                                                )}
                                             </table>
                                         </div>
 
@@ -892,48 +881,50 @@ export default function AdminPage() {
             </div>
 
             {/* ============ MODAL POPUP ============ */}
-            {modal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-                        {/* Modal Header */}
-                        <div className="flex items-center justify-between px-8 py-6 border-b border-zinc-100">
-                            <div>
-                                <h3 className="text-xl font-black tracking-tight">{modal.index >= 0 ? 'Edit' : 'Add'} {BI_CONFIG[modal.section].title}</h3>
-                                <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest mt-1">Fill in the details below</p>
+            {
+                modal.isOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between px-8 py-6 border-b border-zinc-100">
+                                <div>
+                                    <h3 className="text-xl font-black tracking-tight">{modal.index >= 0 ? 'Edit' : 'Add'} {BI_CONFIG[modal.section].title}</h3>
+                                    <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest mt-1">Fill in the details below</p>
+                                </div>
+                                <button onClick={closeModal} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full transition text-zinc-500"><X size={18} /></button>
                             </div>
-                            <button onClick={closeModal} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full transition text-zinc-500"><X size={18} /></button>
-                        </div>
 
-                        {/* Modal Body (Scrollable) */}
-                        <div className="p-8 overflow-y-auto flex-1">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                {BI_CONFIG[modal.section].fields.map((field: any) => (
-                                    <div key={field.key} className={field.type === 'text' && field.key === 'desc' ? 'sm:col-span-2' : ''}>
-                                        {field.type === 'select' ? (
-                                            <SelectField label={field.label} value={modal.data[field.key]} options={field.options} onChange={(v: any) => handleModalFieldChange(field.key, v)} />
-                                        ) : (
-                                            <InputField
-                                                label={field.label}
-                                                type={field.type}
-                                                placeholder={field.placeholder}
-                                                value={modal.data[field.key]}
-                                                onChange={(v: any) => handleModalFieldChange(field.key, v)}
-                                                disabled={field.disabled}
-                                            />
-                                        )}
-                                    </div>
-                                ))}
+                            {/* Modal Body (Scrollable) */}
+                            <div className="p-8 overflow-y-auto flex-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    {BI_CONFIG[modal.section].fields.map((field: any) => (
+                                        <div key={field.key} className={field.type === 'text' && field.key === 'desc' ? 'sm:col-span-2' : ''}>
+                                            {field.type === 'select' ? (
+                                                <SelectField label={field.label} value={modal.data[field.key]} options={field.options} onChange={(v: any) => handleModalFieldChange(field.key, v)} />
+                                            ) : (
+                                                <InputField
+                                                    label={field.label}
+                                                    type={field.type}
+                                                    placeholder={field.placeholder}
+                                                    value={modal.data[field.key]}
+                                                    onChange={(v: any) => handleModalFieldChange(field.key, v)}
+                                                    disabled={field.disabled}
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Modal Footer */}
-                        <div className="px-8 py-5 border-t border-zinc-100 bg-zinc-50 rounded-b-3xl flex justify-end gap-3">
-                            <button onClick={closeModal} className="px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-900 transition">Cancel</button>
-                            <button onClick={saveModalData} className="px-8 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg transition">Save Data</button>
+                            {/* Modal Footer */}
+                            <div className="px-8 py-5 border-t border-zinc-100 bg-zinc-50 rounded-b-3xl flex justify-end gap-3">
+                                <button onClick={closeModal} className="px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-900 transition">Cancel</button>
+                                <button onClick={saveModalData} className="px-8 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg transition">Save Data</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </main>
+                )
+            }
+        </main >
     );
 }

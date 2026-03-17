@@ -38,7 +38,8 @@ const FILTER_OPTIONS = {
         { label: 'Custom Range...', value: 'custom' },
     ],
     industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
-    licenses: ['All Licenses', 'Personal', 'Teams']
+    licenses: ['All Licenses', 'Personal', 'Teams'],
+    paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
 };
 
 export default function ActiveRetentionUsersPage() {
@@ -46,6 +47,7 @@ export default function ActiveRetentionUsersPage() {
     const [selectedTime, setSelectedTime] = useState('this_month');
     const [selectedIndustry, setSelectedIndustry] = useState('All Industries');
     const [selectedLicense, setSelectedLicense] = useState('All Licenses');
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('All Methods');
 
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
@@ -269,12 +271,21 @@ export default function ActiveRetentionUsersPage() {
                 (d.licenseType || '').toLowerCase().includes(selectedLicense.toLowerCase())
             );
         }
+        if (selectedPaymentMethod !== 'All Methods') {
+            if (selectedPaymentMethod === 'No License') {
+                leads = leads.filter(d => d.status === 'No License' || !d.payment_methode);
+            } else {
+                 leads = leads.filter(d =>
+                    (d.payment_methode || '').toLowerCase().includes(selectedPaymentMethod.toLowerCase())
+                );
+            }
+        }
 
         const activeUsers = leads.filter(l => l.successCount >= 1).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const retentionUsers = leads.filter(l => l.successCount > 1).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return { activeUsers, retentionUsers };
-    }, [newRegisters, allPayments, selectedIndustry, selectedLicense]);
+    }, [newRegisters, allPayments, selectedIndustry, selectedLicense, selectedPaymentMethod]);
 
     const displayData = activeTab === 'active' ? processedData.activeUsers : processedData.retentionUsers;
 
@@ -357,6 +368,13 @@ export default function ActiveRetentionUsersPage() {
                             onChange={(e) => setSelectedLicense(e.target.value)}
                         >
                             {FILTER_OPTIONS.licenses.map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                        <select
+                            className="text-sm bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={selectedPaymentMethod}
+                            onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                        >
+                            {FILTER_OPTIONS.paymentMethods.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </div>
                 </div>

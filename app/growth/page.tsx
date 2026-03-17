@@ -15,6 +15,7 @@ interface TrendItem {
     conv: number;
     industry: string;
     license: string;
+    payment_methode?: string;
     week?: string;
 }
 
@@ -49,7 +50,8 @@ const FILTER_OPTIONS = {
         { label: 'Custom Range...', value: 'custom' },
     ],
     industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
-    licenses: ['All Licenses', 'Personal', 'Teams']
+    licenses: ['All Licenses', 'Personal', 'Teams'],
+    paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
 };
 
 export default function UserGrowthIntelligencePage() {
@@ -57,6 +59,7 @@ export default function UserGrowthIntelligencePage() {
     const [selectedTime, setSelectedTime] = useState('this_month');
     const [selectedIndustry, setSelectedIndustry] = useState('All Industries');
     const [selectedLicense, setSelectedLicense] = useState('All Licenses');
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('All Methods');
     const [showFilterPanel, setShowFilterPanel] = useState(true);
     const [expandedLicenseId, setExpandedLicenseId] = useState<string | null>(null);
 
@@ -168,7 +171,8 @@ export default function UserGrowthIntelligencePage() {
                         regist: 1,
                         conv: hasLicense ? 1 : 0,
                         industry: user.industry || 'Not Specified', // JSON tidak ada field industry, set default
-                        license: licenseType
+                        license: licenseType,
+                        payment_methode: hasLicense ? user.licenses[0].payment_methods : undefined
                     });
                 }
             });
@@ -196,7 +200,8 @@ export default function UserGrowthIntelligencePage() {
                                 regist: 0,
                                 conv: 1,
                                 industry: payment.industry || 'Not Specified',
-                                license: licenseType
+                                license: licenseType,
+                                payment_methode: lic.payment_methods
                             });
                         }
                     });
@@ -336,6 +341,25 @@ export default function UserGrowthIntelligencePage() {
             }));
         }
 
+        // Filter Payment Method
+        if (selectedPaymentMethod !== 'All Methods') {
+            if (selectedPaymentMethod === 'No License') {
+                leads = leads.filter(d => d.status === 'No License' || !d.payment_methode);
+                trends = trends.map(d => ({
+                    ...d,
+                    conv: 0 // No license means no paid conversion
+                }));
+            } else {
+                leads = leads.filter(d =>
+                    (d.payment_methode || '').toLowerCase().includes(selectedPaymentMethod.toLowerCase())
+                );
+                trends = trends.map(d => ({
+                    ...d,
+                    conv: (d.payment_methode || '').toLowerCase().includes(selectedPaymentMethod.toLowerCase()) ? d.conv : 0
+                }));
+            }
+        }
+
         // Agregasi Data Tren
         const aggregatedTrendsMap = trends.reduce((acc, curr) => {
             const w = curr.week || 'Unknown';
@@ -396,14 +420,16 @@ export default function UserGrowthIntelligencePage() {
         if (selectedTime !== 'this_month') count++;
         if (selectedIndustry !== 'All Industries') count++;
         if (selectedLicense !== 'All Licenses') count++;
+        if (selectedPaymentMethod !== 'All Methods') count++;
         if (selectedTime === 'custom' && customStartDate && customEndDate) count++;
         return count;
-    }, [selectedTime, selectedIndustry, selectedLicense, customStartDate, customEndDate]);
+    }, [selectedTime, selectedIndustry, selectedLicense, selectedPaymentMethod, customStartDate, customEndDate]);
 
     const resetFilters = () => {
         setSelectedTime('this_month');
         setSelectedIndustry('All Industries');
         setSelectedLicense('All Licenses');
+        setSelectedPaymentMethod('All Methods');
         setCustomStartDate('');
         setCustomEndDate('');
     };
@@ -519,6 +545,21 @@ export default function UserGrowthIntelligencePage() {
                                         className="w-full pl-11 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:outline-none appearance-none cursor-pointer transition-all"
                                     >
                                         {FILTER_OPTIONS.licenses.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Payment Method Filter */}
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2.5">Payment Method</label>
+                                <div className="relative">
+                                    <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={16} />
+                                    <select
+                                        value={selectedPaymentMethod}
+                                        onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                                        className="w-full pl-11 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:outline-none appearance-none cursor-pointer transition-all"
+                                    >
+                                        {FILTER_OPTIONS.paymentMethods.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                     </select>
                                 </div>
                             </div>

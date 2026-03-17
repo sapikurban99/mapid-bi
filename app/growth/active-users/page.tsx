@@ -38,7 +38,7 @@ const FILTER_OPTIONS = {
         { label: 'Custom Range...', value: 'custom' },
     ],
     industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
-    licenses: ['All Licenses', 'Personal', 'Teams'],
+    licenses: ['All Licenses', 'Personal', 'Teams', 'Enterprise'],
     paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
 };
 
@@ -132,6 +132,19 @@ export default function ActiveRetentionUsersPage() {
                 let calculatedCreatedAt = user.createdAt || user.created_on || user.createdat || user.created_at || '';
                 let calculatedUpdatedAt = user.updatedAt || user.updated_on || user.updatedat || user.updated_at || '';
 
+                if (!calculatedCreatedAt && user._id && user._id.length >= 8) {
+                    try {
+                        const timestamp = parseInt(user._id.substring(0, 8), 16) * 1000;
+                        if (!isNaN(timestamp)) {
+                            calculatedCreatedAt = new Date(timestamp).toISOString();
+                        }
+                    } catch (e) {
+                         // ignore
+                    }
+                }
+
+                if (!calculatedUpdatedAt) calculatedUpdatedAt = calculatedCreatedAt;
+
                 // Extract all successful payments for this user from allPayments
                 const userPayments = Array.isArray(allPayments)
                     ? allPayments.filter((p: any) => p.user?._id === user._id && p.status === 'success')
@@ -154,36 +167,28 @@ export default function ActiveRetentionUsersPage() {
                     }
                 }
 
-                // Group payments by date (e.g., YYYY-MM-DD) to detect packages
-                const packagesByDate: Record<string, any[]> = {};
+                // Group payments by distinct payment IDs to accurately count success checkouts
+                const paymentsById: Record<string, any[]> = {};
                 historySource.forEach((l: any) => {
-                    const d = new Date(l.date_in || l.createdAt || l.created_on || l.createdat);
-                    if (!isNaN(d.getTime())) {
-                        const dateKey = d.toISOString().split('T')[0];
-                        if (!packagesByDate[dateKey]) packagesByDate[dateKey] = [];
-                        packagesByDate[dateKey].push(l);
-                    } else {
-                        // Fallback for missing dates: count independently
-                        const fallbackKey = 'unknown_' + Math.random();
-                        packagesByDate[fallbackKey] = [l];
-                    }
+                    // fallback to a random key if no ID exists (very rare)
+                    const pId = l.payment_id || l._id || ('unknown_' + Math.random());
+                    if (!paymentsById[pId]) paymentsById[pId] = [];
+                    paymentsById[pId].push(l);
                 });
 
-                let calculatedSuccessCount = 0;
+                let calculatedSuccessCount = Object.keys(paymentsById).length;
                 const licenseCounts: Record<string, number> = {};
 
-                Object.values(packagesByDate).forEach(group => {
+                Object.values(paymentsById).forEach(group => {
                     const typesInGroup = new Set(group.map(l => (l.license_type || l.payment_type || '').toLowerCase()));
                     
                     // Logic: If basic, sini_ai, and sini_data are all present, it's 1 package.
                     const isPackage = typesInGroup.has('license_basic') && typesInGroup.has('license_sini_ai') && typesInGroup.has('license_sini_data');
                     
                     if (isPackage) {
-                        calculatedSuccessCount += 1;
                         licenseCounts['Mapid Package (Basic, Sini AI, Sini Data)'] = (licenseCounts['Mapid Package (Basic, Sini AI, Sini Data)'] || 0) + 1;
                     } else {
-                        // Count independently
-                        calculatedSuccessCount += group.length;
+                        // Count independently for display list
                         group.forEach(l => {
                             const type = l.license_type || l.payment_type;
                             if (type) {
@@ -210,6 +215,7 @@ export default function ActiveRetentionUsersPage() {
                     status: statusLabel,
                     priority: priorityLevel,
                     redeemCode: firstLicense?.redeem_code || user.redeem_code,
+                    payment_methode: firstLicense?.payment_methods,
                     successCount: calculatedSuccessCount,
                     licenseTypesList
                 });
@@ -252,7 +258,8 @@ export default function ActiveRetentionUsersPage() {
                         leadsMap.set(p.user._id, {
                             ...existing,
                             email: existing.email !== '-' ? existing.email : (p.user.email || '-'),
-                            phone: existing.phone !== '-' ? existing.phone : (p.user.phone_number || p.user.phone || '-')
+                            phone: existing.phone !== '-' ? existing.phone : (p.user.phone_number || p.user.phone || '-'),
+                            payment_methode: p.payment_methode || existing.payment_methode
                         });
                     }
                 }
@@ -263,12 +270,20 @@ export default function ActiveRetentionUsersPage() {
 
         // Apply Industry and License Filters Locally against fetched filtered array
         if (selectedIndustry !== 'All Industries') {
-            leads = leads.filter(d => d.industry === selectedIndustry);
+            let targetIndustry = selectedIndustry;
+            if (selectedIndustry === 'Research & Education') targetIndustry = 'Research and Education';
+            else if (selectedIndustry === 'Info Technology') targetIndustry = 'Information Technology and Services';
+            else if (selectedIndustry === 'Real Estate & Arch') targetIndustry = 'Real Estate and Architecture';
+            else if (selectedIndustry === 'Retail & Fashion') targetIndustry = 'Retail and Fashion';
+
+            leads = leads.filter(d => d.industry === targetIndustry);
         }
         if (selectedLicense !== 'All Licenses') {
+            const licenseKey = selectedLicense === 'Teams' ? 'team' : selectedLicense === 'Enterprise' ? 'enterprise' : 'personal';
+
             leads = leads.filter(d =>
-                (d.plan || '').toLowerCase().includes(selectedLicense.toLowerCase()) ||
-                (d.licenseType || '').toLowerCase().includes(selectedLicense.toLowerCase())
+                (d.plan || '').toLowerCase().includes(licenseKey) ||
+                (d.licenseType || '').toLowerCase().includes(licenseKey)
             );
         }
         if (selectedPaymentMethod !== 'All Methods') {

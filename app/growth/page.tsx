@@ -50,7 +50,7 @@ const FILTER_OPTIONS = {
         { label: 'Custom Range...', value: 'custom' },
     ],
     industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
-    licenses: ['All Licenses', 'Personal', 'Teams'],
+    licenses: ['All Licenses', 'Personal', 'Teams', 'Enterprise'],
     paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
 };
 
@@ -157,22 +157,42 @@ export default function UserGrowthIntelligencePage() {
                     dateStr = user.licenses[0].createdAt?.split('T')[0] || user.licenses[0].date_start?.split('T')[0] || '';
                 }
 
+                // Fallback: Extract from MongoDB _id if date is still missing
+                if (!dateStr && user._id && user._id.length >= 8) {
+                    try {
+                        const timestamp = parseInt(user._id.substring(0, 8), 16) * 1000;
+                        if (!isNaN(timestamp)) {
+                            dateStr = new Date(timestamp).toISOString().split('T')[0];
+                        }
+                    } catch (e) {
+                         // ignore
+                    }
+                }
+
                 if (dateStr) {
                     const hasLicense = user.licenses && user.licenses.length > 0;
                     let licenseType = '';
 
                     if (hasLicense) {
                         const lic = user.licenses[0];
-                        licenseType = (lic.payment_type?.toLowerCase().includes('teams') || lic.license_type?.toLowerCase().includes('teams')) ? 'Teams' : 'Personal';
+                        if (lic.payment_type?.toLowerCase().includes('enterprise') || lic.license_type?.toLowerCase().includes('enterprise')) {
+                            licenseType = 'Enterprise';
+                        } else if (lic.payment_type?.toLowerCase().includes('team') || lic.license_type?.toLowerCase().includes('team')) {
+                            licenseType = 'Teams';
+                        } else {
+                            licenseType = 'Personal';
+                        }
                     }
 
+                    const paymentMethod = hasLicense ? user.licenses[0].payment_methods : undefined;
+                    
                     trends.push({
                         date: dateStr,
                         regist: 1,
-                        conv: hasLicense ? 1 : 0,
+                        conv: (hasLicense && paymentMethod === 'midtrans') ? 1 : 0,
                         industry: user.industry || 'Not Specified', // JSON tidak ada field industry, set default
                         license: licenseType,
-                        payment_methode: hasLicense ? user.licenses[0].payment_methods : undefined
+                        payment_methode: paymentMethod
                     });
                 }
             });
@@ -190,7 +210,9 @@ export default function UserGrowthIntelligencePage() {
                         const dateStr = lic.createdAt?.split('T')[0] || lic.date_start?.split('T')[0] || '';
 
                         let licenseType = 'Personal';
-                        if (lic.payment_type?.toLowerCase().includes('teams') || lic.license_type?.toLowerCase().includes('teams')) {
+                        if (lic.payment_type?.toLowerCase().includes('enterprise') || lic.license_type?.toLowerCase().includes('enterprise')) {
+                            licenseType = 'Enterprise';
+                        } else if (lic.payment_type?.toLowerCase().includes('team') || lic.license_type?.toLowerCase().includes('team')) {
                             licenseType = 'Teams';
                         }
 
@@ -198,7 +220,7 @@ export default function UserGrowthIntelligencePage() {
                             trends.push({
                                 date: dateStr,
                                 regist: 0,
-                                conv: 1,
+                                conv: lic.payment_methods === 'midtrans' ? 1 : 0,
                                 industry: payment.industry || 'Not Specified',
                                 license: licenseType,
                                 payment_methode: lic.payment_methods
@@ -236,6 +258,19 @@ export default function UserGrowthIntelligencePage() {
 
                 let calculatedCreatedAt = user.createdAt || user.created_on || user.createdat || user.created_at || '';
                 let calculatedUpdatedAt = user.updatedAt || user.updated_on || user.updatedat || user.updated_at || '';
+
+                if (!calculatedCreatedAt && user._id && user._id.length >= 8) {
+                    try {
+                        const timestamp = parseInt(user._id.substring(0, 8), 16) * 1000;
+                        if (!isNaN(timestamp)) {
+                            calculatedCreatedAt = new Date(timestamp).toISOString();
+                        }
+                    } catch (e) {
+                         // ignore
+                    }
+                }
+
+                if (!calculatedUpdatedAt) calculatedUpdatedAt = calculatedCreatedAt;
 
                 leadsMap.set(user._id, {
                     _id: user._id,
@@ -296,7 +331,8 @@ export default function UserGrowthIntelligencePage() {
                         leadsMap.set(p.user._id, {
                             ...existing,
                             email: existing.email !== '-' ? existing.email : (p.user.email || '-'),
-                            phone: existing.phone !== '-' ? existing.phone : (p.user.phone_number || p.user.phone || '-')
+                            phone: existing.phone !== '-' ? existing.phone : (p.user.phone_number || p.user.phone || '-'),
+                            payment_methode: p.payment_methode || existing.payment_methode
                         });
                     }
                 }
@@ -325,19 +361,27 @@ export default function UserGrowthIntelligencePage() {
 
         // Filter Industri
         if (selectedIndustry !== 'All Industries') {
-            trends = trends.filter(d => d.industry === selectedIndustry);
-            leads = leads.filter(d => d.industry === selectedIndustry);
+            let targetIndustry = selectedIndustry;
+            if (selectedIndustry === 'Research & Education') targetIndustry = 'Research and Education';
+            else if (selectedIndustry === 'Info Technology') targetIndustry = 'Information Technology and Services';
+            else if (selectedIndustry === 'Real Estate & Arch') targetIndustry = 'Real Estate and Architecture';
+            else if (selectedIndustry === 'Retail & Fashion') targetIndustry = 'Retail and Fashion';
+
+            trends = trends.filter(d => d.industry === targetIndustry);
+            leads = leads.filter(d => d.industry === targetIndustry);
         }
 
         // Filter Lisensi (Hanya berdampak pada Konversi & Leads)
         if (selectedLicense !== 'All Licenses') {
+            const licenseKey = selectedLicense === 'Teams' ? 'team' : selectedLicense === 'Enterprise' ? 'enterprise' : 'personal';
+
             leads = leads.filter(d =>
-                (d.plan || '').toLowerCase().includes(selectedLicense.toLowerCase()) ||
-                (d.licenseType || '').toLowerCase().includes(selectedLicense.toLowerCase())
+                (d.plan || '').toLowerCase().includes(licenseKey) ||
+                (d.licenseType || '').toLowerCase().includes(licenseKey)
             );
             trends = trends.map(d => ({
                 ...d,
-                conv: (d.license || '').toLowerCase().includes(selectedLicense.toLowerCase()) ? d.conv : 0
+                conv: (d.license || '').toLowerCase().includes(licenseKey) || (d.license || '').toLowerCase().includes(selectedLicense.toLowerCase()) ? d.conv : 0
             }));
         }
 
@@ -347,7 +391,8 @@ export default function UserGrowthIntelligencePage() {
                 leads = leads.filter(d => d.status === 'No License' || !d.payment_methode);
                 trends = trends.map(d => ({
                     ...d,
-                    conv: 0 // No license means no paid conversion
+                    conv: 0, // No license means no paid conversion
+                    regist: (!d.payment_methode || d.payment_methode === '') ? d.regist : 0
                 }));
             } else {
                 leads = leads.filter(d =>
@@ -355,7 +400,8 @@ export default function UserGrowthIntelligencePage() {
                 );
                 trends = trends.map(d => ({
                     ...d,
-                    conv: (d.payment_methode || '').toLowerCase().includes(selectedPaymentMethod.toLowerCase()) ? d.conv : 0
+                    conv: (d.payment_methode || '').toLowerCase().includes(selectedPaymentMethod.toLowerCase()) ? d.conv : 0,
+                    regist: (d.payment_methode || '').toLowerCase().includes(selectedPaymentMethod.toLowerCase()) ? d.regist : 0
                 }));
             }
         }
@@ -411,7 +457,7 @@ export default function UserGrowthIntelligencePage() {
             unpaidLeads: leads
         };
 
-    }, [newRegisters, paidConversions, allPayments, selectedIndustry, selectedLicense]);
+    }, [newRegisters, paidConversions, allPayments, selectedIndustry, selectedLicense, selectedPaymentMethod]);
 
     // Helpers untuk Grafik & State
     const maxRegistInTrend = useMemo(() => Math.max(...filteredData.trends.map(d => d.regist), 1), [filteredData.trends]);

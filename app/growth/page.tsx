@@ -5,6 +5,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { useGrowthData } from './useGrowthData';
 import PaymentHistoryModal from './PaymentHistoryModal';
+import UserDetailsModal from './UserDetailsModal';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Users, Target, Activity, Expand, Minimize, Settings2, Download, Table, X, Filter, CalendarDays, Briefcase, CreditCard, ChevronRight, MessageSquare, Send, Clock, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
 
@@ -24,6 +25,8 @@ interface LeadItem {
     phone: string;
     plan: string;
     date: string;
+    createdAt: string;
+    updatedAt: string;
     industry: string;
     total: number;
     status: string;
@@ -31,6 +34,8 @@ interface LeadItem {
     redeemCode?: string;
     licenseType?: string;
     priority?: number;
+    successCount?: number;
+    licenseTypesList?: { type: string, count: number }[];
 }
 
 // Opsi Filter Constant
@@ -56,6 +61,7 @@ export default function UserGrowthIntelligencePage() {
     const [expandedLicenseId, setExpandedLicenseId] = useState<string | null>(null);
 
     const [selectedHistoryUser, setSelectedHistoryUser] = useState<{ id: string, name: string } | null>(null);
+    const [selectedDetailUser, setSelectedDetailUser] = useState<LeadItem | null>(null);
 
     // State untuk Custom Filter
     const [customStartDate, setCustomStartDate] = useState('');
@@ -199,44 +205,102 @@ export default function UserGrowthIntelligencePage() {
         }
 
         // 3. Mapping Unified Directory (Leads & Active Users)
+        // 3. Mapping Unified Directory (Leads & Active Users)
+        const leadsMap = new Map<string, LeadItem>();
+
+        // First, add all new registers
         if (Array.isArray(newRegisters)) {
             const today = new Date();
-            leads = newRegisters.map((user: any) => {
+            newRegisters.forEach((user: any) => {
                 const licenses = user.licenses || [];
                 const firstLicense = licenses.length > 0 ? licenses[0] : null;
 
-                let priorityLevel = 1; // Default Priority 1: No License (Target Blast)
+                let priorityLevel = 1;
                 let statusLabel = 'No License';
 
                 if (firstLicense) {
                     const expiryDate = new Date(firstLicense.date_expired);
                     if (expiryDate < today) {
-                        priorityLevel = 2; // Priority 2: Expired License (Target Renewal)
+                        priorityLevel = 2; // Expired
                         statusLabel = 'Expired';
                     } else {
-                        priorityLevel = 3; // Priority 3: Active
+                        priorityLevel = 3; // Active
                         statusLabel = 'Active';
                     }
                 }
 
-                return {
+                let calculatedCreatedAt = user.createdAt || user.created_on || user.createdat || user.created_at || '';
+                let calculatedUpdatedAt = user.updatedAt || user.updated_on || user.updatedat || user.updated_at || '';
+
+                leadsMap.set(user._id, {
                     _id: user._id,
                     name: user.full_name || user.name || 'Unknown User',
                     email: user.email || '-',
                     phone: user.phone_number || user.phone || '-',
                     plan: firstLicense?.payment_methods || user.payment_type || 'Unspecified',
                     licenseType: firstLicense?.license_type || '-',
-                    date: user.created_on || user.createdAt || '',
+                    date: calculatedCreatedAt,
+                    createdAt: calculatedCreatedAt,
+                    updatedAt: calculatedUpdatedAt,
                     industry: user.industry || 'Not Specified',
                     total: 0,
                     status: statusLabel,
                     priority: priorityLevel,
-                    redeemCode: firstLicense?.redeem_code || user.redeem_code
-                };
+                    redeemCode: firstLicense?.redeem_code || user.redeem_code,
+                    payment_methode: firstLicense?.payment_methods,
+                    successCount: 0, // Calculated below
+                    licenseTypesList: []
+                });
             });
-            // Sort highest priority first
-            leads.sort((a, b) => (a.priority || 3) - (b.priority || 3));
         }
+
+        // Second, add or merge all payments
+        if (Array.isArray(allPayments)) {
+            allPayments.forEach((p: any) => {
+                if (p.user && p.user._id) {
+                    const existing = leadsMap.get(p.user._id);
+
+                    // If user exists, we only update if payment is unpaid/failed and they are currently 'No License'
+                    // Or we just add them as a new "Unpaid Checkout" lead if they aren't in registers
+                    if (!existing || (p.status !== 'success' && existing.priority === 1)) {
+                        const priorityLevel = p.status === 'success' ? 3 : p.status === 'expired' ? 2 : 1; 
+                        const statusLabel = p.status === 'success' ? 'Active' : p.status === 'expired' ? 'Expired' : 'Checkout';
+
+                        leadsMap.set(p.user._id, {
+                            ...existing,
+                            _id: p.user._id,
+                            name: p.user.full_name || p.user.name || existing?.name || 'Unknown User',
+                            email: p.user.email || existing?.email || '-',
+                            phone: p.user.phone_number || p.user.phone || existing?.phone || '-',
+                            plan: p.payment_type || existing?.plan || 'Unspecified',
+                            licenseType: p.license_type || existing?.licenseType || '-',
+                            date: existing?.date || p.date_in || p.createdAt || p.created_on || '',
+                            createdAt: existing?.createdAt || p.date_in || p.createdAt || p.created_on || '',
+                            updatedAt: p.date_out || p.updatedAt || p.updated_on || existing?.updatedAt || '',
+                            industry: p.user.industry || existing?.industry || 'Not Specified',
+                            total: p.detail_amount?.total || p.total || existing?.total || 0,
+                            status: statusLabel,
+                            priority: priorityLevel,
+                            payment_methode: p.payment_methode || existing?.payment_methode,
+                            redeemCode: p.redeem_code || existing?.redeemCode,
+                            successCount: existing?.successCount || 0,
+                            licenseTypesList: existing?.licenseTypesList || []
+                        });
+                    } else if (existing && p.status === 'success') {
+                        // User exists and had a successful payment, update their details just in case they are missing contacts
+                        leadsMap.set(p.user._id, {
+                            ...existing,
+                            email: existing.email !== '-' ? existing.email : (p.user.email || '-'),
+                            phone: existing.phone !== '-' ? existing.phone : (p.user.phone_number || p.user.phone || '-')
+                        });
+                    }
+                }
+            });
+        }
+
+        leads = Array.from(leadsMap.values());
+        // Sort highest priority (Unpaid/Failed = 1) first
+        leads.sort((a, b) => (a.priority || 3) - (b.priority || 3));
 
         // --- GROUPING & FILTERING ---
 
@@ -287,9 +351,8 @@ export default function UserGrowthIntelligencePage() {
         const aggregatedTrends = Object.values(aggregatedTrendsMap).sort((a, b) => a.week.localeCompare(b.week));
 
         // Kalkulasi Headlines (Ensure no negative values)
-        // Kalkulasi Headlines (Ensure no negative values)
-        const totalNewRegisters = Array.isArray(newRegisters) ? newRegisters.length : 0;
-        const totalPaidConversions = Array.isArray(newRegisters) ? newRegisters.filter(u => u.licenses && u.licenses.length > 0).length : 0;
+        const totalNewRegisters = trends.reduce((sum, curr) => sum + curr.regist, 0);
+        const totalPaidConversions = trends.reduce((sum, curr) => sum + curr.conv, 0);
         const unpaidCheckouts = Math.max(0, leads.length);
 
         // Breakdown Industri
@@ -361,6 +424,9 @@ export default function UserGrowthIntelligencePage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        <Link href="/growth/active-users" className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest px-5 py-2.5 rounded-lg transition bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 hover:border-blue-300">
+                            Active & Retention Users
+                        </Link>
                         <button
                             onClick={() => setShowFilterPanel(!showFilterPanel)}
                             className={`flex items-center gap-2 text-xs font-bold uppercase tracking-widest px-5 py-2.5 rounded-lg transition relative ${showFilterPanel ? 'bg-zinc-900 text-white shadow-lg' : 'bg-white border border-zinc-200 text-zinc-600 hover:border-zinc-300'}`}
@@ -651,7 +717,7 @@ export default function UserGrowthIntelligencePage() {
                                     <button
                                         onClick={() => {
                                             const headers = "Name,Email,Phone,Plan,License,Industry,Status,Priority\n";
-                                            const csv = filteredData.unpaidLeads.map(l => `${l.name},${l.email},${l.phone},${l.plan},${l.licenseType},${l.industry},${l.status},${l.priority}`).join('\n');
+                                            const csv = filteredData.unpaidLeads.map(l => `${l.name},${l.email},${l.phone},${l.plan},"${l.licenseTypesList?.map(lic => `${lic.type} (${lic.count}x)`).join(' | ') || '-'}",${l.industry},${l.status},${l.priority}`).join('\n');
                                             const blob = new Blob([headers + csv], { type: 'text/csv' });
                                             const url = window.URL.createObjectURL(blob);
                                             const a = document.createElement('a');
@@ -715,8 +781,8 @@ export default function UserGrowthIntelligencePage() {
                                                                     className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
                                                                 />
                                                             </td>
-                                                            <td className="px-6 py-4">
-                                                                <p className="font-bold text-zinc-900">{lead.name}</p>
+                                                            <td className="px-6 py-4 cursor-pointer group/name" onClick={() => setSelectedDetailUser(lead)}>
+                                                                <p className="font-bold text-zinc-900 group-hover/name:text-blue-600 transition decoration-2 underline-offset-2 group-hover/name:underline">{lead.name}</p>
                                                                 <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><Briefcase size={12} /> {lead.industry}</p>
                                                             </td>
                                                             <td className="px-6 py-4 relative group">
@@ -726,13 +792,27 @@ export default function UserGrowthIntelligencePage() {
                                                             </td>
                                                             <td className="px-6 py-4">
                                                                 <div className="flex flex-col gap-1 items-start cursor-pointer group" onClick={() => setExpandedLicenseId(expandedLicenseId === leadId ? null : leadId)}>
-                                                                    <span className={`text-[10px] font-bold px-2 py-1 rounded capitalize transition-all ${lead.plan.includes('teams') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100 group-hover:bg-emerald-100' : 'bg-zinc-100 text-zinc-700 group-hover:bg-zinc-200'}`}>
-                                                                        {lead.plan}
-                                                                    </span>
-                                                                    {expandedLicenseId === leadId && lead.licenseType && lead.licenseType !== '-' && (
-                                                                        <span className="text-[9px] uppercase tracking-wider text-zinc-600 font-bold border border-zinc-300 px-2 py-0.5 rounded shadow-sm bg-white animate-in slide-in-from-top-1 fade-in duration-200 mt-1">
-                                                                            {lead.licenseType.replace('license_', '').replace('_', ' ')}
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded capitalize transition-all ${lead.plan.includes('teams') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100 group-hover:bg-emerald-100' : 'bg-zinc-100 text-zinc-700 group-hover:bg-zinc-200'}`}>
+                                                                            {lead.plan}
                                                                         </span>
+                                                                        {lead.successCount && lead.successCount > 1 && (
+                                                                            <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-black">{lead.successCount}x</span>
+                                                                        )}
+                                                                    </div>
+                                                                    {expandedLicenseId === leadId && lead.licenseTypesList && lead.licenseTypesList.length > 0 && (
+                                                                        <div className="flex flex-col gap-1 w-full mt-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                                                                            {lead.licenseTypesList.map((lic, i) => (
+                                                                                <div key={i} className="flex items-center justify-between gap-2 border border-zinc-200 px-2 py-0.5 rounded shadow-sm bg-white">
+                                                                                    <span className="text-[9px] uppercase tracking-wider text-zinc-600 font-bold">
+                                                                                        {lic.type.replace('license_', '').replace(/_/g, ' ')}
+                                                                                    </span>
+                                                                                    <span className="text-[8px] font-black bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">
+                                                                                        {lic.count}x
+                                                                                    </span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
                                                                     )}
                                                                 </div>
                                                             </td>
@@ -741,8 +821,13 @@ export default function UserGrowthIntelligencePage() {
                                                                     <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded border ${lead.priority === 1 ? 'bg-rose-50 text-rose-600 border-rose-200' : lead.priority === 2 ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
                                                                         {lead.status}
                                                                     </span>
-                                                                    {lead.plan === 'gift' && lead.redeemCode && (
-                                                                        <span className="text-[9px] uppercase tracking-wider text-purple-600 font-bold px-2 py-0.5 mt-1">
+                                                                    {lead.payment_methode === 'midtrans' && (
+                                                                        <span className="text-[9px] uppercase tracking-wider text-blue-600 font-bold px-2 py-0.5 mt-1 border border-blue-200 bg-blue-50 rounded">
+                                                                            Midtrans
+                                                                        </span>
+                                                                    )}
+                                                                    {lead.payment_methode === 'gift' && lead.redeemCode && (
+                                                                        <span className="text-[9px] uppercase tracking-wider text-purple-600 font-bold px-2 py-0.5 mt-1 border border-purple-200 bg-purple-50 rounded">
                                                                             Gift Code: {lead.redeemCode}
                                                                         </span>
                                                                     )}
@@ -871,6 +956,12 @@ export default function UserGrowthIntelligencePage() {
                     userId={selectedHistoryUser?.id || null}
                     userName={selectedHistoryUser?.name || ''}
                     onClose={() => setSelectedHistoryUser(null)}
+                />
+
+                {/* --- USER DETAILS MODAL --- */}
+                <UserDetailsModal
+                    user={selectedDetailUser}
+                    onClose={() => setSelectedDetailUser(null)}
                 />
             </div>
         </main>

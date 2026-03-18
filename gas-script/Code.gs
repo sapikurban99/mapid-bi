@@ -165,11 +165,11 @@ function doGet(e) {
         }));
 
         kanbanLeads = leadsData.map(r => ({
-          id: r[0], name: r[1], pseId: r[2], isClosed: r[3], stage: r[4] || 'Lead Generation', progress: Number(r[5]) || 0, notes: r[6] || ''
+          id: r[0], name: r[1], pseId: r[2], isClosed: r[3], stage: r[4] || 'Lead Generation', progress: Number(r[5]) || 0, priority: r[6] || 'Medium', notes: r[7] || ''
         }));
 
         kanbanPartners = partnerData.map(r => ({
-          id: r[0], name: r[1], pseId: r[2], isActive: r[3], type: r[4] || 'Technology', stage: r[5] || 'Lead Generation', progress: Number(r[6]) || 0, notes: r[7] || ''
+          id: r[0], name: r[1], pseId: r[2], isActive: r[3], type: r[4] || 'Technology', stage: r[5] || 'Lead Generation', progress: Number(r[6]) || 0, priority: r[7] || 'Medium', notes: r[8] || ''
         }));
 
         pseWorkloads = pseData.filter(p => p[3] === true).map(p => {
@@ -268,7 +268,7 @@ function doPost(e) {
       const ssKanban = SpreadsheetApp.openById(KANBAN_SHEET_ID);
       const sheet = ssKanban.getSheetByName('DB_PSE_Leads');
       const newId = Utilities.getUuid();
-      sheet.appendRow([newId, body.name, body.pseId, false, body.stage, body.progress || 0, body.notes || '']); 
+      sheet.appendRow([newId, body.name, body.pseId, false, body.stage, body.progress || 0, body.priority || 'Medium', body.notes || '']); 
       return ContentService.createTextOutput(JSON.stringify({ success: true, newId: newId })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -278,7 +278,7 @@ function doPost(e) {
       const ssKanban = SpreadsheetApp.openById(KANBAN_SHEET_ID);
       const sheet = ssKanban.getSheetByName('DB_PSE_Partners');
       const newId = Utilities.getUuid();
-      sheet.appendRow([newId, body.name, body.pseId, true, body.type, body.stage, body.progress || 0, body.notes || '']);
+      sheet.appendRow([newId, body.name, body.pseId, true, body.type, body.stage, body.progress || 0, body.priority || 'Medium', body.notes || '']);
       return ContentService.createTextOutput(JSON.stringify({ success: true, newId: newId })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -329,7 +329,7 @@ function doPost(e) {
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
         if (data[i][0] === body.id) {
-          sheet.getRange(i + 1, 2, 1, 6).setValues([[body.name, body.pseId, body.isClosed !== undefined ? body.isClosed : false, body.stage, body.progress || 0, body.notes || '']]);
+          sheet.getRange(i + 1, 2, 1, 7).setValues([[body.name, body.pseId, body.isClosed !== undefined ? body.isClosed : false, body.stage, body.progress || 0, body.priority || 'Medium', body.notes || '']]);
           return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
         }
       }
@@ -342,7 +342,7 @@ function doPost(e) {
       const data = sheet.getDataRange().getValues();
       for (let i = 1; i < data.length; i++) {
         if (data[i][0] === body.id) {
-          sheet.getRange(i + 1, 2, 1, 7).setValues([[body.name, body.pseId, body.isActive !== undefined ? body.isActive : true, body.type, body.stage, body.progress || 0, body.notes || '']]);
+          sheet.getRange(i + 1, 2, 1, 8).setValues([[body.name, body.pseId, body.isActive !== undefined ? body.isActive : true, body.type, body.stage, body.progress || 0, body.priority || 'Medium', body.notes || '']]);
           return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
         }
       }

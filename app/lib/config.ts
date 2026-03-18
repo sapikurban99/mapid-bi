@@ -122,6 +122,7 @@ export interface KanbanLeadItem {
     stage: string;
     isClosed: boolean;
     progress?: number;
+    priority?: string;
     notes?: string;
 }
 
@@ -133,6 +134,7 @@ export interface KanbanPartnerItem {
     isActive: boolean;
     stage: string;
     progress?: number;
+    priority?: string;
     notes?: string;
 }
 

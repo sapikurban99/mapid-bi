@@ -10,6 +10,8 @@ export default function B2BBoardPage() {
     const [config, setLocalConfig] = useState<SiteConfig | null>(null);
     const [loadingBiData, setLoadingBiData] = useState(false);
     const [activeTab, setActiveTab] = useState<'projects' | 'leads' | 'partners' | 'stats'>('projects');
+    const [priorityFilter, setPriorityFilter] = useState('All');
+    const [showArchived, setShowArchived] = useState(false);
 
     // Modals State
     const [isAddingProject, setIsAddingProject] = useState(false);
@@ -18,16 +20,46 @@ export default function B2BBoardPage() {
     const [submitting, setSubmitting] = useState(false);
     // Forms State
     const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' });
-    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, notes: '' });
-    const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, notes: '' });
+    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '' });
+    const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' });
 
     const [editingItemType, setEditingItemType] = useState<'Project' | 'Lead' | 'Partner' | null>(null);
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
     // Kanban Stages (Sesuai SOP)
-    const KANBAN_STAGES = ['Technical Handover', 'Feasibility & Design', 'Demo / POC', 'Development & Data', 'Internal Testing', 'UAT with Client', 'Training & Go Live', 'Value Review'];
-    const PRESALES_STAGES = ['Lead Generation', 'Discovery Meeting', 'MoM & BRD Creation', 'Technical Handover', 'Feasibility Check', 'Solution Design & FRD', 'Validation & Demo', 'Commercial Negotiation'];
-    const PARTNER_STAGES = ['Sourcing', 'Approached', 'Negotiation', 'Onboarded', 'Active'];
+    const KANBAN_STAGES = ['Technical Handover', 'Feasibility & Design', 'Demo / POC', 'Development & Data', 'Internal Testing', 'UAT with Client', 'Training & Go Live', 'Value Review', 'Done', 'Lost'];
+    const PRESALES_STAGES = ['Lead Generation', 'Discovery Meeting', 'MoM & BRD Creation', 'Technical Handover', 'Feasibility Check', 'Solution Design & FRD', 'Validation & Demo', 'Commercial Negotiation', 'Closed Won', 'Closed Lost'];
+    const PARTNER_STAGES = ['Sourcing', 'Approached', 'Negotiation', 'Onboarded', 'Active', 'Archived'];
+
+    const getFilteredProjects = (stage: string) => {
+        return config?.kanbanProjects?.filter((p: any) => {
+            if (p.stage !== stage) return false;
+            if (priorityFilter !== 'All' && (p.priority || 'Medium') !== priorityFilter) return false;
+            const isArchived = p.stage === 'Done' || p.stage === 'Lost';
+            if (!showArchived && isArchived) return false;
+            return true;
+        }) || [];
+    };
+
+    const getFilteredLeads = (stage: string) => {
+        return config?.kanbanLeads?.filter((l: any) => {
+            if (l.stage !== stage) return false;
+            if (priorityFilter !== 'All' && (l.priority || 'Medium') !== priorityFilter) return false;
+            const isArchived = l.stage === 'Closed Won' || l.stage === 'Closed Lost' || l.isClosed === true;
+            if (!showArchived && isArchived) return false;
+            return true;
+        }) || [];
+    };
+
+    const getFilteredPartners = (stage: string) => {
+        return config?.kanbanPartners?.filter((p: any) => {
+            if ((p.stage || 'Sourcing') !== stage) return false;
+            if (priorityFilter !== 'All' && (p.priority || 'Medium') !== priorityFilter) return false;
+            const isArchived = p.stage === 'Archived' || p.isActive === false;
+            if (!showArchived && isArchived) return false;
+            return true;
+        }) || [];
+    };
 
     useEffect(() => {
         setLocalConfig(getConfig());
@@ -126,9 +158,9 @@ export default function B2BBoardPage() {
                 {/* GLOBAL ACTION BAR */}
                 <div className="flex justify-between items-center mb-6 animate-in fade-in duration-300">
                     <div>
-                        {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
-                        {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0 }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
-                        {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0 }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
+                        {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
+                        {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
+                        {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
                     </div>
 
                     <button
@@ -143,6 +175,21 @@ export default function B2BBoardPage() {
                         {loadingBiData || globalIsLoading ? <><Loader2 size={14} className="animate-spin" /> Syncing</> : <><Globe size={14} /> Sync Data</>}
                     </button>
                 </div>
+
+                {/* FILTER BAR OPTIONS */}
+                {activeTab !== 'stats' && (
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 mt-2 animate-in fade-in duration-300">
+                        <div className="flex bg-zinc-100 p-1 rounded-xl w-full sm:w-fit overflow-x-auto hide-scrollbar">
+                            {['All', 'High', 'Medium', 'Low'].map(p => (
+                                <button key={p} onClick={() => setPriorityFilter(p)} className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-all whitespace-nowrap ${priorityFilter === p ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}>{p} Priority</button>
+                            ))}
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-xl border border-zinc-200">
+                            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-zinc-100 border-zinc-300" />
+                            <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest whitespace-nowrap">Show Completed / Archived</span>
+                        </label>
+                    </div>
+                )}
 
                 {/* TAB 1: KANBAN PROJECTS */}
                 {activeTab === 'projects' && (
@@ -168,13 +215,14 @@ export default function B2BBoardPage() {
                             >
                                 <div className="p-4 border-b border-zinc-200/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-zinc-600">
                                     {stage}
-                                    <span className="bg-white border border-zinc-200 text-zinc-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{config.kanbanProjects?.filter((p: any) => p.stage === stage).length || 0}</span>
+                                    <span className="bg-white border border-zinc-200 text-zinc-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredProjects(stage).length}</span>
                                 </div>
                                 <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                    {config.kanbanProjects?.filter((p: any) => p.stage === stage).map((p: any) => (
+                                    {getFilteredProjects(stage).map((p: any) => (
                                         <div key={p.id} draggable onDragStart={(e) => e.dataTransfer.setData('projectId', p.id)}
                                             onClick={() => openEditModal('Project', p)}
                                             className="bg-white border border-zinc-200 shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
+                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${(p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><Briefcase size={14} /></div>
                                                 <div className="flex flex-col gap-1 items-end">
@@ -225,13 +273,14 @@ export default function B2BBoardPage() {
                             >
                                 <div className="p-4 border-b border-emerald-100/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-emerald-800">
                                     {stage}
-                                    <span className="bg-white border border-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{config.kanbanLeads?.filter((l: any) => l.stage === stage && !l.isClosed).length || 0}</span>
+                                    <span className="bg-white border border-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredLeads(stage).length}</span>
                                 </div>
                                 <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                    {config.kanbanLeads?.filter((l: any) => l.stage === stage && !l.isClosed).map((l: any) => (
+                                    {getFilteredLeads(stage).map((l: any) => (
                                         <div key={l.id} draggable onDragStart={(e) => e.dataTransfer.setData('leadId', l.id)}
                                             onClick={() => openEditModal('Lead', l)}
                                             className="bg-white border border-emerald-200 shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
+                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${(l.priority || 'Medium') === 'High' ? 'bg-rose-500' : (l.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center"><Target size={14} /></div>
                                                 <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${getStageColor(l.stage)}`}>{l.stage}</span>
@@ -279,13 +328,14 @@ export default function B2BBoardPage() {
                             >
                                 <div className="p-4 border-b border-purple-200/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-purple-800">
                                     {stage}
-                                    <span className="bg-white border border-purple-200 text-purple-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{config.kanbanPartners?.filter((p: any) => (p.stage || 'Sourcing') === stage && p.isActive).length || 0}</span>
+                                    <span className="bg-white border border-purple-200 text-purple-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredPartners(stage).length}</span>
                                 </div>
                                 <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                    {config.kanbanPartners?.filter((p: any) => (p.stage || 'Sourcing') === stage && p.isActive).map((p: any) => (
+                                    {getFilteredPartners(stage).map((p: any) => (
                                         <div key={p.id} draggable onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)}
                                             onClick={() => openEditModal('Partner', p)}
                                             className="bg-white border border-purple-200 shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
+                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${(p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="w-8 h-8 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center"><Users size={14} /></div>
                                                 <div className="flex flex-col gap-1 items-end">
@@ -422,11 +472,21 @@ export default function B2BBoardPage() {
                                     <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Current Stage</label>
-                                <select value={newLead.stage} onChange={(e) => setNewLead((p: any) => ({ ...p, stage: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                    {PRESALES_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Current Stage</label>
+                                    <select value={newLead.stage} onChange={(e) => setNewLead((p: any) => ({ ...p, stage: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        {PRESALES_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Priority</label>
+                                    <select value={newLead.priority || 'Medium'} onChange={(e) => setNewLead((p: any) => ({ ...p, priority: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="High">High</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="Low">Low</option>
+                                    </select>
+                                </div>
                             </div>
                             <div>
                                 <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">
@@ -441,7 +501,7 @@ export default function B2BBoardPage() {
                             </div>
                         </div>
                         <div className="p-6 border-t border-zinc-100 bg-zinc-50 rounded-b-3xl flex justify-end">
-                            <button disabled={submitting} onClick={() => handleSaveData('Lead', newLead, setNewLead, setIsAddingLead, () => setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, notes: '' }))} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase rounded-xl hover:bg-emerald-700">{submitting ? 'Saving...' : 'Save Lead'}</button>
+                            <button disabled={submitting} onClick={() => handleSaveData('Lead', newLead, setNewLead, setIsAddingLead, () => setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '' }))} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase rounded-xl hover:bg-emerald-700">{submitting ? 'Saving...' : 'Save Lead'}</button>
                         </div>
                     </div>
                 </div>
@@ -463,11 +523,21 @@ export default function B2BBoardPage() {
                                     <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Current Stage</label>
-                                <select value={newPartner.stage} onChange={(e) => setNewPartner((p: any) => ({ ...p, stage: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                    {PARTNER_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Current Stage</label>
+                                    <select value={newPartner.stage} onChange={(e) => setNewPartner((p: any) => ({ ...p, stage: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        {PARTNER_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Priority</label>
+                                    <select value={newPartner.priority || 'Medium'} onChange={(e) => setNewPartner((p: any) => ({ ...p, priority: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="High">High</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="Low">Low</option>
+                                    </select>
+                                </div>
                             </div>
                             <div>
                                 <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">
@@ -482,7 +552,7 @@ export default function B2BBoardPage() {
                             </div>
                         </div>
                         <div className="p-6 border-t border-zinc-100 bg-zinc-50 rounded-b-3xl flex justify-end">
-                            <button disabled={submitting} onClick={() => handleSaveData('Partner', newPartner, setNewPartner, setIsAddingPartner, () => setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, notes: '' }))} className="px-6 py-2.5 bg-purple-600 text-white text-xs font-black uppercase rounded-xl hover:bg-purple-700">{submitting ? 'Saving...' : 'Save Partner'}</button>
+                            <button disabled={submitting} onClick={() => handleSaveData('Partner', newPartner, setNewPartner, setIsAddingPartner, () => setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }))} className="px-6 py-2.5 bg-purple-600 text-white text-xs font-black uppercase rounded-xl hover:bg-purple-700">{submitting ? 'Saving...' : 'Save Partner'}</button>
                         </div>
                     </div>
                 </div>

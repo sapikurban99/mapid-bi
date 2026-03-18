@@ -371,8 +371,8 @@ export default function B2BBoardPage() {
                             <button onClick={() => setIsAddingProject(false)} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full"><X size={16} /></button>
                         </div>
                         <div className="p-6 space-y-4">
-                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Client Name</label><input type="text" value={newProject.client} onChange={(e) => setNewProject(p => ({ ...p, client: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
-                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Project Name</label><input type="text" value={newProject.projectName} onChange={(e) => setNewProject(p => ({ ...p, projectName: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
+                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Client Name</label><input type="text" value={newProject.client} onChange={(e) => setNewProject((p: any) => ({ ...p, client: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
+                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Project Name</label><input type="text" value={newProject.projectName} onChange={(e) => setNewProject((p: any) => ({ ...p, projectName: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PSE Assignee</label>
@@ -415,10 +415,10 @@ export default function B2BBoardPage() {
                             <button onClick={() => setIsAddingLead(false)} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full"><X size={16} /></button>
                         </div>
                         <div className="p-6 space-y-4">
-                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Company / Lead Name</label><input type="text" value={newLead.name} onChange={(e) => setNewLead(p => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-zinc-900" /></div>
+                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Company / Lead Name</label><input type="text" value={newLead.name} onChange={(e) => setNewLead((p: any) => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-zinc-900" /></div>
                             <div>
                                 <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PSE Support</label>
-                                <select value={newLead.pseId} onChange={(e) => setNewLead(p => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                <select value={newLead.pseId} onChange={(e) => setNewLead((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
                                     <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
                                 </select>
                             </div>
@@ -456,10 +456,10 @@ export default function B2BBoardPage() {
                             <button onClick={() => setIsAddingPartner(false)} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full"><X size={16} /></button>
                         </div>
                         <div className="p-6 space-y-4">
-                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Partner Name</label><input type="text" value={newPartner.name} onChange={(e) => setNewPartner(p => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900" /></div>
+                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Partner Name</label><input type="text" value={newPartner.name} onChange={(e) => setNewPartner((p: any) => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900" /></div>
                             <div>
                                 <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC (PSE)</label>
-                                <select value={newPartner.pseId} onChange={(e) => setNewPartner(p => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                <select value={newPartner.pseId} onChange={(e) => setNewPartner((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
                                     <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
                                 </select>
                             </div>

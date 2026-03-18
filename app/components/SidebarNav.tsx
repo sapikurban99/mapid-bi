@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, Target, Settings, Menu, LogOut, PanelLeftClose, PanelRightClose } from "lucide-react";
+import { Activity, LayoutDashboard, Target, Settings, Menu, LogOut, PanelLeftClose, PanelRightClose, Briefcase } from "lucide-react";
 import { getConfig } from "../lib/config";
 import { useEffect, useState } from "react";
 import { useGlobalData } from "./GlobalDataProvider";
@@ -22,6 +22,7 @@ export default function SidebarNav() {
     const links = [
         { href: '/', label: 'Strategy & RACI', icon: Target },
         { href: '/dashboard', label: 'BI Dashboard', icon: LayoutDashboard },
+        { href: '/b2b-board', label: 'B2B Delivery & Ops', icon: Briefcase },
         { href: '/growth', label: 'Growth Intelligence', icon: Activity },
         { href: '/admin', label: 'Admin Panel', icon: Settings },
     ];
@@ -92,6 +93,12 @@ export default function SidebarNav() {
                     <LogOut className="w-4 h-4 shrink-0" />
                     {!isCollapsed && 'Log Out'}
                 </button>
+
+                {!isCollapsed && (
+                    <div className="text-center mt-2">
+                        <span className="text-[9px] font-black tracking-widest uppercase text-zinc-400">v{process.env.NEXT_PUBLIC_APP_VERSION || '0.1.24'}</span>
+                    </div>
+                )}
             </div>
 
             {/* Mobile Bottom Border for spacing */}

@@ -97,15 +97,6 @@ const BI_CONFIG: Record<string, any> = {
             { key: 'action', label: 'Next Action', type: 'text' }
         ]
     },
-    projects: {
-        title: 'Project Delivery',
-        empty: { name: '', phase: '', progress: 0, issue: '' },
-        cols: [{ key: 'name', label: 'Project Name' }, { key: 'phase', label: 'Phase' }, { key: 'progress', label: 'Progress %' }],
-        fields: [
-            { key: 'name', label: 'Project Name', type: 'text' }, { key: 'phase', label: 'Current Phase', type: 'text' },
-            { key: 'progress', label: 'Progress (%)', type: 'number' }, { key: 'issue', label: 'Issue / Notes', type: 'text' }
-        ]
-    },
     docs: {
         title: 'Gallery & Docs',
         empty: { title: '', desc: '', link: '', format: 'Doc', category: '' },
@@ -146,7 +137,7 @@ const BI_CONFIG: Record<string, any> = {
             { key: 'revenue', label: 'Revenue (in Millions)', type: 'number' }, { key: 'dealSize', label: 'Avg Deal Size (in Millions)', type: 'number' }
         ]
     },
-    disbursement: {
+    budget: {
         title: 'Budget Disbursement',
         empty: { category: 'Operational', amount: 0, date: '', description: '' },
         cols: [{ key: 'category', label: 'Category' }, { key: 'amount', label: 'Amount (Rp)' }, { key: 'date', label: 'Date' }],
@@ -728,7 +719,7 @@ export default function AdminPage() {
                                         <button
                                             onClick={() => updateConfig('biData', {
                                                 socials: [], campaigns: [], revenue: [], pipeline: [], projects: [], docs: [], userGrowth: [],
-                                                trends: [], academy: [], disbursement: []
+                                                trends: [], academy: [], budget: []
                                             })}
                                             className="flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition">
                                             <Plus size={14} /> Mulai Kosong
@@ -877,8 +868,9 @@ export default function AdminPage() {
                             )}
                         </div>
                     )}
+
+                    </div>
                 </div>
-            </div>
 
             {/* ============ MODAL POPUP ============ */}
             {

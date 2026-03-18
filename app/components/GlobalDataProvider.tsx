@@ -39,10 +39,10 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
                 mergedData.userGrowth = mergedData.userGrowth?.length ? mergedData.userGrowth : fallbackData.userGrowth || [];
                 mergedData.academy = mergedData.academy?.length ? mergedData.academy : fallbackData.academy || [];
                 mergedData.docs = mergedData.docs?.length ? mergedData.docs : fallbackData.docs || [];
-                mergedData.disbursement = mergedData.disbursement?.length ? mergedData.disbursement : fallbackData.disbursement || [];
+                mergedData.budget = mergedData.budget?.length ? mergedData.budget : fallbackData.budget || [];
 
-                // Store inside central config
-                setConfig({ biData: mergedData });
+                // Store inside central config (kanbanProjects and pseWorkloads might also be here top-level)
+                setConfig({ biData: mergedData, kanbanProjects: mergedData.kanbanProjects || [], pseWorkloads: mergedData.pseWorkloads || [] });
             }
         } catch (error) {
             console.error('Failed to sync global data:', error);

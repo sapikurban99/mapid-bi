@@ -1,20 +1,23 @@
 /**
  * ====================================================
- * MAPID BI Dashboard — Google Apps Script (Reference)
+ * MAPID BI & B2B KANBAN — Multi-Spreadsheet API
  * ====================================================
  */
 
-const SHEET_ID = '1SDOF1rVTKJPBd19UxbAatPqhWotGBwQ3PznVhUrbL6A'; // WAJIB GANTI INI DENGAN ID SHEET ANDA!
+const MAIN_SHEET_ID = '1SDOF1rVTKJPBd19UxbAatPqhWotGBwQ3PznVhUrbL6A'; // Sheet BI Utama
+const KANBAN_SHEET_ID = '1N4Xkb2A0-pqeCl6jIX7pvvgmnRqV-BuFAmEFV2daLI4'; // WAJIB GANTI: Sheet B2B Operations
 
-function setup() {
+// ==========================================
+// 1A. SETUP DB UTAMA (BI DASHBOARD + BUDGET)
+// ==========================================
+function setupMainDB() {
   try {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const ss = SpreadsheetApp.openById(MAIN_SHEET_ID);
     
-    // 1. DATABASE: REVENUE & PROJECTS (Dipersingkat untuk contoh, biarkan yang lama jika ada)
+    // --- DATABASE LAMA (Sesuai Referensi Anda) ---
     let sheetRev = ss.getSheetByName('DB_Revenue') || ss.insertSheet('DB_Revenue');
     let sheetProj = ss.getSheetByName('DB_Projects') || ss.insertSheet('DB_Projects');
     
-    // 2. DATABASE BARU: B2B PIPELINE (Data Asli dari Screenshot)
     let sheetPipe = ss.getSheetByName('DB_Pipeline') || ss.insertSheet('DB_Pipeline');
     sheetPipe.clear();
     sheetPipe.appendRow(['Client', 'Industry', 'Stage', 'Value_IDR', 'Action', 'ETA']);
@@ -28,220 +31,368 @@ function setup() {
     sheetPipe.appendRow(['BTID', 'Property', 'Negotiation', 1798866000, 'Follow Up', '1-Jun']);
     sheetPipe.appendRow(['Nabati (Pilot)', 'FMCG', 'Won', 2204000000, 'Switch to Pilot', '31-May']);
 
-    // 3. DATABASE BARU: B2C CAMPAIGNS & CHANNELS
     let sheetCamp = ss.getSheetByName('DB_Campaigns') || ss.insertSheet('DB_Campaigns');
     sheetCamp.clear();
-    // PERHATIKAN DISINI: 'Period' sudah disisipkan sebelum 'Status'
     sheetCamp.appendRow(['Campaign_Name', 'Period', 'Status', 'Leads', 'Participants', 'Conversion_Pct']);
     sheetCamp.appendRow(['Opening Rush Loc Analytics', 'Q1 2026', 'Completed', 150, 65, 43.3]);
     sheetCamp.appendRow(['Free Class Backgrounds', 'Q1 2026', 'Active', 320, 110, 34.3]);
     sheetCamp.appendRow(['Business Expansion Testing', 'Q2 2026', 'Planning', 0, 0, 0]);
 
-    // 4. DATABASE BARU: SOCIAL MEDIA & COMMUNITY
     let sheetSoc = ss.getSheetByName('DB_Socials') || ss.insertSheet('DB_Socials');
     sheetSoc.clear();
     sheetSoc.appendRow(['Month', 'Week', 'Platform', 'Metric', 'Value']);
     sheetSoc.appendRow(['Jan 2026', 'Week 4', 'Instagram', 'Followers', 6550]);
     sheetSoc.appendRow(['Jan 2026', 'Week 4', 'LinkedIn', 'Followers', 9673]);
     sheetSoc.appendRow(['Jan 2026', 'Week 4', 'YouTube', 'Subscribers', 1240]);
-    sheetSoc.appendRow(['Jan 2026', 'Week 4', 'TikTok', 'Followers', 850]);
     sheetSoc.appendRow(['Jan 2026', 'Week 4', 'WA Community', 'Members', 1893]);
-    sheetSoc.appendRow(['Jan 2026', 'Week 4', 'MAPID Apps', 'Registered Users', 1045]);
-    sheetSoc.appendRow(['Feb 2026', 'Week 1', 'Instagram', 'Followers', 6800]);
-    sheetSoc.appendRow(['Feb 2026', 'Week 1', 'LinkedIn', 'Followers', 10200]);
-    sheetSoc.appendRow(['Feb 2026', 'Week 1', 'YouTube', 'Subscribers', 1300]);
-    sheetSoc.appendRow(['Feb 2026', 'Week 1', 'TikTok', 'Followers', 900]);
-    sheetSoc.appendRow(['Feb 2026', 'Week 1', 'WA Community', 'Members', 1950]);
-    sheetSoc.appendRow(['Feb 2026', 'Week 1', 'MAPID Apps', 'Registered Users', 1040]);
 
-    // 5. DATABASE BARU: TRENDS (Multi-timeframe)
     let sheetTrend = ss.getSheetByName('DB_Trends') || ss.insertSheet('DB_Trends');
     sheetTrend.clear();
     sheetTrend.appendRow(['Timeframe', 'Label', 'Revenue_M', 'DealSizeAvg_M']);
     sheetTrend.appendRow(['month', 'Nov 25', 140, 15]);
     sheetTrend.appendRow(['month', 'Dec 25', 110, 10]);
     sheetTrend.appendRow(['month', 'Jan 26', 180, 20]);
-    sheetTrend.appendRow(['month', 'Feb 26', 195, 25]);
-    sheetTrend.appendRow(['quarter', 'Q2 2025', 320, 14]);
-    sheetTrend.appendRow(['quarter', 'Q3 2025', 410, 16]);
-    sheetTrend.appendRow(['quarter', 'Q4 2025', 380, 12]);
-    sheetTrend.appendRow(['quarter', 'Q1 2026', 180, 20]);
-    sheetTrend.appendRow(['year', '2024', 1200, 12]);
-    sheetTrend.appendRow(['year', '2025', 1550, 15]);
-    sheetTrend.appendRow(['year', '2026 (YTD)', 180, 20]);
 
-    // 6. DATABASE: GALLERY & DOCS (Knowledge Base)
     let sheetDocs = ss.getSheetByName('DB_Docs') || ss.insertSheet('DB_Docs');
     sheetDocs.clear();
     sheetDocs.appendRow(['Title', 'Category', 'Format', 'Link', 'Description']);
-    sheetDocs.appendRow([
-      'Business Status Report Q1', 
-      'Report', 
-      'PDF', 
-      '#',
-      'Bi-weekly status report containing key blockers and pipeline.'
-    ]);
-    sheetDocs.appendRow([
-      'Enterprise Playbook Q1', 
-      'Strategy', 
-      'PDF', 
-      '#', 
-      'Scripts & handling objections for Hunter Team.'
-    ]);
-    sheetDocs.appendRow([
-      'Pricing Calculator', 
-      'Tools', 
-      'Sheet', 
-      '#', 
-      'B2B project scope pricing logic.'
-    ]);
-    sheetDocs.appendRow([
-      'Brand Assets 2026', 
-      'Design', 
-      'Folder', 
-      '#', 
-      'Logos, fonts, and presentation templates.'
-    ]);
+    sheetDocs.appendRow(['Business Status Report Q1', 'Report', 'PDF', '#', 'Bi-weekly status report.']);
 
-    // 7. DATABASE BARU: USER GROWTH ANALYSIS
     let sheetGrowth = ss.getSheetByName('DB_UserGrowth') || ss.insertSheet('DB_UserGrowth');
     sheetGrowth.clear();
     sheetGrowth.appendRow(['Month', 'Week', 'NewRegist', 'ActiveGeoUsers', 'ConversionRate']);
     sheetGrowth.appendRow(['Jan 2026', 'Week 1', 100, 50, 50]);
-    sheetGrowth.appendRow(['Jan 2026', 'Week 2', 120, 60, 50]);
-    sheetGrowth.appendRow(['Jan 2026', 'Week 3', 150, 80, 53.33]);
-    sheetGrowth.appendRow(['Jan 2026', 'Week 4', 200, 120, 60]);
-    sheetGrowth.appendRow(['Feb 2026', 'Week 1', 250, 160, 64]);
-    sheetGrowth.appendRow(['Feb 2026', 'Week 2', 300, 200, 66.67]);
 
-    // 8. DATABASE BARU: ACADEMY PERFORMANCE
     let sheetAcademy = ss.getSheetByName('DB_Academy') || ss.insertSheet('DB_Academy');
     sheetAcademy.clear();
     sheetAcademy.appendRow(['Program', 'Batch', 'Registrants', 'Converted']);
     sheetAcademy.appendRow(['Location Analytics', 'Batch 1', 100, 25]);
-    sheetAcademy.appendRow(['Thematics', 'Batch 1', 50, 10]);
-    sheetAcademy.appendRow(['WebGIS Dev Bootcamp', 'Batch 3', 200, 50]);
 
-    Logger.log("✅ Setup Sukses!");
-  } catch (error) { Logger.log("❌ Setup Error: " + error.message); }
+    // --- DATABASE BARU: BUDGET DISBURSEMENT ---
+    let sheetBudget = ss.getSheetByName('DB_Budget') || ss.insertSheet('DB_Budget');
+    sheetBudget.clear();
+    sheetBudget.appendRow(['Date', 'Category', 'Amount', 'Description']);
+    sheetBudget.appendRow(['2026-03-01', 'Ads Spend', 5000000, 'Meta Ads - Top of Funnel']);
+    sheetBudget.appendRow(['2026-03-05', 'Event', 12500000, 'Sponsorship Acara Peta Bumi']);
+    sheetBudget.appendRow(['2026-03-10', 'Software', 1500000, 'Lisensi n8n & API Pihak Ketiga']);
+
+    Logger.log("✅ Setup Main DB (termasuk Budget) Sukses!");
+  } catch (error) { Logger.log("❌ Setup Main DB Error: " + error.message); }
 }
 
+// ==========================================
+// 1B. SETUP DB KANBAN (SPREADSHEET KEDUA)
+// ==========================================
+function setupKanbanDB() {
+  try {
+    if (!KANBAN_SHEET_ID) {
+      Logger.log("❌ Kanban Sheet ID is empty!");
+      return;
+    }
+
+    const ssKanban = SpreadsheetApp.openById(KANBAN_SHEET_ID);
+    
+    let sheetPSE = ssKanban.getSheetByName('DB_PSE_Members') || ssKanban.insertSheet('DB_PSE_Members');
+    sheetPSE.clear();
+    sheetPSE.appendRow(['PSE_ID', 'Name', 'Max_Capacity', 'Is_Active']);
+    sheetPSE.appendRow([Utilities.getUuid(), 'Zhafran', 15, true]);
+    sheetPSE.appendRow([Utilities.getUuid(), 'Lossa', 15, true]);
+    sheetPSE.appendRow([Utilities.getUuid(), 'Amel', 15, true]);
+
+    let sheetProjects = ssKanban.getSheetByName('DB_Kanban_Projects') || ssKanban.insertSheet('DB_Kanban_Projects');
+    sheetProjects.clear();
+    sheetProjects.appendRow(['Project_ID', 'Client', 'Project_Name', 'PSE_ID', 'Stage', 'Progress_Pct', 'Priority']);
+
+    let sheetLeads = ssKanban.getSheetByName('DB_PSE_Leads') || ssKanban.insertSheet('DB_PSE_Leads');
+    sheetLeads.clear();
+    sheetLeads.appendRow(['Lead_ID', 'Lead_Name', 'PSE_ID', 'Is_Closed']);
+
+    let sheetPartners = ssKanban.getSheetByName('DB_PSE_Partners') || ssKanban.insertSheet('DB_PSE_Partners');
+    sheetPartners.clear();
+    sheetPartners.appendRow(['Partner_ID', 'Partner_Name', 'PSE_ID', 'Is_Active']);
+
+    Logger.log("✅ Setup Kanban DB di Spreadsheet Baru Sukses!");
+  } catch (error) { 
+    Logger.log("❌ Setup Kanban Error: " + error.message); 
+  }
+}
+
+// ==========================================
+// 2. HTTP GET HANDLER (Menggabungkan 2 Sheet)
+// ==========================================
 function doGet(e) {
   try {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
-    const readSheet = (name) => {
+    const ssMain = SpreadsheetApp.openById(MAIN_SHEET_ID);
+    
+    const readData = (ss, name) => {
+      if (!ss) return [];
       const sheet = ss.getSheetByName(name);
       return sheet ? sheet.getDataRange().getValues().slice(1) : [];
     };
 
-    const trendsRaw = readSheet('DB_Trends');
-    
+    // --- BACA DATA DARI SPREADSHEET UTAMA ---
     const payload = {
-      revenue: readSheet('DB_Revenue').map(r => ({ subProduct: r[1], quarter: r[2], target: r[3], actual: r[4], achievement: r[5] })),
-      projects: readSheet('DB_Projects').map(r => ({ name: r[0], phase: r[1], progress: r[2], issue: r[3] })),
-      docs: readSheet('DB_Docs').map(r => ({ title: r[0], category: r[1], format: r[2], link: r[3], desc: r[4] })),
-      
-      // DATA BARU
-      pipeline: readSheet('DB_Pipeline').map(r => ({ client: r[0], industry: r[1], stage: r[2], value: r[3], action: r[4], eta: r[5] })),
-      // BACA DENGAN 'period: r[1]' SEKARANG
-      campaigns: readSheet('DB_Campaigns').map(r => ({ name: r[0], period: r[1], status: r[2], leads: r[3], participants: r[4], conversion: r[5] })),
-      socials: readSheet('DB_Socials').map(r => ({ month: r[0], week: r[1], platform: r[2], metric: r[3], value: r[4] })),
-      userGrowth: readSheet('DB_UserGrowth').map(r => ({ month: r[0], week: r[1], newRegist: r[2], activeGeoUsers: r[3], conversion: r[4] })),
-      
-      // TRENDS FLAT ARRAY
-      trends: trendsRaw.map(r => ({ category: r[0], label: r[1], revenue: r[2], dealSize: r[3] })),
-      
-      // ACADEMY
-      academy: readSheet('DB_Academy').map(r => ({ program: r[0], batch: r[1], registrants: r[2], converted: r[3] }))
+      revenue: readData(ssMain, 'DB_Revenue').map(r => ({ subProduct: r[1], quarter: r[2], target: r[3], actual: r[4], achievement: r[5] })),
+      projects: readData(ssMain, 'DB_Projects').map(r => ({ name: r[0], phase: r[1], progress: r[2], issue: r[3] })),
+      docs: readData(ssMain, 'DB_Docs').map(r => ({ title: r[0], category: r[1], format: r[2], link: r[3], desc: r[4] })),
+      pipeline: readData(ssMain, 'DB_Pipeline').map(r => ({ client: r[0], industry: r[1], stage: r[2], value: r[3], action: r[4], eta: r[5] })),
+      campaigns: readData(ssMain, 'DB_Campaigns').map(r => ({ name: r[0], period: r[1], status: r[2], leads: r[3], participants: r[4], conversion: r[5] })),
+      socials: readData(ssMain, 'DB_Socials').map(r => ({ month: r[0], week: r[1], platform: r[2], metric: r[3], value: r[4] })),
+      userGrowth: readData(ssMain, 'DB_UserGrowth').map(r => ({ month: r[0], week: r[1], newRegist: r[2], activeGeoUsers: r[3], conversion: r[4] })),
+      trends: readData(ssMain, 'DB_Trends').map(r => ({ category: r[0], label: r[1], revenue: r[2], dealSize: r[3] })),
+      academy: readData(ssMain, 'DB_Academy').map(r => ({ program: r[0], batch: r[1], registrants: r[2], converted: r[3] })),
+      // Menarik Data Budget
+      budget: readData(ssMain, 'DB_Budget').map(r => ({ date: r[0], category: r[1], amount: r[2], description: r[3] }))
     };
-    
+
+    // --- BACA DATA DARI SPREADSHEET KANBAN ---
+    let kanbanProjects = [];
+    let pseWorkloads = [];
+    let kanbanLeads = [];
+    let kanbanPartners = [];
+
+    // Failsafe: Hanya coba tarik data jika ID Kanban sudah diubah
+    if (KANBAN_SHEET_ID) {
+      try {
+        const ssKanban = SpreadsheetApp.openById(KANBAN_SHEET_ID);
+        const pseData = readData(ssKanban, 'DB_PSE_Members');
+        const projectData = readData(ssKanban, 'DB_Kanban_Projects');
+        const leadsData = readData(ssKanban, 'DB_PSE_Leads');
+        const partnerData = readData(ssKanban, 'DB_PSE_Partners');
+
+        kanbanProjects = projectData.map(r => ({
+          id: r[0], client: r[1], projectName: r[2], pseId: r[3], stage: r[4], progress: r[5], priority: r[6], notes: r[7] || ''
+        }));
+
+        kanbanLeads = leadsData.map(r => ({
+          id: r[0], name: r[1], pseId: r[2], isClosed: r[3], stage: r[4] || 'Lead Generation', progress: Number(r[5]) || 0, notes: r[6] || ''
+        }));
+
+        kanbanPartners = partnerData.map(r => ({
+          id: r[0], name: r[1], pseId: r[2], isActive: r[3], type: r[4] || 'Technology', stage: r[5] || 'Lead Generation', progress: Number(r[6]) || 0, notes: r[7] || ''
+        }));
+
+        pseWorkloads = pseData.filter(p => p[3] === true).map(p => {
+          const pseId = p[0];
+          const maxCap = p[2] || 15;
+
+          const activeProjects = projectData.filter(prj => prj[3] === pseId && prj[4] !== 'Done').length;
+          const activeLeads = leadsData.filter(ld => ld[2] === pseId && ld[3] === false).length;
+          const activePartners = partnerData.filter(pt => pt[2] === pseId && pt[3] === true).length;
+
+          const totalPoints = (activeProjects * 3) + (activeLeads * 1) + (activePartners * 1);
+          const loadPercentage = maxCap > 0 ? Math.round((totalPoints / maxCap) * 100) : 0;
+
+          return {
+            pseId: pseId, name: p[1], activeProjects: activeProjects, activeLeads: activeLeads, activePartners: activePartners,
+            totalPoints: totalPoints, maxCapacity: maxCap, loadPercentage: loadPercentage
+          };
+        });
+      } catch (kanbanErr) {
+        Logger.log("Gagal baca DB Kanban: " + kanbanErr.message);
+      }
+    }
+
+    payload.kanbanProjects = kanbanProjects;
+    payload.pseWorkloads = pseWorkloads;
+    payload.kanbanLeads = kanbanLeads;
+    payload.kanbanPartners = kanbanPartners;
+
+    // Ambil Admin Config
     var adminConfig = getAdminConfig();
     if (adminConfig) {
       payload.adminConfig = adminConfig;
     }
-    
+
     return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({ isError: true, error: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
+// ==========================================
+// 3. HTTP POST HANDLER (doPost)
+// ==========================================
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     
+    // Handler A: Save Admin Config & Sync BI Data (Simpan ke MAIN SHEET)
     if (body.action === 'saveConfig') {
       saveAdminConfig(body.data);
       if (body.data && body.data.biData) {
         syncBiDataToSheets(body.data.biData);
       }
-      return ContentService
-        .createTextOutput(JSON.stringify({ success: true, message: 'Config & Sheets saved successfully' }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, message: 'Config & Main Sheets saved successfully' })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, message: 'Unknown action' }))
-      .setMimeType(ContentService.MimeType.JSON);
+    // Handler B: Update Kanban Stage dari Drag & Drop (Simpan ke KANBAN SHEET)
+    if (body.action === 'updateKanban') {
+      if (!KANBAN_SHEET_ID) throw new Error("Kanban Sheet ID is empty on the server");
+
+      const ssKanban = SpreadsheetApp.openById(KANBAN_SHEET_ID);
+      const sheet = ssKanban.getSheetByName('DB_Kanban_Projects');
+      const data = sheet.getDataRange().getValues();
+      let isUpdated = false;
+      
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === body.projectId) {
+          sheet.getRange(i + 1, 5).setValue(body.newStage); // Kolom E (Stage)
+          isUpdated = true;
+          break;
+        }
+      }
+      
+      if (isUpdated) {
+        return ContentService.createTextOutput(JSON.stringify({ success: true, message: "Kanban stage updated" })).setMimeType(ContentService.MimeType.JSON);
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, message: "Project ID not found" })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    
+    // Handler C: Add Kanban Project
+    if (body.action === 'addKanbanProject') {
+      if (!KANBAN_SHEET_ID) throw new Error("Kanban Sheet ID is empty on the server");
+
+      const ssKanban = SpreadsheetApp.openById(KANBAN_SHEET_ID);
+      const sheet = ssKanban.getSheetByName('DB_Kanban_Projects');
+      const newId = Utilities.getUuid();
+      sheet.appendRow([newId, body.client, body.projectName, body.pseId || '-', body.stage, body.progress || 0, body.priority || 'Medium', body.notes || '']);
+      
+      return ContentService.createTextOutput(JSON.stringify({ success: true, message: "Kanban project added", newId: newId })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Handler D: Add Kanban Lead
+    if (body.action === 'addKanbanLead') {
+      if (!KANBAN_SHEET_ID) throw new Error("Kanban Sheet ID is empty on the server");
+      const ssKanban = SpreadsheetApp.openById(KANBAN_SHEET_ID);
+      const sheet = ssKanban.getSheetByName('DB_PSE_Leads');
+      const newId = Utilities.getUuid();
+      sheet.appendRow([newId, body.name, body.pseId, false, body.stage, body.progress || 0, body.notes || '']); 
+      return ContentService.createTextOutput(JSON.stringify({ success: true, newId: newId })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Handler E: Add Kanban Partner
+    if (body.action === 'addKanbanPartner') {
+      if (!KANBAN_SHEET_ID) throw new Error("Kanban Sheet ID is empty on the server");
+      const ssKanban = SpreadsheetApp.openById(KANBAN_SHEET_ID);
+      const sheet = ssKanban.getSheetByName('DB_PSE_Partners');
+      const newId = Utilities.getUuid();
+      sheet.appendRow([newId, body.name, body.pseId, true, body.type, body.stage, body.progress || 0, body.notes || '']);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, newId: newId })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Handler F: Update Kanban Lead (Drag & Drop)
+    if (body.action === 'updateKanbanLead') {
+      if (!KANBAN_SHEET_ID) throw new Error("Kanban Sheet ID is empty on the server");
+      const sheet = SpreadsheetApp.openById(KANBAN_SHEET_ID).getSheetByName('DB_PSE_Leads');
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === body.leadId) {
+          sheet.getRange(i + 1, 5).setValue(body.newStage);
+          return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: false, message: "ID not found" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Handler G: Update Kanban Partner (Drag & Drop)
+    if (body.action === 'updateKanbanPartner') {
+      if (!KANBAN_SHEET_ID) throw new Error("Kanban Sheet ID is empty on the server");
+      const sheet = SpreadsheetApp.openById(KANBAN_SHEET_ID).getSheetByName('DB_PSE_Partners');
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === body.partnerId) {
+          sheet.getRange(i + 1, 6).setValue(body.newStage);
+          return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: false, message: "ID not found" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Handler H: Edit Kanban Project
+    if (body.action === 'editKanbanProject') {
+      const sheet = SpreadsheetApp.openById(KANBAN_SHEET_ID).getSheetByName('DB_Kanban_Projects');
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === body.id) {
+          sheet.getRange(i + 1, 2, 1, 7).setValues([[body.client, body.projectName, body.pseId, body.stage, body.progress || 0, body.priority, body.notes || '']]);
+          return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: false })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Handler I: Edit Kanban Lead
+    if (body.action === 'editKanbanLead') {
+      const sheet = SpreadsheetApp.openById(KANBAN_SHEET_ID).getSheetByName('DB_PSE_Leads');
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === body.id) {
+          sheet.getRange(i + 1, 2, 1, 6).setValues([[body.name, body.pseId, body.isClosed !== undefined ? body.isClosed : false, body.stage, body.progress || 0, body.notes || '']]);
+          return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: false })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Handler J: Edit Kanban Partner
+    if (body.action === 'editKanbanPartner') {
+      const sheet = SpreadsheetApp.openById(KANBAN_SHEET_ID).getSheetByName('DB_PSE_Partners');
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === body.id) {
+          sheet.getRange(i + 1, 2, 1, 7).setValues([[body.name, body.pseId, body.isActive !== undefined ? body.isActive : true, body.type, body.stage, body.progress || 0, body.notes || '']]);
+          return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: false })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: 'Unknown action' })).setMimeType(ContentService.MimeType.JSON);
       
   } catch (error) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, message: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: error.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-/**
- * Simpan admin config ke sheet "AdminConfig"
- * Sheet ini hanya punya 2 cell: A1 = "config", A2 = JSON string
- */
+// ==========================================
+// 4. HELPER FUNCTIONS
+// ==========================================
+function getAdminConfig() {
+  var ssMain = SpreadsheetApp.openById(MAIN_SHEET_ID);
+  var sheet = ssMain.getSheetByName('AdminConfig');
+  if (!sheet) return null;
+  var jsonString = sheet.getRange('A2').getValue();
+  if (!jsonString) return null;
+  try { return JSON.parse(jsonString); } catch (e) { return null; }
+}
+
 function saveAdminConfig(configData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('AdminConfig');
-  
-  // Buat sheet jika belum ada
+  var ssMain = SpreadsheetApp.openById(MAIN_SHEET_ID);
+  var sheet = ssMain.getSheetByName('AdminConfig');
   if (!sheet) {
-    sheet = ss.insertSheet('AdminConfig');
+    sheet = ssMain.insertSheet('AdminConfig');
     sheet.getRange('A1').setValue('config');
   }
   
-  // Simpan config sebagai JSON string di A2
-  var jsonString = JSON.stringify(configData);
-  sheet.getRange('A2').setValue(jsonString);
-}
-
-/**
- * Baca admin config dari sheet "AdminConfig"
- * Returns: object config atau null jika belum ada
- */
-function getAdminConfig() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('AdminConfig');
-  
-  if (!sheet) return null;
-  
-  var jsonString = sheet.getRange('A2').getValue();
-  if (!jsonString) return null;
-  
-  try {
-    return JSON.parse(jsonString);
-  } catch (e) {
-    return null;
+  // Clone to avoid deleting biData from the object if it's used later
+  var clone = JSON.parse(JSON.stringify(configData));
+  if (clone.biData) {
+     delete clone.biData;
   }
+  
+  sheet.getRange('A2').setValue(JSON.stringify(clone));
 }
 
-/**
- * Menyinkronkan dan menimpa langsung data di sheet DB_ berdasarkan biData dari Admin Panel
- */
 function syncBiDataToSheets(biData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ssMain = SpreadsheetApp.openById(MAIN_SHEET_ID);
 
   function writeToSheet(sheetName, headers, dataRows) {
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) sheet = ss.insertSheet(sheetName);
+    var sheet = ssMain.getSheetByName(sheetName);
+    if (!sheet) sheet = ssMain.insertSheet(sheetName);
     sheet.clear();
     
-    // Safely replace undefined with empty strings so setValues does not crash
     var maxCols = headers.length;
     var safeDataRows = dataRows.map(function(row) {
       var safeRow = [];
@@ -260,7 +411,6 @@ function syncBiDataToSheets(biData) {
     writeToSheet('DB_Pipeline', ['Client', 'Industry', 'Stage', 'Value_IDR', 'Action', 'ETA'], pipelineRows);
   }
 
-  // DI SINILAH HEADER DAN DATA DISUSAUN ULANG SEBELUM DITULIS KE SHEET
   if (biData.campaigns) {
     var campaignRows = biData.campaigns.map(function(r) { return [r.name, r.period || '', r.status, r.leads, r.participants, r.conversion]; });
     writeToSheet('DB_Campaigns', ['Campaign_Name', 'Period', 'Status', 'Leads', 'Participants', 'Conversion_Pct'], campaignRows);
@@ -296,8 +446,14 @@ function syncBiDataToSheets(biData) {
     writeToSheet('DB_Academy', ['Program', 'Batch', 'Registrants', 'Converted'], academyRows);
   }
 
+  // Menulis Data Budget jika disync dari Admin Panel
+  if (biData.budget) {
+    var budgetRows = biData.budget.map(function(r) { return [r.date, r.category, r.amount, r.description]; });
+    writeToSheet('DB_Budget', ['Date', 'Category', 'Amount', 'Description'], budgetRows);
+  }
+
   if (biData.revenue) {
-    var revSheet = ss.getSheetByName('DB_Revenue');
+    var revSheet = ssMain.getSheetByName('DB_Revenue');
     var existingRevMap = {};
     if (revSheet) {
       var revData = revSheet.getDataRange().getValues().slice(1);

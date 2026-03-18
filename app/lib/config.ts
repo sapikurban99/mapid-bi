@@ -13,7 +13,7 @@ export interface RACIConfig {
     rows: RACIRow[];
 }
 
-export interface DisbursementItem {
+export interface BudgetItem {
     category: string;
     amount: number;
     date: string;
@@ -101,7 +101,51 @@ export interface BIData {
     userGrowth: UserGrowthItem[];
     trends: TrendPoint[];
     academy: AcademyItem[];
-    disbursement: DisbursementItem[];
+    budget: BudgetItem[];
+}
+
+export interface KanbanProjectItem {
+    id: string;
+    client: string;
+    projectName: string;
+    pseId: string;
+    stage: string;
+    progress: number;
+    priority: string;
+    notes?: string;
+}
+
+export interface KanbanLeadItem {
+    id: string;
+    name: string;
+    pseId: string;
+    stage: string;
+    isClosed: boolean;
+    progress?: number;
+    notes?: string;
+}
+
+export interface KanbanPartnerItem {
+    id: string;
+    name: string;
+    pseId: string;
+    type: string;
+    isActive: boolean;
+    stage: string;
+    progress?: number;
+    notes?: string;
+}
+
+export interface KanbanPSEWorkload {
+    pseId: string;
+    name: string;
+    activeProjects: number;
+    activeLeads: number;
+    activePartners: number;
+    totalPoints: number;
+    maxCapacity: number;
+    loadScore: number;
+    loadPercentage: number;
 }
 
 export interface SiteConfig {
@@ -142,6 +186,12 @@ export interface SiteConfig {
 
     // BI Data (override GAS data when set from admin)
     biData: BIData | null;
+
+    // Kanban extensions
+    kanbanProjects?: KanbanProjectItem[];
+    kanbanLeads?: KanbanLeadItem[];
+    kanbanPartners?: KanbanPartnerItem[];
+    pseWorkloads?: KanbanPSEWorkload[];
 }
 
 // ========== DEFAULT VALUES ==========

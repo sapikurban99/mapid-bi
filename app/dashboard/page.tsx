@@ -255,11 +255,11 @@ export default function MinimalistDashboard() {
             <div className="pt-8 border-t border-zinc-200 mt-12 mb-6">
               <h3 className="text-xl font-black tracking-tight leading-tight mb-6">Budget Disbursement<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</span></h3>
               {(() => {
-                const disbursementData = data?.disbursement || [];
-                const totalSpent = disbursementData.reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
-
-                // Group by Category
-                const spentByCategory = disbursementData.reduce((acc: any, item: any) => {
+                const budgetData = data?.budget || [];
+                const totalSpent = budgetData.reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
+                const maxBudget = 100000000;
+                const budgetProgress = (totalSpent / maxBudget) * 100;
+                const spentByCategory = budgetData.reduce((acc: any, item: any) => {
                   const cat = item.category || 'Other';
                   acc[cat] = (acc[cat] || 0) + (Number(item.amount) || 0);
                   return acc;
@@ -293,10 +293,10 @@ export default function MinimalistDashboard() {
                             <tr><th className="px-6 py-4">Date</th><th className="px-6 py-4">Category</th><th className="px-6 py-4 min-w-[200px]">Description</th><th className="px-6 py-4 text-right">Amount (IDR)</th></tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-100">
-                            {disbursementData.length === 0 ? (
+                            {budgetData.length === 0 ? (
                               <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending recorded</td></tr>
                             ) : (
-                              disbursementData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => (
+                              budgetData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => (
                                 <tr key={idx} className="hover:bg-zinc-50 transition">
                                   <td className="px-6 py-5 font-bold whitespace-nowrap">{formatDate(row.date)}</td>
                                   <td className="px-6 py-5"><span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span></td>
@@ -651,43 +651,6 @@ export default function MinimalistDashboard() {
               );
             })()}
 
-            {/* Project Delivery */}
-            <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">Live Project Delivery</h3>
-              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                      <tr><th className="px-6 py-4">Project</th><th className="px-6 py-4">Phase</th><th className="px-6 py-4">Progress</th><th className="px-6 py-4 min-w-[300px]">Issue</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {(data?.projects || []).slice((projectPage - 1) * ITEMS_PER_PAGE, projectPage * ITEMS_PER_PAGE).map((proj: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-zinc-50 transition">
-                          <td className="px-6 py-5 font-bold whitespace-nowrap">{proj.name}</td>
-                          <td className="px-6 py-5 text-zinc-500 font-medium italic uppercase text-xs tracking-tighter whitespace-nowrap">{proj.phase}</td>
-                          <td className="px-6 py-5 min-w-[200px]">
-                            <div className="flex items-center gap-4">
-                              <div className="w-full max-w-[120px] bg-zinc-100 h-1.5 rounded-full overflow-hidden shrink-0">
-                                <div className={`h-full ${proj.progress < 20 ? 'bg-rose-400' : 'bg-zinc-900'}`} style={{ width: `${proj.progress}%` }}></div>
-                              </div>
-                              <span className="text-[10px] font-bold text-zinc-500">{proj.progress}%</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-5 text-xs text-rose-500 italic" title={proj.issue}>{proj.issue || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {(data?.projects || []).length > ITEMS_PER_PAGE && (
-                  <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
-                    <button onClick={() => setProjectPage(p => Math.max(1, p - 1))} disabled={projectPage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
-                    <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {projectPage} of {Math.ceil((data?.projects || []).length / ITEMS_PER_PAGE)}</span>
-                    <button onClick={() => setProjectPage(p => Math.min(Math.ceil((data?.projects || []).length / ITEMS_PER_PAGE), p + 1))} disabled={projectPage === Math.ceil((data?.projects || []).length / ITEMS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
 

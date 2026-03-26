@@ -50,7 +50,7 @@ const FILTER_OPTIONS = {
         { label: 'Custom Range...', value: 'custom' },
     ],
     industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
-    licenses: ['All Licenses', 'Personal', 'Teams', 'Enterprise'],
+    licenses: ['All Licenses', 'Personal', 'Teams'],
     paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
 };
 
@@ -61,8 +61,12 @@ export default function UserGrowthIntelligencePage() {
     const [selectedLicense, setSelectedLicense] = useState('All Licenses');
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('All Methods');
     const [showFilterPanel, setShowFilterPanel] = useState(true);
+    const [leadsFilters, setLeadsFilters] = useState({ name: '', industry: '', email: '', plan: '', status: '' });
+    const [newRegFilters, setNewRegFilters] = useState({ name: '', email: '', industry: '' });
     const [expandedLicenseId, setExpandedLicenseId] = useState<string | null>(null);
 
+    const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+    const [selectedRegisters, setSelectedRegisters] = useState<string[]>([]);
     const [selectedHistoryUser, setSelectedHistoryUser] = useState<{ id: string, name: string } | null>(null);
     const [selectedDetailUser, setSelectedDetailUser] = useState<LeadItem | null>(null);
 
@@ -71,7 +75,6 @@ export default function UserGrowthIntelligencePage() {
     const [customEndDate, setCustomEndDate] = useState('');
 
     // --- STATE UNTUK WA BLAST ---
-    const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
     const [blastModalOpen, setBlastModalOpen] = useState(false);
     const [blastMessage, setBlastMessage] = useState('Halo {{name}}, \n\nKami melihat Anda belum menyelesaikan pembayaran untuk lisensi {{plan}} MAPID. Apakah ada yang bisa kami bantu?');
     const [blastSchedule, setBlastSchedule] = useState('now'); // 'now' | 'schedule'
@@ -80,19 +83,25 @@ export default function UserGrowthIntelligencePage() {
 
     // --- STATE UNTUK PAGINATION ---
     const [leadsPage, setLeadsPage] = useState(1);
+    const [newRegistersPage, setNewRegistersPage] = useState(1);
     const LEADS_PER_PAGE = 10;
+    const NEW_REGISTERS_PER_PAGE = 10;
+
+    const [blastType, setBlastType] = useState<'leads' | 'registers'>('leads');
 
     const handleBlastConfirm = async () => {
         setBlasting(true);
+        const sourceData = blastType === 'leads' ? displayLeads : displayNewRegs;
+        const selectedIds = blastType === 'leads' ? selectedLeads : selectedRegisters;
         // Fallback email to ID if email is not available in real data
-        const leads = filteredData.unpaidLeads.filter(l => selectedLeads.includes(l._id || l.name));
+        const contacts = sourceData.filter(l => selectedIds.includes(l._id || l.name || l.email));
 
         try {
             const res = await fetch('/api/n8n/blast', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contacts: leads,
+                    contacts: contacts,
                     messageTemplate: blastMessage,
                     schedule: blastSchedule === 'schedule' ? blastDateTime : null
                 })
@@ -103,6 +112,7 @@ export default function UserGrowthIntelligencePage() {
             alert('Blast payload successfully sent to n8n Webhook!');
             setBlastModalOpen(false);
             setSelectedLeads([]);
+            setSelectedRegisters([]);
         } catch (error) {
             console.error('Blast failed:', error);
             alert('Failed to send blast payload.');
@@ -373,7 +383,7 @@ export default function UserGrowthIntelligencePage() {
 
         // Filter Lisensi (Hanya berdampak pada Konversi & Leads)
         if (selectedLicense !== 'All Licenses') {
-            const licenseKey = selectedLicense === 'Teams' ? 'team' : selectedLicense === 'Enterprise' ? 'enterprise' : 'personal';
+            const licenseKey = selectedLicense === 'Teams' ? 'team' : 'personal';
 
             leads = leads.filter(d =>
                 (d.plan || '').toLowerCase().includes(licenseKey) ||
@@ -383,6 +393,25 @@ export default function UserGrowthIntelligencePage() {
                 ...d,
                 conv: (d.license || '').toLowerCase().includes(licenseKey) || (d.license || '').toLowerCase().includes(selectedLicense.toLowerCase()) ? d.conv : 0
             }));
+        }
+
+        // --- FILTER NEW REGISTERS SEPARATELY ---
+        let filteredNewRegistersData: any[] = [];
+        if (Array.isArray(newRegisters)) {
+            filteredNewRegistersData = newRegisters.filter(user => {
+
+                // Apply industry filter if needed
+                let targetIndustry = selectedIndustry;
+                if (selectedIndustry === 'Research & Education') targetIndustry = 'Research and Education';
+                else if (selectedIndustry === 'Info Technology') targetIndustry = 'Information Technology and Services';
+                else if (selectedIndustry === 'Real Estate & Arch') targetIndustry = 'Real Estate and Architecture';
+                else if (selectedIndustry === 'Retail & Fashion') targetIndustry = 'Retail and Fashion';
+
+                if (selectedIndustry !== 'All Industries' && user.industry !== targetIndustry) {
+                    return false;
+                }
+                return true;
+            });
         }
 
         // Filter Payment Method
@@ -454,13 +483,13 @@ export default function UserGrowthIntelligencePage() {
                 personal: totalConvForLic > 0 ? Math.round(((licenseCounts['Personal'] || 0) / totalConvForLic) * 100) : 0,
                 teams: totalConvForLic > 0 ? Math.round(((licenseCounts['Teams'] || 0) / totalConvForLic) * 100) : 0,
             },
-            unpaidLeads: leads
+            unpaidLeads: leads,
+            filteredNewRegisters: filteredNewRegistersData
         };
 
     }, [newRegisters, paidConversions, allPayments, selectedIndustry, selectedLicense, selectedPaymentMethod]);
 
     // Helpers untuk Grafik & State
-    const maxRegistInTrend = useMemo(() => Math.max(...filteredData.trends.map(d => d.regist), 1), [filteredData.trends]);
     const activeFilterCount = useMemo(() => {
         let count = 0;
         if (selectedTime !== 'this_month') count++;
@@ -478,7 +507,37 @@ export default function UserGrowthIntelligencePage() {
         setSelectedPaymentMethod('All Methods');
         setCustomStartDate('');
         setCustomEndDate('');
+        setLeadsFilters({ name: '', industry: '', email: '', plan: '', status: '' });
+        setNewRegFilters({ name: '', email: '', industry: '' });
+        setSelectedLeads([]);
+        setSelectedRegisters([]);
     };
+
+    // --- SECONDARY FILTERING FOR PER-COLUMN ---
+    const displayLeads = useMemo(() => {
+        return filteredData.unpaidLeads.filter(lead => {
+            if (leadsFilters.name && !lead.name.toLowerCase().includes(leadsFilters.name.toLowerCase())) return false;
+            if (leadsFilters.industry && !lead.industry.toLowerCase().includes(leadsFilters.industry.toLowerCase())) return false;
+            if (leadsFilters.email && !lead.email.toLowerCase().includes(leadsFilters.email.toLowerCase()) && !lead.phone.toLowerCase().includes(leadsFilters.email.toLowerCase())) return false;
+            if (leadsFilters.plan && !lead.plan.toLowerCase().includes(leadsFilters.plan.toLowerCase()) && !(lead.licenseType && lead.licenseType.toLowerCase().includes(leadsFilters.plan.toLowerCase()))) return false;
+            if (leadsFilters.status && !lead.status.toLowerCase().includes(leadsFilters.status.toLowerCase())) return false;
+            return true;
+        });
+    }, [filteredData.unpaidLeads, leadsFilters]);
+
+    const displayNewRegs = useMemo(() => {
+        return filteredData.filteredNewRegisters.filter(user => {
+            const name = user.full_name || user.name || '';
+            const email = user.email || '';
+            const phone = user.phone_number || user.phone || '';
+            const industry = user.industry || '';
+
+            if (newRegFilters.name && !name.toLowerCase().includes(newRegFilters.name.toLowerCase())) return false;
+            if (newRegFilters.email && !email.toLowerCase().includes(newRegFilters.email.toLowerCase()) && !phone.toLowerCase().includes(newRegFilters.email.toLowerCase())) return false;
+            if (newRegFilters.industry && !industry.toLowerCase().includes(newRegFilters.industry.toLowerCase())) return false;
+            return true;
+        });
+    }, [filteredData.filteredNewRegisters, newRegFilters]);
 
     return (
         <main className="min-h-screen bg-zinc-50 font-sans pb-24 text-zinc-900 selection:bg-zinc-900 selection:text-white">
@@ -545,7 +604,6 @@ export default function UserGrowthIntelligencePage() {
                                     </select>
                                 </div>
 
-                                {/* Custom Date Input */}
                                 {selectedTime === 'custom' && (
                                     <div className="flex items-center gap-2 mt-3 animate-in slide-in-from-top-2 fade-in duration-200">
                                         <input
@@ -797,7 +855,7 @@ export default function UserGrowthIntelligencePage() {
                         <section className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden animate-in fade-in duration-500">
                             <div className="p-6 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-blue-50/30 gap-4">
                                 <div>
-                                    <h2 className="text-lg font-black tracking-tight text-blue-900">Leads & Active Users Directory ({filteredData.unpaidLeads.length})</h2>
+                                    <h2 className="text-lg font-black tracking-tight text-blue-900">Leads & Active Users Directory ({displayLeads.length})</h2>
                                     <p className="text-xs text-blue-600 font-medium mt-1">Daftar kontak prospek siap di follow-up, diprioritaskan untuk konfirmasi lisensi.</p>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -818,10 +876,13 @@ export default function UserGrowthIntelligencePage() {
                                     </button>
                                     {selectedLeads.length > 0 && (
                                         <button
-                                            onClick={() => setBlastModalOpen(true)}
-                                            className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl transition shadow-md flex items-center gap-2 mr-2 animate-in fade-in"
+                                            onClick={() => {
+                                                setBlastType('leads');
+                                                setBlastModalOpen(true);
+                                            }}
+                                            className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl transition shadow-md flex items-center gap-2"
                                         >
-                                            <Send size={14} /> Blast WA ({selectedLeads.length})
+                                            <Send size={14} /> Blast WA {selectedLeads.length > 0 && `(${selectedLeads.length})`}
                                         </button>
                                     )}
                                     {selectedIndustry !== 'All Industries' && <span className="bg-white text-zinc-600 text-[10px] font-bold px-3 py-1 rounded-full border border-zinc-200">{selectedIndustry}</span>}
@@ -832,28 +893,49 @@ export default function UserGrowthIntelligencePage() {
                                 <>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm text-left whitespace-nowrap">
-                                            <thead className="bg-zinc-50 text-[10px] text-zinc-500 uppercase font-black tracking-widest border-b border-zinc-200">
-                                                <tr>
+                                            <thead className="bg-zinc-50 text-[10px] text-zinc-500 font-black tracking-widest border-b border-zinc-200 align-top">
+                                                <tr className="uppercase bg-zinc-100">
                                                     <th className="px-6 py-4 w-10">
                                                         <input
                                                             type="checkbox"
-                                                            checked={filteredData.unpaidLeads.length > 0 && selectedLeads.length === filteredData.unpaidLeads.length}
+                                                            checked={displayLeads.length > 0 && selectedLeads.length === displayLeads.length}
                                                             onChange={(e) => {
-                                                                if (e.target.checked) setSelectedLeads(filteredData.unpaidLeads.map(l => l._id || l.name));
+                                                                if (e.target.checked) setSelectedLeads(displayLeads.map(l => l._id || l.name));
                                                                 else setSelectedLeads([]);
                                                             }}
                                                             className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
                                                         />
                                                     </th>
-                                                    <th className="px-6 py-4">User Info / Industry</th>
-                                                    <th className="px-6 py-4">Contact</th>
-                                                    <th className="px-6 py-4">Plan / License Type</th>
-                                                    <th className="px-6 py-4">Status</th>
-                                                    <th className="px-6 py-4 text-right">Action</th>
+                                                    <th className="px-6 py-4">
+                                                        User Info / Industry
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Name / Industry" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none placeholder:capitalize" value={leadsFilters.name} onChange={(e) => setLeadsFilters({...leadsFilters, name: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4">
+                                                        Contact
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Email / Phone" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none placeholder:capitalize" value={leadsFilters.email} onChange={(e) => setLeadsFilters({...leadsFilters, email: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4">
+                                                        Plan / License Type
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Plan" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none placeholder:capitalize" value={leadsFilters.plan} onChange={(e) => setLeadsFilters({...leadsFilters, plan: e.target.value})} />
+                                                        </div>
+                                                    </th>
+
+                                                    <th className="px-6 py-4">
+                                                        Status
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Status" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none placeholder:capitalize" value={leadsFilters.status} onChange={(e) => setLeadsFilters({...leadsFilters, status: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4 text-right align-middle">Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-zinc-100">
-                                                {filteredData.unpaidLeads.slice((leadsPage - 1) * LEADS_PER_PAGE, leadsPage * LEADS_PER_PAGE).map((lead, idx) => {
+                                                {displayLeads.slice((leadsPage - 1) * LEADS_PER_PAGE, leadsPage * LEADS_PER_PAGE).map((lead, idx) => {
                                                     const leadId = lead._id || lead.name;
                                                     return (
                                                         <tr key={idx} className={`hover:bg-zinc-50 transition border-l-4 ${lead.priority === 1 ? 'border-l-rose-500' : lead.priority === 2 ? 'border-l-amber-500' : 'border-l-emerald-500'} ${selectedLeads.includes(leadId) ? 'bg-zinc-50' : ''}`}>
@@ -933,16 +1015,151 @@ export default function UserGrowthIntelligencePage() {
                                             </tbody>
                                         </table>
                                     </div>
-                                    {filteredData.unpaidLeads.length > LEADS_PER_PAGE && (
+                                    {displayLeads.length > LEADS_PER_PAGE && (
                                         <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
                                             <button onClick={() => setLeadsPage(p => Math.max(1, p - 1))} disabled={leadsPage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
-                                            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {leadsPage} of {Math.ceil(filteredData.unpaidLeads.length / LEADS_PER_PAGE)}</span>
-                                            <button onClick={() => setLeadsPage(p => Math.min(Math.ceil(filteredData.unpaidLeads.length / LEADS_PER_PAGE), p + 1))} disabled={leadsPage === Math.ceil(filteredData.unpaidLeads.length / LEADS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
+                                            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {leadsPage} of {Math.ceil(displayLeads.length / LEADS_PER_PAGE)}</span>
+                                            <button onClick={() => setLeadsPage(p => Math.min(Math.ceil(displayLeads.length / LEADS_PER_PAGE), p + 1))} disabled={leadsPage === Math.ceil(displayLeads.length / LEADS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
                                         </div>
                                     )}
                                 </>
                             ) : (
                                 <div className="text-center py-16 text-zinc-400 text-sm italic bg-white rounded-b-2xl">Tidak ada direktori yang cocok dengan kombinasi filter ini.</div>
+                            )}
+                        </section>
+
+                        {/* 5. TABLE: NEW REGISTERS DIRECTORY */}
+                        <section className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden animate-in fade-in duration-500 mt-8">
+                            <div className="p-6 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-emerald-50/30 gap-4">
+                                <div>
+                                    <h2 className="text-lg font-black tracking-tight text-emerald-900">New Registered Users ({displayNewRegs.length})</h2>
+                                    <p className="text-xs text-emerald-600 font-medium mt-1">Daftar pengguna baru yang mendaftar melalui platform.</p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                        onClick={() => {
+                                            const headers = "Name,Email,Phone,Industry,Date\n";
+                                            const csv = filteredData.filteredNewRegisters.map((u: any) => `${u.full_name || u.name || '-'},${u.email || '-'},${u.phone_number || u.phone || '-'},${u.industry || '-'},${u.created_on || u.createdAt || '-'}`).join('\n');
+                                            const blob = new Blob([headers + csv], { type: 'text/csv' });
+                                            const url = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = 'new-registers.csv';
+                                            a.click();
+                                        }}
+                                        className="bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl transition shadow-sm flex items-center gap-2 mr-2"
+                                    >
+                                        <Download size={14} /> Export CSV
+                                    </button>
+                                    {selectedRegisters.length > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                setBlastType('registers');
+                                                setBlastModalOpen(true);
+                                            }}
+                                            className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl transition shadow-md flex items-center gap-2 animate-in fade-in"
+                                        >
+                                            <Send size={14} /> Blast WA ({selectedRegisters.length})
+                                        </button>
+                                    )}
+
+                                </div>
+                            </div>
+
+                            {filteredData.filteredNewRegisters.length > 0 ? (
+                                <>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left whitespace-nowrap">
+                                            <thead className="bg-zinc-50 text-[10px] text-zinc-500 font-black tracking-widest border-b border-zinc-200 align-top">
+                                                <tr className="uppercase bg-zinc-100">
+                                                    <th className="px-6 py-4 w-10">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={displayNewRegs.length > 0 && selectedRegisters.length === displayNewRegs.length}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) setSelectedRegisters(displayNewRegs.map(u => u._id || u.email));
+                                                                else setSelectedRegisters([]);
+                                                            }}
+                                                            className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
+                                                        />
+                                                    </th>
+                                                    <th className="px-6 py-4 w-1/3">
+                                                        User Name
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Name" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none placeholder:capitalize" value={newRegFilters.name} onChange={(e) => setNewRegFilters({...newRegFilters, name: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4 w-1/3">
+                                                        Contact
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Email / Phone" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none placeholder:capitalize" value={newRegFilters.email} onChange={(e) => setNewRegFilters({...newRegFilters, email: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4 w-1/3">
+                                                        Industry
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Industry" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none placeholder:capitalize" value={newRegFilters.industry} onChange={(e) => setNewRegFilters({...newRegFilters, industry: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-zinc-100">
+                                                {displayNewRegs.slice((newRegistersPage - 1) * NEW_REGISTERS_PER_PAGE, newRegistersPage * NEW_REGISTERS_PER_PAGE).map((user: any, idx: number) => {
+                                                    const dateStr = user.created_on || user.createdAt || '';
+                                                    const date = dateStr ? new Date(dateStr).toISOString() : '';
+                                                    
+                                                    const dummyLead: LeadItem = {
+                                                        _id: user._id,
+                                                        name: user.full_name || user.name || 'Unknown',
+                                                        email: user.email || '-',
+                                                        phone: user.phone_number || user.phone || '-',
+                                                        plan: 'No License',
+                                                        licenseType: '-',
+                                                        date: date,
+                                                        createdAt: date,
+                                                        updatedAt: date,
+                                                        industry: user.industry || 'Not Specified',
+                                                        total: 0,
+                                                        status: 'No License',
+                                                        priority: 1,
+                                                        successCount: 0
+                                                    };
+                                                    return (
+                                                        <tr key={user._id || idx} className="hover:bg-zinc-50 transition cursor-pointer group/name border-l-4 border-l-blue-500" onClick={() => setSelectedDetailUser(dummyLead)}>
+                                                            <td className="px-6 py-4">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedRegisters.includes(user._id || user.email)}
+                                                                    onChange={(e) => {
+                                                                        const userId = user._id || user.email;
+                                                                        if (e.target.checked) setSelectedRegisters([...selectedRegisters, userId]);
+                                                                        else setSelectedRegisters(selectedRegisters.filter(id => id !== userId));
+                                                                    }}
+                                                                    className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
+                                                                />
+                                                            </td>
+                                                            <td className="px-6 py-4 font-bold text-zinc-900 group-hover/name:text-blue-600 transition decoration-2 underline-offset-2 group-hover/name:underline">{user.full_name || user.name || 'Unknown'}</td>
+                                                            <td className="px-6 py-4">
+                                                                <p className="font-medium text-zinc-600">{user.email || '-'}</p>
+                                                                <p className="text-xs text-zinc-400">{user.phone_number || user.phone || '-'}</p>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-zinc-600">{user.industry || '-'}</td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {displayNewRegs.length > NEW_REGISTERS_PER_PAGE && (
+                                        <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
+                                            <button onClick={() => setNewRegistersPage(p => Math.max(1, p - 1))} disabled={newRegistersPage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
+                                            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {newRegistersPage} of {Math.ceil(displayNewRegs.length / NEW_REGISTERS_PER_PAGE)}</span>
+                                            <button onClick={() => setNewRegistersPage(p => Math.min(Math.ceil(displayNewRegs.length / NEW_REGISTERS_PER_PAGE), p + 1))} disabled={newRegistersPage === Math.ceil(displayNewRegs.length / NEW_REGISTERS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-16 text-zinc-400 text-sm italic bg-white rounded-b-2xl">Tidak ada pengguna baru yang mendaftar.</div>
                             )}
                         </section>
 
@@ -962,7 +1179,7 @@ export default function UserGrowthIntelligencePage() {
                                     <div>
                                         <h2 className="font-black text-xl text-zinc-900">WA Blast Configuration</h2>
                                         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">
-                                            {selectedLeads.length} Leads Selected
+                                            {(blastType === 'leads' ? selectedLeads : selectedRegisters).length} {blastType === 'leads' ? 'Leads' : 'Users'} Selected
                                         </p>
                                     </div>
                                 </div>
@@ -1025,9 +1242,12 @@ export default function UserGrowthIntelligencePage() {
                                 >
                                     Cancel
                                 </button>
+                                {(blastType === 'leads' ? selectedLeads : selectedRegisters).length === 0 && (
+                                    <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest animate-pulse flex items-center">Select at least one contact</p>
+                                )}
                                 <button
                                     onClick={handleBlastConfirm}
-                                    disabled={blasting || (blastSchedule === 'schedule' && !blastDateTime)}
+                                    disabled={blasting || (blastSchedule === 'schedule' && !blastDateTime) || (blastType === 'leads' ? selectedLeads : selectedRegisters).length === 0}
                                     className="px-6 py-3 bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition shadow-lg shadow-emerald-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
                                 >
                                     {blasting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />}

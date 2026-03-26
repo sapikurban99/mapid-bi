@@ -38,7 +38,7 @@ const FILTER_OPTIONS = {
         { label: 'Custom Range...', value: 'custom' },
     ],
     industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
-    licenses: ['All Licenses', 'Personal', 'Teams', 'Enterprise'],
+    licenses: ['All Licenses', 'Personal', 'Teams'],
     paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
 };
 
@@ -48,6 +48,7 @@ export default function ActiveRetentionUsersPage() {
     const [selectedIndustry, setSelectedIndustry] = useState('All Industries');
     const [selectedLicense, setSelectedLicense] = useState('All Licenses');
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('All Methods');
+    const [activeFilters, setActiveFilters] = useState({ name: '', industry: '', email: '', plan: '', status: '' });
 
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
@@ -303,10 +304,23 @@ export default function ActiveRetentionUsersPage() {
     }, [newRegisters, allPayments, selectedIndustry, selectedLicense, selectedPaymentMethod]);
 
     const displayData = activeTab === 'active' ? processedData.activeUsers : processedData.retentionUsers;
+    
+    // --- SECONDARY FILTERING FOR PER-COLUMN ---
+    const filteredDisplayData = useMemo(() => {
+        return displayData.filter(lead => {
+            if (activeFilters.name && !lead.name.toLowerCase().includes(activeFilters.name.toLowerCase())) return false;
+            if (activeFilters.industry && !lead.industry.toLowerCase().includes(activeFilters.industry.toLowerCase())) return false;
+            if (activeFilters.email && !lead.email.toLowerCase().includes(activeFilters.email.toLowerCase()) && !lead.phone.toLowerCase().includes(activeFilters.email.toLowerCase())) return false;
+            // Plan filter applies to the plan string
+            if (activeFilters.plan && !lead.plan.toLowerCase().includes(activeFilters.plan.toLowerCase()) && !(lead.licenseType && lead.licenseType.toLowerCase().includes(activeFilters.plan.toLowerCase()))) return false;
+            if (activeFilters.status && !lead.status.toLowerCase().includes(activeFilters.status.toLowerCase())) return false;
+            return true;
+        });
+    }, [displayData, activeFilters]);
 
     const handleBlastConfirm = async () => {
         setBlasting(true);
-        const contacts = displayData.filter(l => selectedLeads.includes(l._id || l.name));
+        const contacts = filteredDisplayData.filter(l => selectedLeads.includes(l._id || l.name));
         try {
             const res = await fetch('/api/n8n/blast', {
                 method: 'POST',
@@ -330,7 +344,7 @@ export default function ActiveRetentionUsersPage() {
 
     const exportCsv = () => {
         const headers = "Name,Email,Phone,Plan,License,Industry,Status,Priority,Success Count\n";
-        const csv = displayData.map(l => `${l.name},${l.email},${l.phone},${l.plan},"${l.licenseTypesList?.map(lic => `${lic.type} (${lic.count}x)`).join(' | ') || '-'}",${l.industry},${l.status},${l.priority},${l.successCount}`).join('\n');
+        const csv = filteredDisplayData.map(l => `${l.name},${l.email},${l.phone},${l.plan},"${l.licenseTypesList?.map(lic => `${lic.type} (${lic.count}x)`).join(' | ') || '-'}",${l.industry},${l.status},${l.priority},${l.successCount}`).join('\n');
         const blob = new Blob([headers + csv], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -474,32 +488,52 @@ export default function ActiveRetentionUsersPage() {
                                 </div>
                             </div>
 
-                            {displayData.length > 0 ? (
+                            {filteredDisplayData.length > 0 ? (
                                 <>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm text-left whitespace-nowrap">
-                                            <thead className="bg-zinc-50 text-[10px] text-zinc-500 uppercase font-black tracking-widest border-b border-zinc-200">
-                                                <tr>
+                                            <thead className="bg-zinc-50 text-[10px] text-zinc-500 font-black tracking-widest border-b border-zinc-200 align-top">
+                                                <tr className="uppercase bg-zinc-100">
                                                     <th className="px-6 py-4 w-10">
                                                         <input
                                                             type="checkbox"
-                                                            checked={displayData.length > 0 && selectedLeads.length === Math.min(LEADS_PER_PAGE, displayData.length)}
+                                                            checked={filteredDisplayData.length > 0 && selectedLeads.length === filteredDisplayData.length}
                                                             onChange={(e) => {
-                                                                if (e.target.checked) setSelectedLeads(displayData.slice((leadsPage - 1) * LEADS_PER_PAGE, leadsPage * LEADS_PER_PAGE).map(l => l._id || l.name));
+                                                                if (e.target.checked) setSelectedLeads(filteredDisplayData.map(l => l._id || l.name));
                                                                 else setSelectedLeads([]);
                                                             }}
                                                             className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
                                                         />
                                                     </th>
-                                                    <th className="px-6 py-4">User Info / Industry</th>
-                                                    <th className="px-6 py-4">Contact</th>
-                                                    <th className="px-6 py-4">Plan / License Type</th>
-                                                    <th className="px-6 py-4">Status</th>
-                                                    <th className="px-6 py-4 text-right">Action</th>
+                                                    <th className="px-6 py-4">
+                                                        User Info / Industry
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Name / Industry" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none placeholder:capitalize" value={activeFilters.name} onChange={(e) => setActiveFilters({...activeFilters, name: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4">
+                                                        Contact
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Email / Phone" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none placeholder:capitalize" value={activeFilters.email} onChange={(e) => setActiveFilters({...activeFilters, email: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4">
+                                                        Plan / License Type
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Plan" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none placeholder:capitalize" value={activeFilters.plan} onChange={(e) => setActiveFilters({...activeFilters, plan: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4">
+                                                        Status
+                                                        <div className="mt-2">
+                                                            <input type="text" placeholder="Filter Status" className="w-full font-medium text-zinc-900 px-2 py-1 rounded border border-zinc-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none placeholder:capitalize" value={activeFilters.status} onChange={(e) => setActiveFilters({...activeFilters, status: e.target.value})} />
+                                                        </div>
+                                                    </th>
+                                                    <th className="px-6 py-4 text-right align-middle">Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-zinc-100">
-                                                {displayData.slice((leadsPage - 1) * LEADS_PER_PAGE, leadsPage * LEADS_PER_PAGE).map((lead, idx) => {
+                                                {filteredDisplayData.slice((leadsPage - 1) * LEADS_PER_PAGE, leadsPage * LEADS_PER_PAGE).map((lead, idx) => {
                                                     const leadId = lead._id || lead.name;
                                                     return (
                                                         <tr key={idx} className={`hover:bg-zinc-50 transition border-l-4 ${lead.priority === 1 ? 'border-l-rose-500' : lead.priority === 2 ? 'border-l-amber-500' : 'border-l-emerald-500'} ${selectedLeads.includes(leadId) ? 'bg-zinc-50' : ''}`}>
@@ -568,11 +602,13 @@ export default function ActiveRetentionUsersPage() {
                                             </tbody>
                                         </table>
                                     </div>
-                                    {displayData.length > LEADS_PER_PAGE && (
+                                    {filteredDisplayData.length > LEADS_PER_PAGE && (
                                         <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
                                             <button onClick={() => setLeadsPage(p => Math.max(1, p - 1))} disabled={leadsPage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
-                                            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {leadsPage} of {Math.ceil(displayData.length / LEADS_PER_PAGE)}</span>
-                                            <button onClick={() => setLeadsPage(p => Math.min(Math.ceil(displayData.length / LEADS_PER_PAGE), p + 1))} disabled={leadsPage === Math.ceil(displayData.length / LEADS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
+                                            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">
+                                                Page {leadsPage} of {Math.ceil(filteredDisplayData.length / LEADS_PER_PAGE)}
+                                            </span>
+                                            <button onClick={() => setLeadsPage(p => Math.min(Math.ceil(filteredDisplayData.length / LEADS_PER_PAGE), p + 1))} disabled={leadsPage === Math.ceil(filteredDisplayData.length / LEADS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
                                         </div>
                                     )}
                                 </>

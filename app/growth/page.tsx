@@ -103,7 +103,9 @@ export default function UserGrowthIntelligencePage() {
                 body: JSON.stringify({
                     contacts: contacts,
                     messageTemplate: blastMessage,
-                    schedule: blastSchedule === 'schedule' ? blastDateTime : null
+                    schedule: (blastSchedule === 'schedule' && blastDateTime) 
+                        ? (blastDateTime.length === 16 ? `${blastDateTime}:00` : blastDateTime) 
+                        : null
                 })
             });
             const data = await res.json();

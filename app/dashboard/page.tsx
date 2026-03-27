@@ -32,6 +32,121 @@ export default function MinimalistDashboard() {
   const [socialSecondaryWeek, setSocialSecondaryWeek] = useState('All');
   const [errorMsg, setErrorMsg] = useState<any>(null);
 
+  const [webhookRevenue, setWebhookRevenue] = useState<any[] | null>(null);
+
+  useEffect(() => {
+    async function fetchWebhookRevenue() {
+      try {
+        const res = await fetch('/api/n8n/get-revenue');
+        if (res.ok) {
+          const json = await res.json();
+          // The proxy route returns { success: true, data: [...] }
+          let n8nData = [];
+           if (json && json.data) {
+              let rawData = json.data;
+              if (typeof rawData === 'string') {
+                  try { rawData = JSON.parse(rawData); } catch(e) {}
+              }
+              n8nData = Array.isArray(rawData) ? rawData : (Array.isArray(rawData.data) ? rawData.data : [rawData]);
+           } else {
+              n8nData = Array.isArray(json) ? json : json.revenue || [];
+           }
+          
+          if (n8nData && n8nData.length > 0) {
+             const totals = typeof n8nData[0] === 'string' ? JSON.parse(n8nData[0]) : n8nData[0];
+             const isQuarterFormat = Object.keys(totals).some(k => k.match(/\d{4}-q\d/i) || k.match(/q\d/i));
+             const hasRecognizedKey = isQuarterFormat ? true : Object.keys(totals).some(k => k.toLowerCase().includes('revenue') || k.toLowerCase().includes('platform') || k.toLowerCase().includes('academy'));
+             
+             if (hasRecognizedKey) {
+                 const mappedRevenue: any[] = [];
+                 
+                 if (isQuarterFormat) {
+                     for (const [quarterKey, quarterData] of Object.entries(totals)) {
+                         let quarterStr = quarterKey;
+                         const qMatch = quarterKey.match(/^(\d{4})-(Q\d)$/i);
+                         if (qMatch) quarterStr = `${qMatch[2].toUpperCase()} ${qMatch[1]}`;
+                         
+                         for (const key of Object.keys(quarterData as any)) {
+                             const lowerKey = key.toLowerCase();
+                             let matchedProduct = '';
+                             if (lowerKey.includes('platform')) matchedProduct = 'Platform';
+                             else if (lowerKey.includes('academy')) matchedProduct = 'Webgis Academy';
+                             else if (lowerKey.includes('analytics')) matchedProduct = 'Location Analytics';
+                             else if (lowerKey.includes('thematic')) matchedProduct = 'Thematic Class';
+                             
+                             if (matchedProduct) {
+                                 const actualValue = Number((quarterData as any)[key]) || 0;
+                                 const existing = (data?.revenue || []).find((r: any) => 
+                                     (r.subProduct?.toLowerCase().includes(matchedProduct.toLowerCase()) || 
+                                     matchedProduct.toLowerCase().includes(r.subProduct?.toLowerCase())) &&
+                                     r.quarter === quarterStr
+                                 );
+                                 
+                                 const target = existing?.target || 0;
+                                 const achievement = target > 0 ? Number(((actualValue / target) * 100).toFixed(2)) : 0;
+                                 
+                                 mappedRevenue.push({
+                                     subProduct: existing?.subProduct || matchedProduct,
+                                     quarter: quarterStr,
+                                     target: target,
+                                     actual: actualValue,
+                                     achievement: achievement
+                                 });
+                             }
+                         }
+                     }
+                 } else {
+                     const currentYear = new Date().getFullYear();
+                     const currentQuarterNum = Math.floor(new Date().getMonth() / 3) + 1;
+                     const currentQuarterStr = `Q${currentQuarterNum} ${currentYear}`;
+
+                     for (const key of Object.keys(totals)) {
+                         const lowerKey = key.toLowerCase();
+                         let matchedProduct = '';
+                         if (lowerKey.includes('platform')) matchedProduct = 'Platform';
+                         else if (lowerKey.includes('academy')) matchedProduct = 'Webgis Academy';
+                         else if (lowerKey.includes('analytics')) matchedProduct = 'Location Analytics';
+                         else if (lowerKey.includes('thematic')) matchedProduct = 'Thematic Class';
+                         
+                         if (matchedProduct) {
+                             const actualValue = Number(totals[key]) || 0;
+                             const existing = (data?.revenue || []).find((r: any) => 
+                                 (r.subProduct?.toLowerCase().includes(matchedProduct.toLowerCase()) || 
+                                 matchedProduct.toLowerCase().includes(r.subProduct?.toLowerCase())) &&
+                                 r.quarter === currentQuarterStr
+                             );
+                             
+                             const target = existing?.target || 0;
+                             const achievement = target > 0 ? Number(((actualValue / target) * 100).toFixed(2)) : 0;
+                             
+                             mappedRevenue.push({
+                                 subProduct: existing?.subProduct || matchedProduct,
+                                 quarter: currentQuarterStr,
+                                 target: target,
+                                 actual: actualValue,
+                                 achievement: achievement
+                             });
+                         }
+                     }
+                 }
+
+                 // Prevent the webhook push from hiding data of previous quarters
+                 const existingUnmatched = (data?.revenue || []).filter((r: any) => 
+                     !mappedRevenue.some(m => m.subProduct === r.subProduct && m.quarter === r.quarter)
+                 );
+                 setWebhookRevenue([...mappedRevenue, ...existingUnmatched]);
+             } else {
+                 setWebhookRevenue(n8nData);
+             }
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching webhook revenue:', err);
+      }
+    }
+    fetchWebhookRevenue();
+  }, []);
+
   // Custom Recharts Tooltip
   const CustomRechartsTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -118,13 +233,15 @@ export default function MinimalistDashboard() {
   };
 
   // --- CALCULATIONS ---
+  const activeRevenueData = webhookRevenue || data?.revenue || [];
+
   const b2cPeriods = new Set<string>();
   (data?.campaigns || []).forEach((c: any) => { if (c.period) b2cPeriods.add(c.period); });
-  (data?.revenue || []).forEach((r: any) => { if (r.quarter) b2cPeriods.add(r.quarter); });
+  activeRevenueData.forEach((r: any) => { if (r.quarter) b2cPeriods.add(r.quarter); });
   const uniqueB2cPeriods = ['All', ...Array.from(b2cPeriods).sort()];
 
   const filteredCampaigns = (data?.campaigns || []).filter((c: any) => b2cPeriod === 'All' || c.period === b2cPeriod);
-  const filteredB2cRevenue = (data?.revenue || []).filter((r: any) => b2cPeriod === 'All' || r.quarter === b2cPeriod);
+  const filteredB2cRevenue = activeRevenueData.filter((r: any) => b2cPeriod === 'All' || r.quarter === b2cPeriod);
 
   const totalB2CActual = filteredB2cRevenue.reduce((acc: number, curr: any) => acc + curr.actual, 0) || 0;
   const totalB2CTarget = filteredB2cRevenue.reduce((acc: number, curr: any) => acc + curr.target, 0) || 0;

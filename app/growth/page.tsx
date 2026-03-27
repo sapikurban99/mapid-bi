@@ -7,7 +7,7 @@ import { useGrowthData } from './useGrowthData';
 import PaymentHistoryModal from './PaymentHistoryModal';
 import UserDetailsModal from './UserDetailsModal';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { Users, Target, Activity, Expand, Minimize, Settings2, Download, Table, X, Filter, CalendarDays, Briefcase, CreditCard, ChevronRight, MessageSquare, Send, Clock, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { Users, Target, Activity, Expand, Minimize, Settings2, Download, Table, X, Filter, CalendarDays, Briefcase, CreditCard, ChevronRight, MessageSquare, Send, Clock, AlertCircle, Loader2, ArrowLeft, DollarSign, Wallet, TrendingUp } from 'lucide-react';
 
 interface TrendItem {
     date: string;
@@ -69,6 +69,7 @@ export default function UserGrowthIntelligencePage() {
     const [selectedRegisters, setSelectedRegisters] = useState<string[]>([]);
     const [selectedHistoryUser, setSelectedHistoryUser] = useState<{ id: string, name: string } | null>(null);
     const [selectedDetailUser, setSelectedDetailUser] = useState<LeadItem | null>(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // State untuk Custom Filter
     const [customStartDate, setCustomStartDate] = useState('');
@@ -451,6 +452,39 @@ export default function UserGrowthIntelligencePage() {
         // Urutkan Array secara chronological sederhana (berdasarkan key string)
         const aggregatedTrends = Object.values(aggregatedTrendsMap).sort((a, b) => a.week.localeCompare(b.week));
 
+        // Kalkulasi Revenue
+        let totalRevenue = 0;
+        let successTransactions = 0;
+        const successPaymentsList: any[] = [];
+        
+        if (Array.isArray(allPayments)) {
+            allPayments.forEach((p: any) => {
+                if (p.status === 'success') {
+                    let targetIndustry = selectedIndustry;
+                    if (selectedIndustry === 'Research & Education') targetIndustry = 'Research and Education';
+                    else if (selectedIndustry === 'Info Technology') targetIndustry = 'Information Technology and Services';
+                    else if (selectedIndustry === 'Real Estate & Arch') targetIndustry = 'Real Estate and Architecture';
+                    else if (selectedIndustry === 'Retail & Fashion') targetIndustry = 'Retail and Fashion';
+
+                    const matchIndustry = selectedIndustry === 'All Industries' || p.user?.industry === targetIndustry;
+                    
+                    const pLicense = (p.license_type || p.payment_type || '').toLowerCase();
+                    const filterLicenseKey = selectedLicense === 'Teams' ? 'team' : 'personal';
+                    const matchLicense = selectedLicense === 'All Licenses' || pLicense.includes(filterLicenseKey);
+                    
+                    const matchPaymentMethod = selectedPaymentMethod === 'All Methods' || (selectedPaymentMethod !== 'No License' && (p.payment_methode || '').toLowerCase().includes(selectedPaymentMethod.toLowerCase()));
+                    const isMidtrans = p.payment_methode?.toLowerCase() === 'midtrans';
+                    
+                    if (matchIndustry && matchLicense && matchPaymentMethod && isMidtrans) {
+                        const amount = p.detail_amount?.total || p.detail_amount?.price || p.total || 0;
+                        totalRevenue += amount;
+                        successTransactions += 1;
+                        successPaymentsList.push(p);
+                    }
+                }
+            });
+        }
+
         // Kalkulasi Headlines (Ensure no negative values)
         const totalNewRegisters = trends.reduce((sum, curr) => sum + curr.regist, 0);
         const totalPaidConversions = trends.reduce((sum, curr) => sum + curr.conv, 0);
@@ -478,7 +512,7 @@ export default function UserGrowthIntelligencePage() {
         const totalConvForLic = Object.values(licenseCounts).reduce((sum, c) => sum + c, 0);
 
         return {
-            headlines: { newRegisters: totalNewRegisters, paidConversions: totalPaidConversions, unpaidCheckouts },
+            headlines: { newRegisters: totalNewRegisters, paidConversions: totalPaidConversions, unpaidCheckouts, totalRevenue, successTransactions, successPaymentsList },
             trends: aggregatedTrends,
             industryBreakdown: industryBreakdown.slice(0, 5),
             licenseBreakdown: {
@@ -695,6 +729,53 @@ export default function UserGrowthIntelligencePage() {
                     </section>
                 ) : (
                     <>
+                        {/* REVENUE DASHBOARD */}
+                        <section className="animate-in fade-in duration-500 mb-8 mt-2">
+                            <h2 className="text-xl font-black tracking-tight mb-4 flex items-center gap-2 text-zinc-900 border-b border-zinc-200 pb-3">
+                                <Wallet className="text-emerald-500" size={24} /> 
+                                Revenue Overview
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Total Revenue */}
+                                <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-800 p-8 rounded-3xl shadow-lg relative overflow-hidden group hover:shadow-xl hover:scale-[1.01] transition-all">
+                                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <span className="text-8xl font-black text-emerald-400 italic">Rp</span>
+                                    </div>
+                                    <div className="flex flex-col h-full justify-between relative z-10">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="p-2.5 bg-white/10 rounded-xl text-emerald-400 backdrop-blur-sm px-3"><span className="text-sm font-black italic">Rp</span></div>
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-zinc-300">Total Revenue (Midtrans)</h4>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-zinc-400 mb-1 tracking-widest uppercase">IDR</p>
+                                            <div className="text-4xl font-black tracking-tighter text-white drop-shadow-md truncate">
+                                                {filteredData.headlines.totalRevenue.toLocaleString('id-ID')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Success Transactions */}
+                                <div 
+                                    onClick={() => setShowSuccessModal(true)}
+                                    className="bg-white border border-zinc-200 p-8 rounded-3xl shadow-sm hover:shadow-md hover:border-zinc-300 transition-all flex flex-col justify-between cursor-pointer group"
+                                >
+                                    <div className="flex justify-between items-center mb-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-500 group-hover:bg-emerald-100 transition-colors"><Activity size={20} /></div>
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Success Transactions</h4>
+                                        </div>
+                                        <div className="bg-zinc-100 text-zinc-400 p-2 rounded-full group-hover:bg-zinc-900 group-hover:text-white transition-all">
+                                            <ChevronRight size={16} />
+                                        </div>
+                                    </div>
+                                    <div className="text-4xl font-black tracking-tighter text-zinc-900">
+                                        {filteredData.headlines.successTransactions.toLocaleString('id-ID')}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
                         {/* 1. HEADLINE METRICS (FUNNEL) */}
                         <section className="animate-in fade-in duration-500 flex flex-col lg:flex-row gap-8">
                             <div className="flex-1 flex flex-col gap-4">
@@ -1272,6 +1353,113 @@ export default function UserGrowthIntelligencePage() {
                     user={selectedDetailUser}
                     onClose={() => setSelectedDetailUser(null)}
                 />
+                {/* --- SUCCESS PAYMENTS MODAL --- */}
+                {showSuccessModal && (
+                    <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl animate-in slide-in-from-bottom-8 duration-300 overflow-hidden flex flex-col max-h-[85vh]">
+                            <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-zinc-50 shrink-0">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
+                                        <Activity size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-3">
+                                            <h2 className="font-black text-xl text-zinc-900">Success Transactions</h2>
+                                            {filteredData.headlines.successPaymentsList.length > 0 && (
+                                                <button
+                                                    onClick={() => {
+                                                        const headers = "User Name,Email,Industry,License Type,Payment Method,Date,Amount (IDR)\n";
+                                                        const csv = filteredData.headlines.successPaymentsList.map((payment: any) => {
+                                                            const name = payment.user?.full_name || payment.user?.name || 'Unknown';
+                                                            const email = payment.user?.email || '-';
+                                                            const industry = payment.user?.industry || 'Not Specified';
+                                                            const license = payment.license_type || payment.payment_type || 'Unknown';
+                                                            const method = payment.payment_methode || '-';
+                                                            const dateStr = payment.date_in || payment.createdAt || '';
+                                                            const amount = payment.detail_amount?.total || payment.detail_amount?.price || payment.total || 0;
+                                                            return `"${name}","${email}","${industry}","${license}","${method}","${dateStr}","${amount}"`;
+                                                        }).join('\n');
+                                                        const blob = new Blob([headers + csv], { type: 'text/csv' });
+                                                        const url = window.URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = 'success-transactions.csv';
+                                                        a.click();
+                                                    }}
+                                                    className="bg-white hover:bg-emerald-50 border border-zinc-200 text-emerald-700 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition shadow-sm flex items-center gap-1.5"
+                                                >
+                                                    <Download size={12} /> Export CSV
+                                                </button>
+                                            )}
+                                        </div>
+                                        <p className="text-xs font-bold text-zinc-500 mt-1">
+                                            {filteredData.headlines.successPaymentsList.length} Payments Found (Midtrans Only)
+                                        </p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowSuccessModal(false)} className="text-zinc-400 hover:text-zinc-900 p-2 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-full transition"><X size={20} /></button>
+                            </div>
+                            
+                            <div className="overflow-y-auto w-full p-6">
+                                {filteredData.headlines.successPaymentsList.length > 0 ? (
+                                    <div className="overflow-x-auto rounded-xl border border-zinc-200 shadow-sm">
+                                        <table className="w-full text-sm text-left whitespace-nowrap">
+                                            <thead className="bg-zinc-100 text-[10px] text-zinc-500 font-black tracking-widest border-b border-zinc-200">
+                                                <tr className="uppercase">
+                                                    <th className="px-6 py-4">User</th>
+                                                    <th className="px-6 py-4">Industry</th>
+                                                    <th className="px-6 py-4">License Type</th>
+                                                    <th className="px-6 py-4">Date</th>
+                                                    <th className="px-6 py-4 text-right">Amount (IDR)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-zinc-100">
+                                                {filteredData.headlines.successPaymentsList.map((payment: any, idx: number) => {
+                                                    const dateStr = payment.date_in || payment.createdAt || '';
+                                                    const formattedDate = dateStr ? new Date(dateStr).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                                                    const amount = payment.detail_amount?.total || payment.detail_amount?.price || payment.total || 0;
+                                                    
+                                                    return (
+                                                        <tr key={payment._id || idx} className="hover:bg-zinc-50 transition border-l-4 border-l-emerald-500">
+                                                            <td className="px-6 py-4">
+                                                                <p className="font-bold text-zinc-900">{payment.user?.full_name || payment.user?.name || 'Unknown'}</p>
+                                                                <p className="text-[10px] text-zinc-500 font-medium">{payment.user?.email || '-'}</p>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <span className="text-xs text-zinc-600 bg-zinc-100 px-2 py-1 rounded font-medium">{payment.user?.industry || 'Not Specified'}</span>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-1 rounded">
+                                                                    {payment.license_type || payment.payment_type || 'Unknown'}
+                                                                </span>
+                                                                {(payment.payment_methode) && (
+                                                                     <div className="text-[9px] uppercase tracking-wider text-blue-600 font-bold px-2 py-0.5 mt-2 border border-blue-200 bg-blue-50 rounded inline-block">
+                                                                        {payment.payment_methode}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-xs font-medium text-zinc-500">
+                                                                {formattedDate}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right font-black text-zinc-900">
+                                                                Rp {amount.toLocaleString('id-ID')}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-16 text-zinc-400 text-sm italic bg-zinc-50 rounded-xl border-2 border-dashed border-zinc-200">
+                                        Tidak ada data transaksi sukses untuk kombinasi filter ini.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
             </div>
         </main>
     );

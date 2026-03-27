@@ -717,7 +717,7 @@ export default function UserGrowthIntelligencePage() {
                     <div className="flex flex-col items-center justify-center p-16 animate-in fade-in bg-white border border-rose-200 rounded-2xl shadow-sm text-rose-500 text-center h-64">
                         <AlertCircle className="mb-4 text-rose-300" size={48} strokeWidth={1.5} />
                         <h3 className="text-xl font-black mb-2 text-rose-900">Failed to Fetch Data</h3>
-                        <p className="text-sm max-w-sm text-rose-600/80 mb-6">Terdapat masalah saat mengambil data dari devserver.mapid.io. Pastikan API aktif.</p>
+                        <p className="text-sm max-w-sm text-rose-600/80 mb-6">Terdapat masalah saat mengambil data dari alphaserver.mapid.io. Pastikan API aktif.</p>
                         <button onClick={resetFilters} className="text-xs font-bold uppercase tracking-widest bg-rose-100 text-rose-900 px-6 py-3 rounded-xl hover:bg-rose-200 transition">Try Again</button>
                     </div>
                 ) : filteredData.headlines.newRegisters === 0 && filteredData.unpaidLeads.length === 0 ? (

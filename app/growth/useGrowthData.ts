@@ -31,9 +31,9 @@ export function useGrowthData(startDate: string, endDate: string) {
     const shouldFetch = startDate && endDate;
     const query = shouldFetch ? `?start_date=${startDate}&end_date=${endDate}` : '';
 
-    const urlNewRegist = getBaseUrl(process.env.NEXT_PUBLIC_API_GROWTH_NEW_REGIST, 'https://devserver.mapid.io/admins/users/new-registrations');
-    const urlSuccess = getBaseUrl(process.env.NEXT_PUBLIC_API_GROWTH_PAYMENT_SUCCESS, 'https://devserver.mapid.io/admins/users/payment-success');
-    const urlAllPayments = getBaseUrl(process.env.NEXT_PUBLIC_API_GROWTH_ALL_PAYMENTS, 'https://devserver.mapid.io/admins/users/all_payments');
+    const urlNewRegist = getBaseUrl(process.env.NEXT_PUBLIC_API_GROWTH_NEW_REGIST, 'https://alphaserver.mapid.io/admins/users/new-registrations');
+    const urlSuccess = getBaseUrl(process.env.NEXT_PUBLIC_API_GROWTH_PAYMENT_SUCCESS, 'https://alphaserver.mapid.io/admins/users/payment-success');
+    const urlAllPayments = getBaseUrl(process.env.NEXT_PUBLIC_API_GROWTH_ALL_PAYMENTS, 'https://alphaserver.mapid.io/admins/users/all_payments');
 
     const {
         data: newRegistersData,
@@ -80,7 +80,7 @@ export function useGrowthData(startDate: string, endDate: string) {
 }
 
 export function useUserPaymentHistory(userId: string | null) {
-    const urlHistory = getBaseUrl(process.env.NEXT_PUBLIC_API_GROWTH_PAYMENT_HISTORY, 'https://devserver.mapid.io/admins/users/payments');
+    const urlHistory = getBaseUrl(process.env.NEXT_PUBLIC_API_GROWTH_PAYMENT_HISTORY, 'https://alphaserver.mapid.io/admins/users/payments');
 
     const { data, error, isLoading } = useSWR(
         userId ? `${urlHistory}/${userId}` : null,

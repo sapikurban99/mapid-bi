@@ -39,22 +39,30 @@ interface LeadItem {
     licenseTypesList?: { type: string, count: number }[];
 }
 
-// Opsi Filter Constant
-const FILTER_OPTIONS = {
-    timeRanges: [
-        { label: 'Bulan Ini (Mar)', value: 'this_month' },
-        { label: 'Hari Ini', value: 'today' },
-        { label: '7 Hari Terakhir', value: '7d' },
-        { label: 'Kuartal Ini (Q1)', value: 'this_quarter' },
-        { label: 'Semua Waktu', value: 'all' },
-        { label: 'Custom Range...', value: 'custom' },
-    ],
-    industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
-    licenses: ['All Licenses', 'Personal', 'Teams'],
-    paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
-};
-
 export default function UserGrowthIntelligencePage() {
+    // Agregasi Data Tren (Helper for labels)
+    const currentMonthName = useMemo(() => {
+        return new Date().toLocaleString('id-ID', { month: 'short' });
+    }, []);
+
+    const currentQuarter = useMemo(() => {
+        return Math.floor(new Date().getMonth() / 3) + 1;
+    }, []);
+
+    const dynamicFilterOptions = useMemo(() => ({
+        timeRanges: [
+            { label: `Bulan Ini (${currentMonthName})`, value: 'this_month' },
+            { label: 'Hari Ini', value: 'today' },
+            { label: '7 Hari Terakhir', value: '7d' },
+            { label: `Kuartal Ini (Q${currentQuarter})`, value: 'this_quarter' },
+            { label: 'Semua Waktu', value: 'all' },
+            { label: 'Custom Range...', value: 'custom' },
+        ],
+        industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
+        licenses: ['All Licenses', 'Personal', 'Teams'],
+        paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
+    }), [currentMonthName, currentQuarter]);
+
     // --- STATE MANAGEMENT UNTUK FILTER ---
     const [selectedTime, setSelectedTime] = useState('this_month');
     const [selectedIndustry, setSelectedIndustry] = useState('All Industries');
@@ -636,7 +644,7 @@ export default function UserGrowthIntelligencePage() {
                                         onChange={(e) => setSelectedTime(e.target.value)}
                                         className="w-full pl-11 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:outline-none appearance-none cursor-pointer transition-all"
                                     >
-                                        {FILTER_OPTIONS.timeRanges.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                        {dynamicFilterOptions.timeRanges.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                     </select>
                                 </div>
 
@@ -669,7 +677,7 @@ export default function UserGrowthIntelligencePage() {
                                         onChange={(e) => setSelectedIndustry(e.target.value)}
                                         className="w-full pl-11 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:outline-none appearance-none cursor-pointer transition-all"
                                     >
-                                        {FILTER_OPTIONS.industries.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        {dynamicFilterOptions.industries.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -684,7 +692,7 @@ export default function UserGrowthIntelligencePage() {
                                         onChange={(e) => setSelectedLicense(e.target.value)}
                                         className="w-full pl-11 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:outline-none appearance-none cursor-pointer transition-all"
                                     >
-                                        {FILTER_OPTIONS.licenses.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        {dynamicFilterOptions.licenses.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -699,7 +707,7 @@ export default function UserGrowthIntelligencePage() {
                                         onChange={(e) => setSelectedPaymentMethod(e.target.value)}
                                         className="w-full pl-11 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 focus:ring-2 focus:ring-zinc-900 focus:outline-none appearance-none cursor-pointer transition-all"
                                     >
-                                        {FILTER_OPTIONS.paymentMethods.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        {dynamicFilterOptions.paymentMethods.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -717,7 +725,7 @@ export default function UserGrowthIntelligencePage() {
                     <div className="flex flex-col items-center justify-center p-16 animate-in fade-in bg-white border border-rose-200 rounded-2xl shadow-sm text-rose-500 text-center h-64">
                         <AlertCircle className="mb-4 text-rose-300" size={48} strokeWidth={1.5} />
                         <h3 className="text-xl font-black mb-2 text-rose-900">Failed to Fetch Data</h3>
-                        <p className="text-sm max-w-sm text-rose-600/80 mb-6">Terdapat masalah saat mengambil data dari alphaserver.mapid.io. Pastikan API aktif.</p>
+                        <p className="text-sm max-w-sm text-rose-600/80 mb-6">Terdapat masalah saat mengambil data dari server. Pastikan API aktif.</p>
                         <button onClick={resetFilters} className="text-xs font-bold uppercase tracking-widest bg-rose-100 text-rose-900 px-6 py-3 rounded-xl hover:bg-rose-200 transition">Try Again</button>
                     </div>
                 ) : filteredData.headlines.newRegisters === 0 && filteredData.unpaidLeads.length === 0 ? (

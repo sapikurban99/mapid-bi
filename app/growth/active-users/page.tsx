@@ -27,22 +27,29 @@ interface LeadItem {
     licenseTypesList?: { type: string, count: number }[];
 }
 
-// Opsi Filter Constant
-const FILTER_OPTIONS = {
-    timeRanges: [
-        { label: 'Bulan Ini (Mar)', value: 'this_month' },
-        { label: 'Hari Ini', value: 'today' },
-        { label: '7 Hari Terakhir', value: '7d' },
-        { label: 'Kuartal Ini (Q1)', value: 'this_quarter' },
-        { label: 'Semua Waktu', value: 'all' },
-        { label: 'Custom Range...', value: 'custom' },
-    ],
-    industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
-    licenses: ['All Licenses', 'Personal', 'Teams'],
-    paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
-};
-
 export default function ActiveRetentionUsersPage() {
+    // Agregasi Data Tren (Helper for labels)
+    const currentMonthName = useMemo(() => {
+        return new Date().toLocaleString('id-ID', { month: 'short' });
+    }, []);
+
+    const currentQuarter = useMemo(() => {
+        return Math.floor(new Date().getMonth() / 3) + 1;
+    }, []);
+
+    const dynamicFilterOptions = useMemo(() => ({
+        timeRanges: [
+            { label: `Bulan Ini (${currentMonthName})`, value: 'this_month' },
+            { label: 'Hari Ini', value: 'today' },
+            { label: '7 Hari Terakhir', value: '7d' },
+            { label: `Kuartal Ini (Q${currentQuarter})`, value: 'this_quarter' },
+            { label: 'Semua Waktu', value: 'all' },
+            { label: 'Custom Range...', value: 'custom' },
+        ],
+        industries: ['All Industries', 'Research & Education', 'Info Technology', 'Government', 'Real Estate & Arch', 'Retail & Fashion', 'Not Specified'],
+        licenses: ['All Licenses', 'Personal', 'Teams'],
+        paymentMethods: ['All Methods', 'Midtrans', 'Gift', 'No License']
+    }), [currentMonthName, currentQuarter]);
     // --- STATE MANAGEMENT UNTUK FILTER ---
     const [selectedTime, setSelectedTime] = useState('this_month');
     const [selectedIndustry, setSelectedIndustry] = useState('All Industries');
@@ -375,7 +382,7 @@ export default function ActiveRetentionUsersPage() {
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
                         >
-                            {FILTER_OPTIONS.timeRanges.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            {dynamicFilterOptions.timeRanges.map((t: any) => <option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
                         {selectedTime === 'custom' && (
                             <div className="flex items-center gap-2">
@@ -389,21 +396,21 @@ export default function ActiveRetentionUsersPage() {
                             value={selectedIndustry}
                             onChange={(e) => setSelectedIndustry(e.target.value)}
                         >
-                            {FILTER_OPTIONS.industries.map(i => <option key={i} value={i}>{i}</option>)}
+                            {dynamicFilterOptions.industries.map((i: any) => <option key={i} value={i}>{i}</option>)}
                         </select>
                         <select
                             className="text-sm bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 font-medium focus:ring-2 focus:ring-blue-500 outline-none"
                             value={selectedLicense}
                             onChange={(e) => setSelectedLicense(e.target.value)}
                         >
-                            {FILTER_OPTIONS.licenses.map(l => <option key={l} value={l}>{l}</option>)}
+                            {dynamicFilterOptions.licenses.map((l: any) => <option key={l} value={l}>{l}</option>)}
                         </select>
                         <select
                             className="text-sm bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 font-medium focus:ring-2 focus:ring-blue-500 outline-none"
                             value={selectedPaymentMethod}
                             onChange={(e) => setSelectedPaymentMethod(e.target.value)}
                         >
-                            {FILTER_OPTIONS.paymentMethods.map(p => <option key={p} value={p}>{p}</option>)}
+                            {dynamicFilterOptions.paymentMethods.map((p: any) => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </div>
                 </div>

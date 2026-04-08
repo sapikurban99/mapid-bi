@@ -77,7 +77,7 @@ export default function SidebarNav() {
             {/* Bottom Actions Container - Push to bottom on Desktop */}
             <div className={`lg:absolute lg:bottom-0 lg:left-0 lg:w-full bg-white lg:border-t lg:border-zinc-100 ${isCollapsed ? 'p-4' : 'p-6'} hidden lg:flex flex-col gap-3 shrink-0 z-10`}>
                 <button
-                    onClick={syncData}
+                    onClick={() => syncData()}
                     disabled={isLoading}
                     title={isCollapsed ? "Sync Data" : undefined}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${isLoading ? 'bg-zinc-100 text-zinc-400 cursor-wait' : 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 hover:-translate-y-0.5'}`}

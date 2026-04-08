@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { useGrowthData } from './useGrowthData';
@@ -93,8 +93,12 @@ export default function UserGrowthIntelligencePage() {
     // --- STATE UNTUK PAGINATION ---
     const [leadsPage, setLeadsPage] = useState(1);
     const [newRegistersPage, setNewRegistersPage] = useState(1);
+    const [successPaymentsPage, setSuccessPaymentsPage] = useState(1);
     const LEADS_PER_PAGE = 10;
     const NEW_REGISTERS_PER_PAGE = 10;
+    const SUCCESS_PAYMENTS_PER_PAGE = 10;
+
+    const successTableRef = useRef<HTMLDivElement>(null);
 
     const [blastType, setBlastType] = useState<'leads' | 'registers'>('leads');
 
@@ -552,7 +556,9 @@ export default function UserGrowthIntelligencePage() {
         setCustomStartDate('');
         setCustomEndDate('');
         setLeadsFilters({ name: '', industry: '', email: '', plan: '', status: '' });
-        setNewRegFilters({ name: '', email: '', industry: '' });
+        setLeadsPage(1);
+        setNewRegistersPage(1);
+        setSuccessPaymentsPage(1);
         setSelectedLeads([]);
         setSelectedRegisters([]);
     };
@@ -765,7 +771,9 @@ export default function UserGrowthIntelligencePage() {
 
                                 {/* Success Transactions */}
                                 <div 
-                                    onClick={() => setShowSuccessModal(true)}
+                                    onClick={() => {
+                                        successTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }}
                                     className="bg-white border border-zinc-200 p-8 rounded-3xl shadow-sm hover:shadow-md hover:border-zinc-300 transition-all flex flex-col justify-between cursor-pointer group"
                                 >
                                     <div className="flex justify-between items-center mb-6">
@@ -774,7 +782,7 @@ export default function UserGrowthIntelligencePage() {
                                             <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Success Transactions</h4>
                                         </div>
                                         <div className="bg-zinc-100 text-zinc-400 p-2 rounded-full group-hover:bg-zinc-900 group-hover:text-white transition-all">
-                                            <ChevronRight size={16} />
+                                            <TrendingUp size={16} />
                                         </div>
                                     </div>
                                     <div className="text-4xl font-black tracking-tighter text-zinc-900">
@@ -782,6 +790,113 @@ export default function UserGrowthIntelligencePage() {
                                     </div>
                                 </div>
                             </div>
+                        </section>
+
+                        {/* SUCCESS TRANSACTIONS TABLE */}
+                        <section ref={successTableRef} className="bg-white border border-zinc-200 rounded-3xl shadow-sm overflow-hidden animate-in fade-in duration-500 scroll-mt-24">
+                            <div className="p-6 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-emerald-50/20 gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-100">
+                                        <DollarSign size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-black tracking-tight text-zinc-900">Successful Transactions ({filteredData.headlines.successPaymentsList.length})</h2>
+                                        <p className="text-xs text-zinc-500 font-medium mt-1">Daftar transaksi Midtrans yang berhasil pada rentang waktu terpilih.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {filteredData.headlines.successPaymentsList.length > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                const headers = "User Name,Email,Industry,License Type,Payment Method,Date,Amount (IDR)\n";
+                                                const csv = filteredData.headlines.successPaymentsList.map((payment: any) => {
+                                                    const name = payment.user?.full_name || payment.user?.name || 'Unknown';
+                                                    const email = payment.user?.email || '-';
+                                                    const industry = payment.user?.industry || 'Not Specified';
+                                                    const license = payment.license_type || payment.payment_type || 'Unknown';
+                                                    const method = payment.payment_methode || '-';
+                                                    const dateStr = payment.date_in || payment.createdAt || '';
+                                                    const amount = payment.detail_amount?.total || payment.detail_amount?.price || payment.total || 0;
+                                                    return `"${name}","${email}","${industry}","${license}","${method}","${dateStr}","${amount}"`;
+                                                }).join('\n');
+                                                const blob = new Blob([headers + csv], { type: 'text/csv' });
+                                                const url = window.URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = 'success-transactions.csv';
+                                                a.click();
+                                            }}
+                                            className="bg-zinc-900 border border-zinc-900 text-white text-[10px] font-black uppercase tracking-widest px-5 py-2.5 rounded-xl transition shadow-lg shadow-zinc-200 flex items-center gap-2 hover:bg-zinc-800"
+                                        >
+                                            <Download size={14} /> Export CSV
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {filteredData.headlines.successPaymentsList.length > 0 ? (
+                                <>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left whitespace-nowrap">
+                                            <thead className="bg-zinc-50 text-[10px] text-zinc-500 font-black tracking-widest border-b border-zinc-200">
+                                                <tr className="uppercase bg-zinc-100">
+                                                    <th className="px-6 py-4">User Details</th>
+                                                    <th className="px-6 py-4 text-center">Industry</th>
+                                                    <th className="px-6 py-4">License Type</th>
+                                                    <th className="px-6 py-4">Date</th>
+                                                    <th className="px-6 py-4 text-right">Amount (IDR)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-zinc-100">
+                                                {filteredData.headlines.successPaymentsList.slice((successPaymentsPage - 1) * SUCCESS_PAYMENTS_PER_PAGE, successPaymentsPage * SUCCESS_PAYMENTS_PER_PAGE).map((payment: any, idx: number) => {
+                                                    const dateStr = payment.date_in || payment.createdAt || '';
+                                                    const formattedDate = dateStr ? new Date(dateStr).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                                                    const amount = payment.detail_amount?.total || payment.detail_amount?.price || payment.total || 0;
+                                                    
+                                                    return (
+                                                        <tr key={payment._id || idx} className="hover:bg-zinc-50 transition border-l-4 border-l-emerald-500 group">
+                                                            <td className="px-6 py-4">
+                                                                <p className="font-bold text-zinc-900 group-hover:text-blue-600 transition">{payment.user?.full_name || payment.user?.name || 'Unknown'}</p>
+                                                                <p className="text-[10px] text-zinc-400 font-medium">{payment.user?.email || '-'}</p>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <span className="text-[9px] font-black uppercase tracking-tighter text-zinc-400 bg-zinc-50 px-2 py-0.5 rounded border border-zinc-100">{payment.user?.industry || 'Not Specified'}</span>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <div className="flex flex-col gap-1 items-start">
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded">
+                                                                        {payment.license_type || payment.payment_type || 'Unknown'}
+                                                                    </span>
+                                                                    <span className="text-[8px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-widest">
+                                                                        {payment.payment_methode || 'Midtrans'}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-[11px] font-bold text-zinc-500">
+                                                                {formattedDate}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right font-black text-zinc-900 text-lg">
+                                                                Rp {amount.toLocaleString('id-ID')}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {filteredData.headlines.successPaymentsList.length > SUCCESS_PAYMENTS_PER_PAGE && (
+                                        <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
+                                            <button onClick={() => setSuccessPaymentsPage(p => Math.max(1, p - 1))} disabled={successPaymentsPage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
+                                            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {successPaymentsPage} of {Math.ceil(filteredData.headlines.successPaymentsList.length / SUCCESS_PAYMENTS_PER_PAGE)}</span>
+                                            <button onClick={() => setSuccessPaymentsPage(p => Math.min(Math.ceil(filteredData.headlines.successPaymentsList.length / SUCCESS_PAYMENTS_PER_PAGE), p + 1))} disabled={successPaymentsPage === Math.ceil(filteredData.headlines.successPaymentsList.length / SUCCESS_PAYMENTS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-20 text-zinc-400 text-sm italic border-2 border-dashed border-zinc-100 m-6 rounded-2xl bg-zinc-50">
+                                    No successful transactions found for the current filter.
+                                </div>
+                            )}
                         </section>
 
                         {/* 1. HEADLINE METRICS (FUNNEL) */}

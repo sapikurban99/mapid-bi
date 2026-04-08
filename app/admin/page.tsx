@@ -5,7 +5,7 @@ import {
     Settings, Save, RotateCcw, Lock, Eye, EyeOff, Search,
     ChevronDown, ChevronRight, ChevronLeft, Check, X, Plus, Trash2, Edit2,
     Home, Users, BarChart3, Palette, Shield, Table2, Database,
-    Loader2, AlertCircle, Globe, TrendingUp
+    Loader2, AlertCircle, Globe, TrendingUp, Share2
 } from 'lucide-react';
 import {
     getConfig, setConfig, resetConfig, saveConfigToGAS, loadConfigFromGAS,
@@ -188,6 +188,21 @@ export default function AdminPage() {
     const [editingRaci, setEditingRaci] = useState<{ row: number; col: string } | null>(null);
     const [loadingBiData, setLoadingBiData] = useState(false);
     const [biLoadMsg, setBiLoadMsg] = useState('');
+    const [scrapeLogs, setScrapeLogs] = useState<any[]>([]);
+
+    const fetchScrapeLogs = async () => {
+        try {
+            const res = await fetch('/api/n8n/sync-socials');
+            const json = await res.json();
+            if (json.success) setScrapeLogs(json.logs);
+        } catch (e) { console.error('Failed to fetch scrape logs:', e); }
+    };
+
+    useEffect(() => {
+        if (activeSection === 'bidata' && biSubTab === 'socials') {
+            fetchScrapeLogs();
+        }
+    }, [activeSection, biSubTab]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -509,6 +524,32 @@ export default function AdminPage() {
             setTimeout(() => setBiLoadMsg(''), 4000);
         } finally {
             setLoadingBiData(false);
+        }
+    };
+
+    const handleScrapeSocials = async (platform: string) => {
+        if (!confirm(`Trigger ${platform} scraping via n8n?`)) return;
+        try {
+            setLoadingBiData(true);
+            setBiLoadMsg(`Scraping ${platform}...`);
+            const res = await fetch('/api/n8n/sync-socials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ platform })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setBiLoadMsg(`✓ ${platform} sync complete!`);
+                syncData({ silent: true }); // Refresh global data
+                fetchScrapeLogs();
+            } else {
+                setBiLoadMsg(`Error: ${json.message}`);
+            }
+        } catch (err) {
+            setBiLoadMsg(`Failed to connect to n8n.`);
+        } finally {
+            setLoadingBiData(false);
+            setTimeout(() => setBiLoadMsg(''), 4000);
         }
     };
 
@@ -928,11 +969,36 @@ export default function AdminPage() {
                                                     {loadingBiData ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />} Get Data n8n
                                                 </button>
                                             )}
+                                            {biSubTab === 'socials' && (
+                                                <div className="flex gap-2 w-full lg:w-auto">
+                                                    <button onClick={() => handleScrapeSocials('Instagram')} disabled={loadingBiData} className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-tr from-purple-600 to-pink-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:opacity-90 transition shadow-md shadow-purple-100">
+                                                        {loadingBiData ? <Loader2 size={12} className="animate-spin" /> : <Share2 size={12} />} Sync Instagram
+                                                    </button>
+                                                    <button onClick={() => handleScrapeSocials('LinkedIn')} disabled={loadingBiData} className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-800 transition shadow-md shadow-blue-100">
+                                                        {loadingBiData ? <Loader2 size={12} className="animate-spin" /> : <Users size={12} />} Sync LinkedIn
+                                                    </button>
+                                                </div>
+                                            )}
                                             <button onClick={() => openModal(biSubTab)} className="w-full lg:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-900 text-white text-xs font-black uppercase tracking-wider rounded-lg hover:bg-zinc-800 transition shadow-md shadow-zinc-200">
                                                 <Plus size={14} /> Add Data
                                             </button>
                                         </div>
                                     </div>
+
+                                    {biSubTab === 'socials' && scrapeLogs.length > 0 && (
+                                        <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col gap-2">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Recent Scrape Logs</h4>
+                                            <div className="flex flex-wrap gap-3">
+                                                {scrapeLogs.map((log, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-100">
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'Success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                                                        <span className="text-[10px] font-bold text-zinc-900">{log.platform}</span>
+                                                        <span className="text-[9px] text-zinc-400 font-medium">{new Date(log.scraped_at).toLocaleString()}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Table View */}
                                     <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">

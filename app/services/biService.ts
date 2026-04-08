@@ -1,5 +1,7 @@
 import { supabase } from '../../lib/supabaseClient';
 
+const N8N_SOCIALS_URL = process.env.N8N_SOCIALS_WEBHOOK_URL;
+
 // ========================================
 // Supabase BI Service Layer
 // Replaces Google Apps Script doGet/doPost
@@ -356,3 +358,78 @@ async function syncBiDataToTables(biData: any) {
     await replaceTable('revenue', biData.revenue.map((r: any) => ({ sub_product: r.subProduct, quarter: r.quarter || '', target: r.target, actual: r.actual, achievement_pct: r.achievement })));
   }
 }
+
+// --- SOCIAL SCRAPING LOGIC ---
+
+export async function getSocialScrapeLogs() {
+  const { data, error } = await supabase
+    .from('social_scrape_logs')
+    .select('*')
+    .order('scraped_at', { ascending: false })
+    .limit(10);
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function syncSocialsFromN8n(platform: string) {
+  if (!N8N_SOCIALS_URL) throw new Error('N8N_SOCIALS_WEBHOOK_URL is not defined in environment variables');
+
+  try {
+    const res = await fetch(N8N_SOCIALS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, action: 'scrape' }),
+    });
+
+    if (!res.ok) throw new Error(`n8n responded with ${res.status}`);
+    const json = await res.json();
+
+    // EXPECTED PAYLOAD: { platform: 'Instagram', month: 'Feb 2026', week: 'Week 4', metrics: [{ metric: 'Followers', value: 1200 }, ...] }
+    const payload = Array.isArray(json) ? json[0] : json;
+
+    if (payload && payload.metrics) {
+      const upsertRows = payload.metrics.map((m: any) => ({
+        platform: payload.platform || platform,
+        month: payload.month,
+        week: payload.week,
+        metric: m.metric,
+        value: m.value,
+        updated_at: new Date().toISOString(),
+      }));
+
+      // In Supabase, we don't have a simple "composite unique" upsert unless we define it in DB.
+      // So we'll do it manually: delete matching records first, then insert.
+      for (const row of upsertRows) {
+        await supabase.from('socials')
+          .delete()
+          .eq('platform', row.platform)
+          .eq('month', row.month)
+          .eq('week', row.week)
+          .eq('metric', row.metric);
+      }
+      
+      const { error: insertError } = await supabase.from('socials').insert(upsertRows);
+      if (insertError) throw new Error(insertError.message);
+
+      // Log success
+      await supabase.from('social_scrape_logs').insert({
+        platform,
+        status: 'Success',
+        details: payload,
+      });
+
+      return { success: true, message: `Successfully synced ${platform} data!` };
+    } else {
+      throw new Error('No metrics data returned from n8n');
+    }
+  } catch (error: any) {
+    // Log failure
+    await supabase.from('social_scrape_logs').insert({
+      platform,
+      status: 'Failed',
+      details: { error: error.message },
+    });
+    throw error;
+  }
+}
+

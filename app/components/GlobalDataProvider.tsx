@@ -3,7 +3,11 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import DinoGame from './DinoGame';
+import GlobalLoadingOverlay from './GlobalLoadingOverlay';
+import InactivityPrompt from './InactivityPrompt';
 import { setConfig, getConfig } from '../lib/config';
+
+const INACTIVITY_THRESHOLD = 30 * 60 * 1000; // 30 minutes in ms
 
 interface DataContextType {
     isHovering: boolean; // Just a dummy property, the real data lives in config.ts, but we use context to trigger syncs
@@ -17,6 +21,8 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const [isLoading, setIsLoading] = useState(false);
     const [hasFetched, setHasFetched] = useState(false);
+    const [showInactivityModal, setShowInactivityModal] = useState(false);
+    const [lastFocusTime, setLastFocusTime] = useState<number | null>(null);
 
     const syncData = async (options?: { silent?: boolean }) => {
         const silent = options?.silent ?? false;
@@ -60,9 +66,28 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
         }
     }, [pathname, hasFetched]);
 
+    // Inactivity Tracker
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                setLastFocusTime(Date.now());
+            } else {
+                if (lastFocusTime && (Date.now() - lastFocusTime > INACTIVITY_THRESHOLD)) {
+                    setShowInactivityModal(true);
+                }
+            }
+        };
+
+        window.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => window.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [lastFocusTime]);
+
+
     return (
         <GlobalDataContext.Provider value={{ isHovering: false, syncData, isLoading }}>
-            {pathname !== '/login' && isLoading && <DinoGame isFetching={isLoading} />}
+            {pathname !== '/login' && isLoading && !hasFetched && <DinoGame isFetching={isLoading} />}
+            {pathname !== '/login' && isLoading && hasFetched && <GlobalLoadingOverlay isLoading={isLoading} />}
+            <InactivityPrompt show={showInactivityModal} />
             {children}
         </GlobalDataContext.Provider>
     );

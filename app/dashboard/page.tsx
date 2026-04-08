@@ -177,6 +177,43 @@ export default function MinimalistDashboard() {
 
   const data = config.biData; // Use globally cached data
 
+  // Auto-fill filters based on available data
+  useEffect(() => {
+    const socialsData = data?.socials || [];
+    if (socialsData.length > 0 && socialPrimaryMonth === 'All' && activeTab === 'B2C') {
+      // Find all unique periods (month + week)
+      const periods = Array.from(new Set(socialsData.map(s => `${s.month}|${s.week}`)))
+        .map(p => {
+          const [month, week] = p.split('|');
+          return { month, week, sortKey: `${month}-${week}` };
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.month).getTime();
+          const dateB = new Date(b.month).getTime();
+          if (dateA !== dateB) return dateB - dateA;
+          return b.week.localeCompare(a.week, undefined, { numeric: true });
+        });
+
+      if (periods.length > 0) {
+        const latest = periods[0];
+        setSocialPrimaryMonth(latest.month);
+        setSocialPrimaryWeek(latest.week);
+
+        if (periods.length > 1) {
+          const previous = periods[1];
+          setSocialSecondaryMonth(previous.month);
+          setSocialSecondaryWeek(previous.week);
+        }
+      }
+    }
+
+    // Also auto-fill B2C period if empty
+    if (data?.campaigns && data.campaigns.length > 0 && b2cPeriod === 'All' && activeTab === 'B2C') {
+      const periods = Array.from(new Set((data.campaigns as any[]).map(c => c.period).filter(Boolean))).sort().reverse();
+      if (periods.length > 0) setB2cPeriod(periods[0]);
+    }
+  }, [data, activeTab]);
+
   const visibleTabs = Object.entries(config.tabsVisible)
     .filter(([, visible]) => visible)
     .map(([name]) => name);
@@ -288,10 +325,12 @@ export default function MinimalistDashboard() {
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Revenue Performance</h3>
               <div className="flex gap-3">
-                <select value={trendCategory} onChange={(e) => setTrendCategory(e.target.value)}
-                  className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
-                  {uniqueTrendCategories.map((c: any) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
-                </select>
+                {uniqueTrendCategories.length > 2 && (
+                  <select value={trendCategory} onChange={(e) => setTrendCategory(e.target.value)}
+                    className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
+                    {uniqueTrendCategories.map((c: any) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -445,35 +484,40 @@ export default function MinimalistDashboard() {
 
 
                 // --- DATA TRANSFORMS FOR B2C SOCIALS ---
-                const filteredPrimary = socialsData.filter((d: any) =>
-                  (socialPrimaryMonth === 'All' || d.month === socialPrimaryMonth) &&
-                  (socialPrimaryWeek === 'All' || d.week === socialPrimaryWeek)
-                );
-                const filteredSecondary = socialsData.filter((d: any) =>
-                  (socialSecondaryMonth === 'All' || d.month === socialSecondaryMonth) &&
-                  (socialSecondaryWeek === 'All' || d.week === socialSecondaryWeek)
-                );
+                const getComparisonValue = (dataset: any[], month: string, week: string, platform: string, metric: string, type: 'latest' | 'earliest') => {
+                  const filtered = dataset.filter(d =>
+                    d.platform === platform &&
+                    d.metric === metric &&
+                    (month === 'All' || d.month === month) &&
+                    (week === 'All' || d.week === week)
+                  );
 
-                // Initialize exact match metric maps using a unique key
-                const metricsMap: Record<string, { platform: string, metric: string, primary: number, secondary: number }> = {};
+                  if (filtered.length === 0) return 0;
 
-                filteredPrimary.forEach((d: any) => {
-                  const key = `${d.platform}|${d.metric}`;
-                  if (!metricsMap[key]) {
-                    metricsMap[key] = { platform: d.platform, metric: d.metric, primary: 0, secondary: 0 };
+                  // If "All" is selected for month or week, we show target data point (latest vs earliest)
+                  // instead of aggregating (summing) as per user request.
+                  if (week === 'All' || month === 'All') {
+                    const sorted = [...filtered].sort((a, b) => {
+                      const dateA = new Date(a.month).getTime();
+                      const dateB = new Date(b.month).getTime();
+                      if (dateA !== dateB) return dateA - dateB;
+                      return b.week.localeCompare(a.week, undefined, { numeric: true });
+                    });
+                    // For growth comparison: primary is latest, secondary is earliest
+                    return type === 'latest' ? (Number(sorted[sorted.length - 1].value) || 0) : (Number(sorted[0].value) || 0);
                   }
-                  metricsMap[key].primary += Number(d.value) || 0;
-                });
 
-                filteredSecondary.forEach((d: any) => {
-                  const key = `${d.platform}|${d.metric}`;
-                  if (!metricsMap[key]) {
-                    metricsMap[key] = { platform: d.platform, metric: d.metric, primary: 0, secondary: 0 };
-                  }
-                  metricsMap[key].secondary += Number(d.value) || 0;
-                });
+                  // Normal behavior for specific week/month
+                  return filtered.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0);
+                };
 
-                const comparisonRows = Object.values(metricsMap).sort((a, b) => a.platform.localeCompare(b.platform));
+                const uniqueMetrics = Array.from(new Set(socialsData.map((d: any) => `${d.platform}|${d.metric}`)));
+                const comparisonRows = uniqueMetrics.map(key => {
+                  const [platform, metric] = key.split('|');
+                  const primary = getComparisonValue(socialsData, socialPrimaryMonth, socialPrimaryWeek, platform, metric, 'latest');
+                  const secondary = getComparisonValue(socialsData, socialSecondaryMonth, socialSecondaryWeek, platform, metric, 'earliest');
+                  return { platform, metric, primary, secondary };
+                }).filter(r => r.primary > 0 || r.secondary > 0);
 
                 return (
                   <div>
@@ -483,27 +527,35 @@ export default function MinimalistDashboard() {
                         {/* Primary Filters */}
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Now</span>
-                          <select value={socialPrimaryMonth} onChange={(e) => setSocialPrimaryMonth(e.target.value)}
-                            className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                            {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
-                          </select>
-                          <select value={socialPrimaryWeek} onChange={(e) => setSocialPrimaryWeek(e.target.value)}
-                            className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                            {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                          </select>
+                          {uniqueMonths.length > 2 && (
+                            <select value={socialPrimaryMonth} onChange={(e) => setSocialPrimaryMonth(e.target.value)}
+                              className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
+                              {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
+                            </select>
+                          )}
+                          {uniqueWeeks.length > 2 && (
+                            <select value={socialPrimaryWeek} onChange={(e) => setSocialPrimaryWeek(e.target.value)}
+                              className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
+                              {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                            </select>
+                          )}
                         </div>
-                        <div className="hidden md:block w-px bg-zinc-200"></div>
+                        {(uniqueMonths.length > 2 || uniqueWeeks.length > 2) && <div className="hidden md:block w-px bg-zinc-200"></div>}
                         {/* Secondary Filters */}
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Then</span>
-                          <select value={socialSecondaryMonth} onChange={(e) => setSocialSecondaryMonth(e.target.value)}
-                            className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                            {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
-                          </select>
-                          <select value={socialSecondaryWeek} onChange={(e) => setSocialSecondaryWeek(e.target.value)}
-                            className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                            {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                          </select>
+                          {uniqueMonths.length > 2 && (
+                            <select value={socialSecondaryMonth} onChange={(e) => setSocialSecondaryMonth(e.target.value)}
+                              className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
+                              {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
+                            </select>
+                          )}
+                          {uniqueWeeks.length > 2 && (
+                            <select value={socialSecondaryWeek} onChange={(e) => setSocialSecondaryWeek(e.target.value)}
+                              className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
+                              {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
+                            </select>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -561,10 +613,12 @@ export default function MinimalistDashboard() {
             {/* Filter B2C Campaigns & Revenue */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-zinc-200 pb-4 mb-6 gap-4">
               <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">B2C Performance Overview</h3>
-              <select value={b2cPeriod} onChange={(e) => setB2cPeriod(e.target.value)}
-                className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
-                {uniqueB2cPeriods.map((p: string) => <option key={p} value={p}>{p === 'All' ? 'All Periods' : p}</option>)}
-              </select>
+              {uniqueB2cPeriods.length > 2 && (
+                <select value={b2cPeriod} onChange={(e) => setB2cPeriod(e.target.value)}
+                  className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
+                  {uniqueB2cPeriods.map((p: string) => <option key={p} value={p}>{p === 'All' ? 'All Periods' : p}</option>)}
+                </select>
+              )}
             </div>
 
             {/* Campaign Activations */}

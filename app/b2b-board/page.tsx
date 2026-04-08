@@ -121,7 +121,7 @@ export default function B2BBoardPage() {
                 resetForm();
                 
                 // Silent refetch to sync background changes directly to config state
-                syncData();
+                syncData({ silent: true });
             } else {
                 alert(`Error saving ${type}: ` + data.message);
             }

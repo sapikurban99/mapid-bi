@@ -7,7 +7,7 @@ import { setConfig, getConfig } from '../lib/config';
 
 interface DataContextType {
     isHovering: boolean; // Just a dummy property, the real data lives in config.ts, but we use context to trigger syncs
-    syncData: () => void;
+    syncData: (options?: { silent?: boolean }) => void;
     isLoading: boolean;
 }
 
@@ -18,8 +18,9 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(false);
     const [hasFetched, setHasFetched] = useState(false);
 
-    const syncData = async () => {
-        setIsLoading(true);
+    const syncData = async (options?: { silent?: boolean }) => {
+        const silent = options?.silent ?? false;
+        if (!silent) setIsLoading(true);
         try {
             const res = await fetch('/api/gas');
             const json = await res.json();

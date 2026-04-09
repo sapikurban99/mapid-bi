@@ -4,10 +4,10 @@ const N8N_SOCIALS_URL = process.env.N8N_SOCIALS_WEBHOOK_URL;
 
 // ========================================
 // Supabase BI Service Layer
-// Replaces Google Apps Script doGet/doPost
+// Primary Backend for BI Operations
 // ========================================
 
-// --- READ: Get all BI Data (replaces GAS doGet) ---
+// --- READ: Get all BI Data ---
 export async function getAllBIData() {
   const [
     { data: revenue },
@@ -201,7 +201,7 @@ export async function getAllBIData() {
 }
 
 
-// --- WRITE: Handle POST actions (replaces GAS doPost) ---
+// --- WRITE: Handle POST actions ---
 
 export async function saveAdminConfig(configData: any) {
   // Clone and strip biData before saving config

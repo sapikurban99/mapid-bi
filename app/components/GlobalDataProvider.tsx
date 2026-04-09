@@ -28,7 +28,7 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
         const silent = options?.silent ?? false;
         if (!silent) setIsLoading(true);
         try {
-            const res = await fetch('/api/gas');
+            const res = await fetch('/api/bi');
             const json = await res.json();
 
             if (json && !json.isError && !json.error) {
@@ -59,11 +59,22 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    // Auto-fetch ONLY on initial load for protected routes
+    // Auto-fetch on initial load
     useEffect(() => {
         if (pathname !== '/login' && !hasFetched) {
             syncData();
         }
+    }, [pathname, hasFetched]);
+
+    // Periodic Background Sync (Seamless)
+    useEffect(() => {
+        if (pathname === '/login' || !hasFetched) return;
+
+        const interval = setInterval(() => {
+            syncData({ silent: true });
+        }, 60000); // Sync every 60 seconds
+
+        return () => clearInterval(interval);
     }, [pathname, hasFetched]);
 
     // Inactivity Tracker
@@ -86,7 +97,7 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
     return (
         <GlobalDataContext.Provider value={{ isHovering: false, syncData, isLoading }}>
             {pathname !== '/login' && isLoading && !hasFetched && <DinoGame isFetching={isLoading} />}
-            {pathname !== '/login' && isLoading && hasFetched && <GlobalLoadingOverlay isLoading={isLoading} />}
+            {/* Removed GlobalLoadingOverlay for a more seamless, non-intrusive experience */}
             <InactivityPrompt show={showInactivityModal} />
             {children}
         </GlobalDataContext.Provider>

@@ -92,7 +92,7 @@ export default function B2BBoardPage() {
         try {
             const isEditing = !!editingItemId && editingItemType === type;
             const endpoint = isEditing ? `editKanban${type}` : `addKanban${type}`;
-            const res = await fetch('/api/gas', {
+            const res = await fetch('/api/bi', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: endpoint, ...(isEditing ? { id: editingItemId } : {}), ...payload })
@@ -209,7 +209,7 @@ export default function B2BBoardPage() {
                                             setConfig({ kanbanProjects: n.kanbanProjects });
                                             return n;
                                         });
-                                        fetch('/api/gas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanban', projectId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                        fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanban', projectId, newStage: stage }) }).catch(() => alert("Fail update"));
                                     }
                                 }}
                             >
@@ -267,7 +267,7 @@ export default function B2BBoardPage() {
                                             setConfig({ kanbanLeads: n.kanbanLeads });
                                             return n;
                                         });
-                                        fetch('/api/gas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanLead', leadId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                        fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanLead', leadId, newStage: stage }) }).catch(() => alert("Fail update"));
                                     }
                                 }}
                             >
@@ -322,7 +322,7 @@ export default function B2BBoardPage() {
                                             setConfig({ kanbanPartners: n.kanbanPartners });
                                             return n;
                                         });
-                                        fetch('/api/gas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanPartner', partnerId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                        fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanPartner', partnerId, newStage: stage }) }).catch(() => alert("Fail update"));
                                     }
                                 }}
                             >

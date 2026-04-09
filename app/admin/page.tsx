@@ -8,7 +8,7 @@ import {
     Loader2, AlertCircle, Globe, TrendingUp, Share2
 } from 'lucide-react';
 import {
-    getConfig, setConfig, resetConfig, saveConfigToGAS, loadConfigFromGAS,
+    getConfig, setConfig, resetConfig, saveConfigToSupabase, loadConfigFromSupabase,
     DEFAULT_CONFIG, DEFAULT_RACI, SiteConfig,
     RACIRow, SocialItem, CampaignItem, RevenueItem, PipelineItem, ProjectItem, DocItem, TrendPoint, BIData
 } from '../lib/config';
@@ -167,6 +167,11 @@ export default function AdminPage() {
     const [biFilterKey, setBiFilterKey] = useState('');
     const [biFilterValue, setBiFilterValue] = useState('All');
     const [biGroupBy, setBiGroupBy] = useState('');
+    
+    // Auto-save State
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const skipAutoSaveRef = useRef(false);
 
     useEffect(() => {
         setBiSearch('');
@@ -176,14 +181,45 @@ export default function AdminPage() {
         setBiGroupBy('');
     }, [biSubTab]);
 
+    // AUTO-SAVE LOGIC (Debounced)
+    useEffect(() => {
+        if (isInitialLoad) {
+            setIsInitialLoad(false);
+            return;
+        }
+
+        // Skip auto-save if triggered by a reset (to avoid overwriting DB with empty defaults)
+        if (skipAutoSaveRef.current) {
+            skipAutoSaveRef.current = false;
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setSaveStatus('saving');
+            try {
+                // Background save
+                setConfig(config); // Update local cache
+                const result = await saveConfigToSupabase(config);
+                if (result.success) {
+                    setSaveStatus('saved');
+                    setTimeout(() => setSaveStatus('idle'), 2000);
+                } else {
+                    setSaveStatus('error');
+                }
+            } catch (e) {
+                setSaveStatus('error');
+            }
+        }, 1500); // 1.5s debounce
+
+        return () => clearTimeout(timer);
+    }, [config]);
+
     // Modal State
     const [modal, setModal] = useState<{ isOpen: boolean; section: string; index: number; data: any }>({
         isOpen: false, section: '', index: -1, data: null
     });
 
-    const [saved, setSaved] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [saveMsg, setSaveMsg] = useState('');
+
     const [expandedRole, setExpandedRole] = useState<string | null>(null);
     const [editingRaci, setEditingRaci] = useState<{ row: number; col: string } | null>(null);
     const [loadingBiData, setLoadingBiData] = useState(false);
@@ -204,21 +240,33 @@ export default function AdminPage() {
         }
     }, [activeSection, biSubTab]);
 
+    // handleSave is now redundant with Auto-save, but we can keep it for manual forced sync if needed
     const handleSave = async () => {
-        setSaving(true);
-        setSaveMsg('');
-        setConfig(config);
-        const result = await saveConfigToGAS(config);
-        setSaving(false);
-        setSaved(true);
-        setSaveMsg(result.message);
-        setTimeout(() => { setSaved(false); setSaveMsg(''); }, 3000);
+        setSaveStatus('saving');
+        const result = await saveConfigToSupabase(config);
+        if (result.success) {
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus('idle'), 2000);
+        } else {
+            setSaveStatus('error');
+        }
     };
 
-    const handleReset = () => {
-        if (confirm('Reset semua settings ke default? Perubahan yang sudah disimpan akan hilang.')) {
+    const handleReset = async () => {
+        if (confirm('Reset settings (roles, text, RACI) ke default?\n\nData BI (revenue, pipeline, dsb) akan di-reload dari database.')) {
+            // Prevent auto-save from writing empty defaults to Supabase
+            skipAutoSaveRef.current = true;
             resetConfig();
-            setLocalConfig(DEFAULT_CONFIG);
+
+            // Immediately re-fetch from Supabase to restore BI data
+            try {
+                const freshConfig = await loadConfigFromSupabase();
+                setLocalConfig(freshConfig);
+            } catch {
+                // Fallback: at least set defaults + trigger global sync
+                setLocalConfig(DEFAULT_CONFIG);
+                syncData();
+            }
         }
     };
 
@@ -321,10 +369,21 @@ export default function AdminPage() {
         setModal({ isOpen: false, section: '', index: -1, data: null });
     };
 
+    const normalizeMonth = (m: string) => {
+        if (!m || typeof m !== 'string') return m;
+        if (m.includes('T')) return m.split('T')[0];
+        if (m.includes(' ') && (m.includes('-') || m.includes('/'))) return m.split(' ')[0];
+        return m;
+    };
+
     const handleModalFieldChange = (fieldKey: string, value: any) => {
         setModal(prev => {
             if (!prev.data) return prev;
-            const newData = { ...prev.data, [fieldKey]: value };
+            let finalValue = value;
+            if (fieldKey === 'month' && (prev.section === 'socials' || prev.section === 'userGrowth')) {
+                finalValue = normalizeMonth(value);
+            }
+            const newData = { ...prev.data, [fieldKey]: finalValue };
 
             // Auto Calculations on the fly
             const sec = prev.section;
@@ -379,7 +438,7 @@ export default function AdminPage() {
     };
 
     const handleFetchN8nRevenue = async () => {
-        if (!confirm('Fetch revenue data from n8n and save to Google App Script? This will overwrite existing revenue data.')) return;
+        if (!confirm('Fetch revenue data from n8n and save to Supabase? This will overwrite existing revenue data in the database.')) return;
         try {
             setLoadingBiData(true);
             setBiLoadMsg('Fetching from n8n (proxy)...');
@@ -404,7 +463,7 @@ export default function AdminPage() {
                     const hasRecognizedKey = isQuarterFormat ? true : Object.keys(totals).some(k => k.toLowerCase().includes('revenue') || k.toLowerCase().includes('platform') || k.toLowerCase().includes('academy'));
                     
                     if (hasRecognizedKey) {
-                        setBiLoadMsg('Mapping and Saving to GAS...');
+                        setBiLoadMsg('Mapping and Saving to Supabase...');
                         setLocalConfig(prev => {
                             const n = JSON.parse(JSON.stringify(prev));
                             if (!n.biData) n.biData = {};
@@ -490,7 +549,7 @@ export default function AdminPage() {
                             n.biData.revenue = [...mappedRevenue, ...existingUnmatched];
                             
                             // Background save
-                            saveConfigToGAS(n).then(result => {
+                            saveConfigToSupabase(n).then(result => {
                                 setBiLoadMsg('✓ n8n data saved: ' + result.message);
                                 setTimeout(() => setBiLoadMsg(''), 4000);
                             });
@@ -503,7 +562,7 @@ export default function AdminPage() {
                             const n = JSON.parse(JSON.stringify(prev));
                             if (!n.biData) n.biData = {};
                             n.biData.revenue = n8nData;
-                            saveConfigToGAS(n).then(result => {
+                            saveConfigToSupabase(n).then(result => {
                                 setBiLoadMsg('✓ n8n data saved: ' + result.message);
                                 setTimeout(() => setBiLoadMsg(''), 4000);
                             });
@@ -597,13 +656,34 @@ export default function AdminPage() {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                        {saveMsg && <span className={`text-xs font-bold ${saved ? 'text-emerald-600' : 'text-amber-600'}`}>{saveMsg}</span>}
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-100">
+                            {saveStatus === 'saving' && (
+                                <div className="flex items-center gap-2 text-blue-600">
+                                    <Loader2 size={14} className="animate-spin" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Saving...</span>
+                                </div>
+                            )}
+                            {saveStatus === 'saved' && (
+                                <div className="flex items-center gap-2 text-emerald-600">
+                                    <Check size={14} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Changes Synced</span>
+                                </div>
+                            )}
+                            {saveStatus === 'error' && (
+                                <div className="flex items-center gap-2 text-rose-600">
+                                    <AlertCircle size={14} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Sync Failed</span>
+                                </div>
+                            )}
+                            {saveStatus === 'idle' && (
+                                <div className="flex items-center gap-2 text-zinc-400">
+                                    <Shield size={14} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Cloud Protected</span>
+                                </div>
+                            )}
+                        </div>
                         <button onClick={handleReset} className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition hidden md:flex">
                             <RotateCcw size={14} /> <span className="hidden sm:inline">Reset</span>
-                        </button>
-                        <button onClick={handleSave} disabled={saving}
-                            className={`flex flex-1 md:flex-none items-center justify-center gap-2 px-6 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition shadow-lg ${saving ? 'bg-zinc-400 text-white cursor-wait' : saved ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-zinc-200'}`}>
-                            {saving ? <><Loader2 size={14} className="animate-spin" /> Saving</> : saved ? <><Check size={14} /> Saved</> : <><Save size={14} /> Save</>}
                         </button>
                     </div>
                 </div>
@@ -664,10 +744,7 @@ export default function AdminPage() {
                     {/* ============ TEAM ROLES ============ */}
                     {activeSection === 'roles' && (
                         <div className="space-y-6 animate-in fade-in duration-300">
-                            <div className="mb-8">
-                                <h2 className="text-2xl font-black tracking-tight">Team Roles</h2>
                                 <p className="text-sm text-zinc-400 font-medium mt-1">Edit role details shown in the org chart modal</p>
-                            </div>
 
                             {Object.entries(config.roles).map(([key, role]) => (
                                 <div key={key} className="bg-white border border-zinc-200 rounded-2xl overflow-hidden transition-all">
@@ -873,11 +950,11 @@ export default function AdminPage() {
 
                             {!config.biData && (
                                 <div className="bg-white border border-zinc-200 rounded-2xl p-8 text-center">
-                                    <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <div className="w-16 h-16 bg-zinc-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
                                         <Database className="text-zinc-400" size={24} />
                                     </div>
-                                    <h3 className="text-lg font-black tracking-tight mb-2">Load Data dari Spreadsheet</h3>
-                                    <p className="text-sm text-zinc-400 font-medium mb-6 max-w-md mx-auto">Ambil data yang sudah ada di Google Sheets, lalu edit langsung dari sini. Tidak perlu buka spreadsheet lagi.</p>
+                                    <h3 className="text-lg font-black tracking-tight mb-2">Workspace BI Data</h3>
+                                    <p className="text-sm text-zinc-400 font-medium mb-6 max-w-md mx-auto">Visualisasi dan edit data BI langsung dari sini. Perubahan tersimpan otomatis ke database pusat.</p>
                                     {biLoadMsg && (
                                         <p className="text-xs font-bold text-amber-600 mb-4">{biLoadMsg}</p>
                                     )}
@@ -927,60 +1004,61 @@ export default function AdminPage() {
                                     </div>
 
                                     {/* Header & Search & Filters */}
-                                    <div className="flex flex-col lg:flex-row justify-between gap-4 items-start lg:items-center bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
-                                        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto flex-wrap">
+                                    <div className="flex flex-col lg:flex-row lg:flex-wrap items-stretch lg:items-center justify-between gap-4 lg:gap-6 bg-white p-4 lg:p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                                        <div className="flex flex-col md:flex-row flex-wrap items-stretch md:items-center gap-4 flex-1 min-w-0">
                                             {/* Search */}
-                                            <div className="relative w-full sm:w-60">
+                                            <div className="relative w-full md:w-64 shrink-0">
                                                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                                                 <input type="text" placeholder={`Search ${biConf.title}...`} value={biSearch} onChange={(e) => setBiSearch(e.target.value)}
-                                                    className="w-full pl-9 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-zinc-900 focus:outline-none transition" />
+                                                    className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-zinc-900 focus:outline-none transition h-[44px]" />
                                             </div>
 
-                                            {/* Filter Dropdowns */}
-                                            {filterKeys.length > 0 && (
-                                                <div className="flex items-center gap-2">
-                                                    <select value={biFilterKey} onChange={(e) => { setBiFilterKey(e.target.value); setBiFilterValue('All'); }} className="py-2.5 px-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition h-[38px]">
-                                                        <option value="">No Filter</option>
-                                                        {filterKeys.map(k => <option key={k} value={k}>Filter by {k}</option>)}
-                                                    </select>
-                                                    {biFilterKey && (
-                                                        <select value={biFilterValue} onChange={(e) => setBiFilterValue(e.target.value)} className="py-2.5 px-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition h-[38px] max-w-[150px] truncate">
-                                                            <option value="All">All {biFilterKey}</option>
-                                                            {uniqueFilterValues.map(v => <option key={v} value={v}>{v}</option>)}
+                                            {/* Filter & Grouping Group */}
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                {filterKeys.length > 0 && (
+                                                    <div className="flex items-center gap-2">
+                                                        <select value={biFilterKey} onChange={(e) => { setBiFilterKey(e.target.value); setBiFilterValue('All'); }} className="h-[44px] px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition min-w-[140px]">
+                                                            <option value="">No Filter</option>
+                                                            {filterKeys.map(k => <option key={k} value={k}>Filter by {k}</option>)}
                                                         </select>
-                                                    )}
-                                                </div>
-                                            )}
+                                                        {biFilterKey && (
+                                                            <select value={biFilterValue} onChange={(e) => setBiFilterValue(e.target.value)} className="h-[44px] px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition max-w-[160px] truncate">
+                                                                <option value="All">All {biFilterKey}</option>
+                                                                {uniqueFilterValues.map(v => <option key={v} value={v}>{v}</option>)}
+                                                            </select>
+                                                        )}
+                                                    </div>
+                                                )}
 
-                                            {/* Grouping Dropdown */}
-                                            {filterKeys.length > 0 && (
-                                                <div className="flex items-center gap-2">
-                                                    <select value={biGroupBy} onChange={(e) => setBiGroupBy(e.target.value)} className="py-2.5 px-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition h-[38px]">
-                                                        <option value="">No Grouping</option>
-                                                        {filterKeys.map(k => <option key={k} value={k}>Group by {k}</option>)}
-                                                    </select>
-                                                </div>
-                                            )}
+                                                {filterKeys.length > 0 && (
+                                                    <div className="flex items-center gap-2">
+                                                        <select value={biGroupBy} onChange={(e) => setBiGroupBy(e.target.value)} className="h-[44px] px-4 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition min-w-[140px]">
+                                                            <option value="">No Grouping</option>
+                                                            {filterKeys.map(k => <option key={k} value={k}>Group by {k}</option>)}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
 
-                                        <div className="w-full lg:w-auto flex items-center justify-end gap-2">
+                                        <div className="flex flex-wrap items-center justify-start lg:justify-end gap-3 shrink-0">
                                             {biSubTab === 'revenue' && (
-                                                <button onClick={handleFetchN8nRevenue} disabled={loadingBiData} className="w-full lg:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-xs font-black uppercase tracking-wider rounded-lg hover:bg-blue-700 transition shadow-md shadow-blue-200">
+                                                <button onClick={handleFetchN8nRevenue} disabled={loadingBiData} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-100 h-[44px] whitespace-nowrap">
                                                     {loadingBiData ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />} Get Data n8n
                                                 </button>
                                             )}
                                             {biSubTab === 'socials' && (
-                                                <div className="flex gap-2 w-full lg:w-auto">
-                                                    <button onClick={() => handleScrapeSocials('Instagram')} disabled={loadingBiData} className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-tr from-purple-600 to-pink-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:opacity-90 transition shadow-md shadow-purple-100">
-                                                        {loadingBiData ? <Loader2 size={12} className="animate-spin" /> : <Share2 size={12} />} Sync Instagram
+                                                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                                                    <button onClick={() => handleScrapeSocials('Instagram')} disabled={loadingBiData} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-tr from-purple-600 to-pink-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition shadow-lg shadow-purple-100 h-[44px] whitespace-nowrap">
+                                                        {loadingBiData ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />} Sync Instagram
                                                     </button>
-                                                    <button onClick={() => handleScrapeSocials('LinkedIn')} disabled={loadingBiData} className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-800 transition shadow-md shadow-blue-100">
-                                                        {loadingBiData ? <Loader2 size={12} className="animate-spin" /> : <Users size={12} />} Sync LinkedIn
+                                                    <button onClick={() => handleScrapeSocials('LinkedIn')} disabled={loadingBiData} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-800 transition shadow-lg shadow-blue-100 h-[44px] whitespace-nowrap text-center">
+                                                        {loadingBiData ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />} Sync LinkedIn
                                                     </button>
                                                 </div>
                                             )}
-                                            <button onClick={() => openModal(biSubTab)} className="w-full lg:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-900 text-white text-xs font-black uppercase tracking-wider rounded-lg hover:bg-zinc-800 transition shadow-md shadow-zinc-200">
-                                                <Plus size={14} /> Add Data
+                                            <button onClick={() => openModal(biSubTab)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-zinc-900 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-zinc-800 transition shadow-lg shadow-zinc-200 h-[44px] whitespace-nowrap w-full sm:w-auto">
+                                                <Plus size={16} /> Add Data
                                             </button>
                                         </div>
                                     </div>
@@ -1032,7 +1110,7 @@ export default function AdminPage() {
                                                                     <td className="px-6 py-4 text-xs font-bold text-zinc-400">{idx + 1}</td>
                                                                     {biConf.cols.map((col: any) => (
                                                                         <td key={col.key} className="px-4 py-4 font-medium text-zinc-700 truncate max-w-[200px]">
-                                                                            {String(item[col.key] ?? '-')}
+                                                                            {col.key === 'month' ? normalizeMonth(String(item[col.key] ?? '-')) : String(item[col.key] ?? '-')}
                                                                         </td>
                                                                     ))}
                                                                     <td className="px-6 py-4 text-right space-x-2">
@@ -1050,7 +1128,7 @@ export default function AdminPage() {
                                                                 <td className="px-6 py-4 text-xs font-bold text-zinc-400">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
                                                                 {biConf.cols.map((col: any) => (
                                                                     <td key={col.key} className="px-4 py-4 font-medium text-zinc-700 truncate max-w-[200px]">
-                                                                        {String(item[col.key] ?? '-')}
+                                                                        {col.key === 'month' ? normalizeMonth(String(item[col.key] ?? '-')) : String(item[col.key] ?? '-')}
                                                                     </td>
                                                                 ))}
                                                                 <td className="px-6 py-4 text-right space-x-2">

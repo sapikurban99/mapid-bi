@@ -1,5 +1,5 @@
 // Shared configuration utility for admin-managed settings
-// Uses localStorage as cache + Google Apps Script as persistent backend
+// Uses localStorage as cache + Supabase as persistent backend
 
 // ========== TYPE DEFINITIONS ==========
 
@@ -186,7 +186,7 @@ export interface SiteConfig {
     // RACI Matrix
     raci: RACIConfig;
 
-    // BI Data (override GAS data when set from admin)
+    // BI Data (override database data when set from admin)
     biData: BIData | null;
 
     // Kanban extensions
@@ -202,20 +202,20 @@ export const DEFAULT_RACI: RACIConfig = {
     columns: [
         { key: 'hob', label: 'HoB' },
         { key: 'ent_lead', label: 'Ent. Lead' },
-        { key: 'dwi', label: 'Grwth (Dwi)' },
-        { key: 'wina', label: 'Actv (Wina)' },
-        { key: 'annisa', label: 'Dsgn (Annisa)' },
-        { key: 'fariz', label: 'Acdm (Fariz)' },
-        { key: 'pse', label: 'PSE' },
+        { key: 'dwi', label: 'Growth (Dwi)' },
+        { key: 'wina', label: 'Activation (Wina)' },
+        { key: 'annisa', label: 'Design (Annisa)' },
+        { key: 'fariz', label: 'Academy (Fariz)' },
+        { key: 'pse_team', label: 'PSE (Technical)' },
         { key: 'sales', label: 'Sales' },
     ],
     rows: [
-        { activity: 'Content Execution & Socmed', values: { hob: 'I', ent_lead: 'I', dwi: 'A', wina: 'R', annisa: 'C', fariz: 'I', pse: 'C', sales: 'I' } },
-        { activity: 'Paid Ads & Funnel Analytics', values: { hob: 'I', ent_lead: 'I', dwi: 'R/A', wina: 'I', annisa: 'I', fariz: 'I', pse: 'I', sales: 'I' } },
-        { activity: 'Visual Assets & Brand Drc.', values: { hob: 'I', ent_lead: 'I', dwi: 'I', wina: 'C', annisa: 'R/A', fariz: 'I', pse: 'I', sales: 'I' } },
-        { activity: 'Academy Curriculum & LMS', values: { hob: 'I', ent_lead: 'I', dwi: 'I', wina: 'C', annisa: 'C', fariz: 'R/A', pse: 'C', sales: 'I' } },
-        { activity: 'Solution Design & SDLC', values: { hob: 'I', ent_lead: 'I', dwi: 'I', wina: 'I', annisa: 'I', fariz: 'I', pse: 'R/A', sales: 'C' } },
-        { activity: 'Enterprise Lead Acquisition', values: { hob: 'I', ent_lead: 'A', dwi: 'I', wina: 'I', annisa: 'I', fariz: 'I', pse: 'C', sales: 'R' } },
+        { activity: 'Content Execution & Socmed', values: { hob: 'I', ent_lead: 'I', dwi: 'A', wina: 'R', annisa: 'C', fariz: 'I', pse_team: 'C', sales: 'I' } },
+        { activity: 'Paid Ads & Funnel Analytics', values: { hob: 'I', ent_lead: 'I', dwi: 'R/A', wina: 'I', annisa: 'I', fariz: 'I', pse_team: 'I', sales: 'I' } },
+        { activity: 'Visual Assets & Brand Drc.', values: { hob: 'I', ent_lead: 'I', dwi: 'I', wina: 'C', annisa: 'R/A', fariz: 'I', pse_team: 'I', sales: 'I' } },
+        { activity: 'Academy Curriculum & LMS', values: { hob: 'I', ent_lead: 'I', dwi: 'I', wina: 'C', annisa: 'C', fariz: 'R/A', pse_team: 'C', sales: 'I' } },
+        { activity: 'Solution Design & SDLC', values: { hob: 'I', ent_lead: 'I', dwi: 'I', wina: 'I', annisa: 'I', fariz: 'I', pse_team: 'R/A', sales: 'C' } },
+        { activity: 'Enterprise Lead Acquisition', values: { hob: 'I', ent_lead: 'A', dwi: 'I', wina: 'I', annisa: 'I', fariz: 'I', pse_team: 'C', sales: 'R' } },
     ],
 };
 
@@ -241,18 +241,81 @@ export const DEFAULT_CONFIG: SiteConfig = {
     },
 
     roles: {
-        'dwi': { title: 'Growth Marketing (Dwi)', focus: 'Planning Conversion Funnels, Data Analytics.', responsibilities: ['Analyze user data & manage paid channels.', 'Temporary Admin (Q1).', 'Final Quality Control (QC) for content.'], dos: ['Focus on CPL and Conversion Rates.'], donts: ['Do not execute content creation.'] },
-        'wina': { title: 'Activation (Wina)', focus: 'Full Content Execution & Community Leadership.', responsibilities: ['Plan & Execute ALL social media content.', 'Manage community freelancers.', 'Lead brainstorming with PSE.'], dos: ['Translate complex tech jargon.'], donts: ['Do not wait for ideas (You are the engine).'] },
-        'annisa': { title: 'Design (Annisa)', focus: 'Brand Awareness & Art Direction.', responsibilities: ['Create visual assets.', 'Manage freelance designers.', 'Maintain Brand Guidelines.'], dos: ['Ensure visual consistency.'], donts: ['Do not compromise brand guidelines.'] },
-        'fariz': { title: 'Academy Ops (Fariz)', focus: 'Curriculum Architecture.', responsibilities: ['Draft curriculum & update LMS.', 'Manage thematic classes.', 'Ensure product readiness.'], dos: ['Focus on curriculum quality.'], donts: ['Do not handle PR/Humas.'] },
-        'pse_team': { title: 'PSE Team', focus: 'Technical PM & Solution Design.', responsibilities: ['Manage SDLC.', 'Technical proposals.', 'Handover Validation.', 'Technical support.'], dos: ['Reject incomplete handovers.'], donts: ['NO commercial negotiation.'] },
+        'dwi': { 
+            title: 'Growth Marketing (Dwi)', 
+            focus: 'Ensuring the B2C engine runs effectively, interconnected, and aligned with goals.', 
+            responsibilities: [
+                'Define direction, priorities, and trade-offs for the B2C team.',
+                'Ensure every role works according to objectives.',
+                'Maintain the rhythm of weekly meetings, planning, and evaluation.',
+                'Oversee the end-to-end funnel: acquisition, activation, conversion, and retention.',
+                'Act as the primary decision-maker for campaign priorities and effort allocation.',
+                'Identify cross-role bottlenecks and drive their resolution.'
+            ], 
+            dos: ['Focus on ROI and cross-role synergy.'], 
+            donts: ['Do not micromanage execution details if the rhythm is established.'] 
+        },
+        'wina': { 
+            title: 'Activation Specialist (Wina)', 
+            focus: 'Driving the top funnel and conversation layer to ensure leads enter, are processed, and remain fresh.', 
+            responsibilities: [
+                'Community activation.',
+                'Social media coordination and execution support.',
+                'Customer service and inquiry handling.',
+                'Lead follow-up discipline.',
+                'Tracking incoming leads and inquiry sources.'
+            ], 
+            dos: ['Maintain high responsiveness to inquiries.'], 
+            donts: ['Do not let leads go cold without follow-up.'] 
+        },
+        'annisa': { 
+            title: 'Graphic Designer & Video Editor (Annisa)', 
+            focus: 'Ensuring all visual and content assets are ready on time, consistent, and support the funnel.', 
+            responsibilities: [
+                'Creative asset production for campaigns.',
+                'Video editing for social and product content.',
+                'Visual consistency across MAPID and MAPID Academy.',
+                'Supporting campaign readiness with timely asset delivery.',
+                'Helping maintain discipline in request flow and creative timeline.'
+            ], 
+            dos: ['Maintain creative discipline and schedule.'], 
+            donts: ['Do not compromise brand consistency for speed.'] 
+        },
+        'fariz': { 
+            title: 'Learning Operation (Fariz)', 
+            focus: 'Ensuring MAPID Academy products are market-ready, run smoothly, and continuously improve in delivery and quality.', 
+            responsibilities: [
+                'Product strategy for MAPID Academy.',
+                'Operational readiness and batch planning.',
+                'Curriculum and class flow improvement.',
+                'Mentor coordination and class quality.',
+                'Evaluation of learner experience and product enhancement.',
+                'Documentation of feedback into concrete improvement.'
+            ], 
+            dos: ['Prioritize learner experience and curriculum relevance.'], 
+            donts: ['Do not neglect post-class feedback loops.'] 
+        },
+        'pse_team': { 
+            title: 'Product Solutions Engineer', 
+            focus: 'Technical solution owner across presales and delivery stages.', 
+            responsibilities: [
+                'Acts as the technical solution owner across both presales (Leads Support stages) and delivery (Projects Kanban stages), ensuring end‑to‑end consistency from Discovery Meeting to Value Review.',
+                'Supports presales by joining Discovery Meetings, translating MoM & BRD into feasible solution designs, performing Feasibility Checks, producing Solution Design & FRD, and leading Validation & Demo sessions.',
+                'Collaborates with sales during Commercial Negotiation to confirm technical scope, assumptions, and risks, so that what is committed in proposals can be realistically delivered.',
+                'Leads the technical flow after Technical Handover in Projects: Feasibility & Design, Demo/POC (if required), Development & Data, Internal Testing, UAT with Client, and supports Training & Go Live.',
+                'Ensures solution quality by coordinating with data, product, and engineering teams, minimizing rework between Internal Testing and UAT with Client.',
+                'Drives Value Review with clients by helping quantify outcomes and surfacing expansion opportunities back into the Leads Support pipeline.'
+            ], 
+            dos: ['Reject incomplete handovers.', 'Verify technical feasibility before commitment.'], 
+            donts: ['NO commercial negotiation without sales alignment.'] 
+        },
         'sales_enterprise': { title: 'Enterprise Sales', focus: 'New Lead Acquisition.', responsibilities: ['Acquire new accounts.', 'Draft commercial proposals.', 'Target: 20 Proposals / Month.'], dos: ['Hit proposal volume.'], donts: ['Do not promise unvalidated tech features.'] },
         'hob': { title: 'Head of Business', focus: 'Growth Engine & P&L Management.', responsibilities: ['Oversee P&L.', 'Manage Marketing & PSE.', 'Coordinate strategy.'], dos: ['Ensure smooth operations.'], donts: ['Do not micromanage daily sales.'] },
         'enterprise_lead': { title: 'Enterprise Lead', focus: 'Commercial Engine.', responsibilities: ['Lead Sales Team.', 'C-Level negotiations.', 'Report pipeline.'], dos: ['Focus on big-ticket deals.'], donts: ['Do not over-commit tech resources.'] },
     },
 
     raci: DEFAULT_RACI,
-    biData: null, // null = use GAS data, non-null = admin override
+    biData: null, // null = use database data, non-null = admin override
 };
 
 // ========== STORAGE ==========
@@ -287,11 +350,11 @@ export function resetConfig(): void {
     localStorage.removeItem(STORAGE_KEY);
 }
 
-// ========== GAS INTEGRATION ==========
+// ========== SUPABASE INTEGRATION ==========
 
-export async function saveConfigToGAS(config: SiteConfig): Promise<{ success: boolean; message: string }> {
+export async function saveConfigToSupabase(config: SiteConfig): Promise<{ success: boolean; message: string }> {
     try {
-        const res = await fetch('/api/gas', {
+        const res = await fetch('/api/bi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'saveConfig', data: config }),
@@ -300,19 +363,19 @@ export async function saveConfigToGAS(config: SiteConfig): Promise<{ success: bo
         if (json.success) {
             // Also update localStorage cache
             localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-            return { success: true, message: 'Config saved to Google Sheets!' };
+            return { success: true, message: 'Config saved to Supabase!' };
         }
-        return { success: false, message: json.message || 'Failed to save to GAS' };
+        return { success: false, message: json.message || 'Failed to save to Supabase' };
     } catch (err: any) {
         // Fallback: save to localStorage only
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-        return { success: false, message: `GAS unreachable, saved locally only. (${err.message})` };
+        return { success: false, message: `Supabase unreachable, saved locally only. (${err.message})` };
     }
 }
 
-export async function loadConfigFromGAS(): Promise<SiteConfig> {
+export async function loadConfigFromSupabase(): Promise<SiteConfig> {
     try {
-        const res = await fetch('/api/gas?includeConfig=true');
+        const res = await fetch('/api/bi?includeConfig=true');
         const json = await res.json();
         if (json.adminConfig) {
             const merged = deepMerge(DEFAULT_CONFIG, json.adminConfig) as SiteConfig;

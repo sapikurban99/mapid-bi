@@ -1,33 +1,58 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Target, Zap, ChevronRight, X, ChevronDown, ChevronUp, Layers, Briefcase } from 'lucide-react';
+import useSWR from 'swr';
+import { ArrowRight, Target, Zap, ChevronRight, X, ChevronDown, Layers, Briefcase, Loader2 } from 'lucide-react';
+import { useGrowthData } from './growth/useGrowthData';
+import { useGlobalData } from './components/GlobalDataProvider';
 import { getConfig, DEFAULT_CONFIG, SiteConfig } from './lib/config';
 
+// Fetcher for SWR
+const apiFetcher = (url: string) => fetch(url).then(r => r.json());
+
 export default function StrategyHome() {
+  const { isLoading: globalIsLoading } = useGlobalData();
   const [activeRole, setActiveRole] = useState<string | null>(null);
   const [config, setConfigState] = useState<SiteConfig>(DEFAULT_CONFIG);
 
-  // State untuk Hide/Show RACI Matrix
-  const [showRaci, setShowRaci] = useState<boolean>(true);
+  // Fetch Academy revenue directly from Supabase via /api/bi (not from localStorage)
+  const { data: biData, isLoading: biLoading } = useSWR('/api/bi', apiFetcher, { revalidateOnFocus: false });
+
+  // Fetch Live Platform Data from DevServer for Q2 2026
+  const { allPayments, isLoading: platformLoading } = useGrowthData('2026-04-01', '2026-06-30');
 
   useEffect(() => {
     setConfigState(getConfig());
-  }, []);
+  }, [globalIsLoading]);
 
   const roleDetails = config.roles;
 
-  // Helper untuk render badge RACI
-  const renderRACI = (type: string) => {
-    switch (type) {
-      case 'R': return <span className="font-black text-blue-600 bg-blue-50 px-2 py-1 rounded">R</span>;
-      case 'A': return <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded">A</span>;
-      case 'R/A': return <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded">R/A</span>;
-      case 'C': return <span className="font-black text-amber-600 bg-amber-50 px-2 py-1 rounded">C</span>;
-      default: return <span className="text-zinc-300 font-medium">I</span>;
-    }
-  };
+  // Calculate B2C targets from live data sources
+  const b2cMetrics = useMemo(() => {
+    // Academy: from Supabase revenue table (fetched via /api/bi)
+    const revenueRows = biData?.revenue || [];
+    const q2Revenue = revenueRows.filter((r: any) => r.quarter?.includes('Q2') && r.quarter?.includes('2026'));
+
+    const academyActual = q2Revenue
+      .filter((r: any) => r.subProduct?.toLowerCase().includes('academy'))
+      .reduce((sum: number, r: any) => sum + (r.actual || 0), 0);
+
+    // Platform: from devserver (live payment data)
+    const platformActual = allPayments
+      .filter((p: any) => p.status === 'success' && p.payment_methode?.toLowerCase() === 'midtrans')
+      .reduce((sum: number, p: any) => sum + (p.detail_amount?.total || p.total || 0), 0);
+
+    const academyTarget = 60000000;
+    const platformTarget = 40000000;
+
+    return {
+      academy: { actual: academyActual, target: academyTarget, percent: Math.min(Math.round((academyActual / academyTarget) * 100), 100) },
+      platform: { actual: platformActual, target: platformTarget, percent: Math.min(Math.round((platformActual / platformTarget) * 100), 100) },
+      total: { actual: academyActual + platformActual, target: academyTarget + platformTarget, percent: Math.min(Math.round(((academyActual + platformActual) / (academyTarget + platformTarget)) * 100), 100) },
+      isLoading: biLoading || platformLoading,
+    };
+  }, [biData, allPayments, biLoading, platformLoading]);
 
   return (
     <div className="bg-zinc-50 min-h-screen text-zinc-900 font-sans pb-24 selection:bg-zinc-900 selection:text-white">
@@ -71,7 +96,7 @@ export default function StrategyHome() {
           <div className="mb-20 text-center md:text-left flex flex-col md:flex-row md:justify-between md:items-end border-b border-zinc-200 pb-6">
             <div>
               <h3 className="font-black text-3xl tracking-tight mb-2">Team Architecture</h3>
-              <p className="text-zinc-500 font-medium">Two equal pillars reporting to the CEO. Click cards for RACI breakdown.</p>
+              <p className="text-zinc-500 font-medium">Two equal pillars reporting to the CEO. Click cards for responsibilities.</p>
             </div>
           </div>
 
@@ -158,47 +183,78 @@ export default function StrategyHome() {
           </div>
         </section>
 
-        {/* RACI MATRIX WITH HIDE/SHOW TOGGLE */}
+        {/* B2C Q2 REVENUE TARGETS */}
         <section className="mb-32">
-          <div className="flex justify-between items-center border-b border-zinc-200 pb-4 mb-8">
-            <h2 className="text-2xl font-black tracking-tight">RACI Matrix Alignment</h2>
-            <button
-              onClick={() => setShowRaci(!showRaci)}
-              className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 transition-colors bg-zinc-100 hover:bg-zinc-200 px-4 py-2 rounded-lg"
-            >
-              {showRaci ? 'Hide Matrix' : 'Show Matrix'}
-              {showRaci ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-zinc-200 pb-4 mb-8 gap-4">
+            <div>
+              <h2 className="text-3xl font-black tracking-tight mb-1">B2C Q2 Revenue Targets</h2>
+              <p className="text-zinc-400 text-sm font-medium">Real-time — Academy from database, Platform from live API.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {b2cMetrics.isLoading && (
+                <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
+                  <Loader2 size={14} className="animate-spin" /> Fetching live data...
+                </div>
+              )}
+              <div className="bg-zinc-100 px-4 py-2 rounded-xl border border-zinc-200">
+                <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Global Target:</span>
+                <span className="ml-2 text-sm font-black text-zinc-950">Rp {(b2cMetrics.total.target / 1000000).toFixed(0)}M</span>
+              </div>
+            </div>
           </div>
 
-          {/* Transition wrapper for hide/show */}
-          <div className={`transition-all duration-500 ease-in-out overflow-hidden ${showRaci ? 'opacity-100 max-h-[1000px]' : 'opacity-0 max-h-0'}`}>
-            <div className="bg-white border border-zinc-200 overflow-x-auto rounded-2xl shadow-sm">
-              <table className="w-full text-sm text-left whitespace-nowrap">
-                <thead className="bg-zinc-900 text-[10px] uppercase tracking-[0.2em] text-white">
-                  <tr>
-                    <th className="px-6 py-5 font-black">Activity Function</th>
-                    {config.raci.columns.map(col => (
-                      <th key={col.key} className="px-4 py-5 text-center font-bold">{col.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {config.raci.rows.map((row, ridx) => (
-                    <tr key={ridx} className="hover:bg-zinc-50 transition">
-                      <td className="px-6 py-5 font-bold text-zinc-900">{row.activity}</td>
-                      {config.raci.columns.map(col => (
-                        <td key={col.key} className="text-center">{renderRACI(row.values[col.key] || 'I')}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="p-4 bg-zinc-50 text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex gap-6 justify-center border-t border-zinc-200">
-                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div> (R) Responsible</span>
-                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> (A) Accountable</span>
-                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500"></div> (C) Consulted</span>
-                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-zinc-300"></div> (I) Informed</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Academy Module */}
+            <div className="bg-white border-2 border-zinc-100 p-8 rounded-3xl shadow-sm hover:border-blue-500 transition-all group relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Layers size={48} className="text-blue-600" />
+              </div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-6">MAPID Academy</h3>
+              <div className="flex items-end gap-2 mb-2">
+                <span className="text-4xl font-black tracking-tighter text-zinc-900">Rp {(b2cMetrics.academy.actual / 1000000).toFixed(1)}M</span>
+                <span className="text-xs font-bold text-zinc-400 mb-2">/ {(b2cMetrics.academy.target / 1000000).toFixed(0)}M</span>
+              </div>
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">{b2cMetrics.academy.percent}% COMPLETE</span>
+              </div>
+              <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-600 transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.academy.percent}%` }}></div>
+              </div>
+              <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: Supabase DB → revenue table</p>
+            </div>
+
+            {/* Platform Module */}
+            <div className="bg-white border-2 border-zinc-100 p-8 rounded-3xl shadow-sm hover:border-emerald-500 transition-all group relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Zap size={48} className="text-emerald-600" />
+              </div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-6">MAPID Platform</h3>
+              <div className="flex items-end gap-2 mb-2">
+                <span className="text-4xl font-black tracking-tighter text-zinc-900">Rp {(b2cMetrics.platform.actual / 1000000).toFixed(1)}M</span>
+                <span className="text-xs font-bold text-zinc-400 mb-2">/ {(b2cMetrics.platform.target / 1000000).toFixed(0)}M</span>
+              </div>
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{b2cMetrics.platform.percent}% COMPLETE</span>
+              </div>
+              <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-600 transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.platform.percent}%` }}></div>
+              </div>
+              <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: DevServer API → all_payments</p>
+            </div>
+
+            {/* Combined Total Module */}
+            <div className="bg-zinc-900 p-8 rounded-3xl shadow-xl shadow-zinc-200 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-950 -z-0"></div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-zinc-500 mb-6 relative z-10">Total B2C Performance</h3>
+              <div className="flex items-end gap-2 mb-2 relative z-10">
+                <span className="text-5xl font-black tracking-tighter text-white">Rp {(b2cMetrics.total.actual / 1000000).toFixed(1)}M</span>
+              </div>
+              <div className="flex justify-between items-center mb-4 relative z-10">
+                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">GLOBAL ACHIEVEMENT</span>
+                <span className="text-xs font-black text-white">{b2cMetrics.total.percent}%</span>
+              </div>
+              <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden relative z-10">
+                <div className="h-full bg-white transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.total.percent}%` }}></div>
               </div>
             </div>
           </div>

@@ -182,7 +182,7 @@ export default function MinimalistDashboard() {
     const socialsData = data?.socials || [];
     if (socialsData.length > 0 && socialPrimaryMonth === 'All' && activeTab === 'B2C') {
       // Find all unique periods (month + week)
-      const periods = Array.from(new Set(socialsData.map(s => `${s.month}|${s.week}`)))
+      const periods = Array.from(new Set(socialsData.map(s => `${normalizeMonth(s.month)}|${s.week}`)))
         .map(p => {
           const [month, week] = p.split('|');
           return { month, week, sortKey: `${month}-${week}` };
@@ -267,6 +267,14 @@ export default function MinimalistDashboard() {
       }
     }
     return label;
+  };
+
+  const normalizeMonth = (m: string) => {
+    if (!m || typeof m !== 'string') return m;
+    if (m.includes('T')) return m.split('T')[0];
+    // Jika formatnya 'YYYY-MM-DD HH:mm:ss'
+    if (m.includes(' ') && (m.includes('-') || m.includes('/'))) return m.split(' ')[0];
+    return m;
   };
 
   // --- CALCULATIONS ---
@@ -479,7 +487,7 @@ export default function MinimalistDashboard() {
             <div>
               {(() => {
                 const socialsData = data?.socials || [];
-                const uniqueMonths = ['All', ...Array.from(new Set(socialsData.map((d: any) => d.month).filter(Boolean)))];
+                const uniqueMonths = ['All', ...Array.from(new Set(socialsData.map((d: any) => normalizeMonth(d.month)).filter(Boolean)))];
                 const uniqueWeeks = ['All', ...Array.from(new Set(socialsData.map((d: any) => d.week).filter(Boolean)))];
 
 
@@ -488,7 +496,7 @@ export default function MinimalistDashboard() {
                   const filtered = dataset.filter(d =>
                     d.platform === platform &&
                     d.metric === metric &&
-                    (month === 'All' || d.month === month) &&
+                    (month === 'All' || normalizeMonth(d.month) === normalizeMonth(month)) &&
                     (week === 'All' || d.week === week)
                   );
 

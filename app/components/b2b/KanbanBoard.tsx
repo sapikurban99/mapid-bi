@@ -42,7 +42,7 @@ export default function KanbanBoard({
 
             {!config.kanbanProjects || config.kanbanProjects.length === 0 ? (
                 <div className="bg-white border border-zinc-200 rounded-3xl p-12 text-center text-zinc-500 font-bold tracking-wide">
-                    No Kanban projects found. Ensure KANBAN_SHEET_ID is set correctly in GAS script and fetch data.
+                    No Kanban projects found. Ensure data is initialized in Supabase and fetch data.
                 </div>
             ) : (
                 <div className="flex gap-6 overflow-x-auto pb-6 hide-scrollbar flex-nowrap items-start" style={{ minHeight: '70vh' }}>
@@ -64,7 +64,7 @@ export default function KanbanBoard({
                                     });
                                     // API call
                                     try {
-                                        await fetch('/api/gas', {
+                                        const res = await fetch('/api/bi', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ action: 'updateKanban', projectId, newStage: stage })
@@ -177,7 +177,7 @@ export default function KanbanBoard({
                                 onClick={async () => {
                                     setSubmitting(true);
                                     try {
-                                        const res = await fetch('/api/gas', {
+                                        const res = await fetch('/api/bi', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ action: 'addKanbanProject', ...newProject })

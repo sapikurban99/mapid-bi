@@ -319,6 +319,24 @@ export async function updateKanbanPartner(partnerId: string, newStage: string) {
   return { success: true };
 }
 
+export async function deleteKanbanProject(id: string) {
+  const { error } = await supabase.from('kanban_projects').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function deleteKanbanLead(id: string) {
+  const { error } = await supabase.from('pse_leads').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function deleteKanbanPartner(id: string) {
+  const { error } = await supabase.from('pse_partners').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
 // --- Sync BI Data from admin panel to individual tables ---
 async function syncBiDataToTables(biData: any) {
   async function replaceTable(tableName: string, rows: any[]) {

@@ -148,6 +148,8 @@ export interface KanbanPSEWorkload {
     maxCapacity: number;
     loadScore: number;
     loadPercentage: number;
+    isActive?: boolean;
+    isExisting?: boolean;
 }
 
 export interface SiteConfig {

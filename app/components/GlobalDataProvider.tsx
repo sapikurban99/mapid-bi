@@ -49,7 +49,13 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
                 mergedData.budget = mergedData.budget?.length ? mergedData.budget : fallbackData.budget || [];
 
                 // Store inside central config (kanbanProjects and pseWorkloads might also be here top-level)
-                setConfig({ biData: mergedData, kanbanProjects: mergedData.kanbanProjects || [], pseWorkloads: mergedData.pseWorkloads || [] });
+                setConfig({ 
+                    biData: mergedData, 
+                    kanbanProjects: mergedData.kanbanProjects || [], 
+                    kanbanLeads: mergedData.kanbanLeads || [],
+                    kanbanPartners: mergedData.kanbanPartners || [],
+                    pseWorkloads: mergedData.pseWorkloads || [] 
+                });
             }
         } catch (error) {
             console.error('Failed to sync global data:', error);

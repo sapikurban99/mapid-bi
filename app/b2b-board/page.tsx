@@ -5,12 +5,109 @@ import { getConfig, SiteConfig, setConfig } from '../lib/config';
 import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
+// --- Sub-components (Cards) ---
+const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
+    const isDone = p.stage === 'Done';
+    const isLost = p.stage === 'Lost';
+    return (
+        <div draggable onDragStart={(e) => e.dataTransfer.setData('projectId', p.id)}
+            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isDone ? 'bg-emerald-50 border-emerald-200' : isLost ? 'bg-rose-50 border-rose-200' : 'bg-white border-zinc-200'}`}>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : (p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDone ? 'bg-emerald-100 text-emerald-600' : isLost ? 'bg-rose-100 text-rose-600' : 'bg-blue-50 text-blue-600'}`}><Briefcase size={14} /></div>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete('Project', p.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
+                </div>
+                <div className="flex flex-col gap-1 items-end text-right">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${isDone ? 'bg-emerald-200 text-emerald-800' : isLost ? 'bg-rose-200 text-rose-800' : 'bg-blue-100 text-blue-800'}`}>{p.stage}</span>
+                    <span className={`text-[8px] font-black uppercase tracking-widest ${p.priority === 'High' ? 'text-rose-500' : p.priority === 'Medium' ? 'text-amber-500' : 'text-blue-500'}`}>{p.priority}</span>
+                </div>
+            </div>
+            <div onClick={() => onEdit('Project', p)}>
+                <h3 className={`font-bold text-base mb-1 ${isDone ? 'text-emerald-950' : isLost ? 'text-rose-950' : 'text-blue-950'}`}>{p.projectName}</h3>
+                {p.client && <p className="text-[10px] font-black uppercase text-zinc-400 mb-1">Client: <span className="text-zinc-600">{p.client}</span></p>}
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-3 truncate">PSE: <span className="text-zinc-600">{getPseName(p.pseId)}</span></p>
+                <div className="flex flex-col border-t border-zinc-50 pt-3">
+                    <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
+                        <span className="text-zinc-400">Progress</span>
+                        <span className={isDone ? 'text-emerald-500' : 'text-blue-500'}>{p.progress || 0}%</span>
+                    </div>
+                    <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
+                        <div className={`h-full ${isDone ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${p.progress || 0}%` }}></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any) => {
+    const isLost = l.stage === 'Closed Lost';
+    return (
+        <div draggable onDragStart={(e) => e.dataTransfer.setData('leadId', l.id)}
+            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isLost ? 'bg-rose-50 border-rose-200' : 'bg-white border-zinc-200'}`}>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${isLost ? 'bg-rose-500' : (l.priority || 'Medium') === 'High' ? 'bg-rose-500' : (l.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isLost ? 'bg-rose-100 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}><Target size={14} /></div>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete('Lead', l.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
+                </div>
+                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border ${isLost ? 'bg-rose-200 text-rose-800' : getStageColor(l.stage)}`}>{l.stage}</span>
+            </div>
+            <div onClick={() => onEdit('Lead', l)}>
+                <h3 className="font-bold text-zinc-900 text-base mb-1">{l.name}</h3>
+                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-3">Support: <span className="text-zinc-600">{getPseName(l.pseId)}</span></p>
+                <div className="flex flex-col border-t border-emerald-50 pt-3">
+                    <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
+                        <span className="text-zinc-400">Progress</span>
+                        <span className="text-emerald-500">{l.progress || 0}%</span>
+                    </div>
+                    <div className="w-full h-1 bg-emerald-50 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500" style={{ width: `${l.progress || 0}%` }}></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor }: any) => (
+    <div draggable onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)}
+        className="bg-white border border-zinc-200 shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
+        <div className={`absolute top-0 left-0 w-1.5 h-full ${(p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+        <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center"><Users size={14} /></div>
+                <button onClick={(e) => { e.stopPropagation(); onDelete('Partner', p.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
+            </div>
+            <div className="text-right">
+                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md block mb-1 border ${getStageColor(p.stage || 'Sourcing')}`}>{p.stage || 'Sourcing'}</span>
+                <span className="text-[8px] font-black uppercase tracking-widest text-purple-400">{p.type}</span>
+            </div>
+        </div>
+        <div onClick={() => onEdit('Partner', p)}>
+            <h3 className="font-bold text-purple-950 text-base mb-1">{p.name}</h3>
+            <p className="text-[10px] font-black text-purple-600/70 uppercase tracking-widest mb-3">PIC: <span className="text-purple-800">{getPseName(p.pseId)}</span></p>
+            <div className="flex flex-col border-t border-purple-50 pt-3">
+                <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
+                    <span className="text-purple-600/50">Syncing</span>
+                    <span className="text-purple-500">{p.progress || 0}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-purple-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500 rounded-full" style={{ width: `${p.progress || 0}%` }}></div>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
 export default function B2BBoardPage() {
     const { syncData, isLoading: globalIsLoading } = useGlobalData();
     const [config, setLocalConfig] = useState<SiteConfig | null>(null);
     const [loadingBiData, setLoadingBiData] = useState(false);
     const [activeTab, setActiveTab] = useState<'projects' | 'leads' | 'partners' | 'stats'>('projects');
     const [priorityFilter, setPriorityFilter] = useState('All');
+    const [groupMode, setGroupMode] = useState<'none' | 'company' | 'pse'>('none');
     const [showArchived, setShowArchived] = useState(false);
 
     // Modals State
@@ -18,6 +115,7 @@ export default function B2BBoardPage() {
     const [isAddingLead, setIsAddingLead] = useState(false);
     const [isAddingPartner, setIsAddingPartner] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    
     // Forms State
     const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' });
     const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '' });
@@ -25,11 +123,29 @@ export default function B2BBoardPage() {
 
     const [editingItemType, setEditingItemType] = useState<'Project' | 'Lead' | 'Partner' | null>(null);
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
+    const [editingMember, setEditingMember] = useState<any>(null);
 
     // Kanban Stages (Sesuai SOP)
     const KANBAN_STAGES = ['Technical Handover', 'Feasibility & Design', 'Demo / POC', 'Development & Data', 'Internal Testing', 'UAT with Client', 'Training & Go Live', 'Value Review', 'Done', 'Lost'];
     const PRESALES_STAGES = ['Lead Generation', 'Discovery Meeting', 'MoM & BRD Creation', 'Technical Handover', 'Feasibility Check', 'Solution Design & FRD', 'Validation & Demo', 'Commercial Negotiation', 'Closed Lost'];
     const PARTNER_STAGES = ['Sourcing', 'Approached', 'Negotiation', 'Onboarded', 'Active', 'Archived'];
+
+    useEffect(() => {
+        setLocalConfig(getConfig());
+    }, [globalIsLoading]);
+
+    if (!config) return <div className="p-8 text-center text-zinc-500 font-bold uppercase tracking-widest text-xs">Loading Workspace...</div>;
+
+    // Helper: Cari nama PSE dari ID
+    const getPseName = (id: string) => config.pseWorkloads?.find((p: any) => p.pseId === id)?.name || 'Unknown PSE';
+
+    // Helper: Hitung warna badge stage
+    const getStageColor = (stage: string) => {
+        const index = PRESALES_STAGES.indexOf(stage);
+        if (index < 3) return 'bg-zinc-100 text-zinc-500 border-zinc-200'; 
+        if (index < 6) return 'bg-blue-50 text-blue-600 border-blue-100';
+        return 'bg-emerald-50 text-emerald-600 border-emerald-100'; 
+    };
 
     const getFilteredProjects = (stage: string) => {
         return config?.kanbanProjects?.filter((p: any) => {
@@ -53,23 +169,6 @@ export default function B2BBoardPage() {
             if (priorityFilter !== 'All' && (p.priority || 'Medium') !== priorityFilter) return false;
             return true;
         }) || [];
-    };
-
-    useEffect(() => {
-        setLocalConfig(getConfig());
-    }, [globalIsLoading]);
-
-    if (!config) return <div className="p-8 text-center text-zinc-500 font-bold uppercase tracking-widest text-xs">Loading Workspace...</div>;
-
-    // Helper: Cari nama PSE dari ID
-    const getPseName = (id: string) => config.pseWorkloads?.find((p: any) => p.pseId === id)?.name || 'Unknown PSE';
-
-    // Helper: Hitung warna badge stage
-    const getStageColor = (stage: string) => {
-        const index = PRESALES_STAGES.indexOf(stage);
-        if (index < 3) return 'bg-zinc-200 text-zinc-800'; 
-        if (index < 6) return 'bg-blue-100 text-blue-800';
-        return 'bg-emerald-100 text-emerald-800'; 
     };
 
     // --- Action Handlers ---
@@ -110,7 +209,6 @@ export default function B2BBoardPage() {
         if (!confirm(`Convert "${lead.name}" to an Active Project? This will move the data to Projects and remove it from Leads.`)) return;
         setSubmitting(true);
         try {
-            // 1. Create Project
             const projectPayload = {
                 client: lead.name,
                 projectName: `${lead.name} - Project`,
@@ -128,14 +226,12 @@ export default function B2BBoardPage() {
             const addData = await addRes.json();
             
             if (addData.success) {
-                // 2. Delete Lead
                 await fetch('/api/bi', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'deleteKanbanLead', id: lead.id })
                 });
 
-                // 3. Optimistic Update
                 setLocalConfig((prev: any) => {
                     if (!prev) return prev;
                     const n = JSON.parse(JSON.stringify(prev));
@@ -169,7 +265,6 @@ export default function B2BBoardPage() {
             });
             const data = await res.json();
             if (data.success) {
-                // Optimistic Update
                 setLocalConfig((prev: any) => {
                     if (!prev) return prev;
                     const n = JSON.parse(JSON.stringify(prev));
@@ -189,14 +284,56 @@ export default function B2BBoardPage() {
                 setEditingItemId(null);
                 setEditingItemType(null);
                 resetForm();
-                
-                // Silent refetch to sync background changes directly to config state
                 syncData({ silent: true });
             } else {
                 alert(`Error saving ${type}: ` + data.message);
             }
         } catch (err) {
             alert(`Failed to save ${type}.`);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleUpdateMember = async () => {
+        if (!editingMember) return;
+        setSubmitting(true);
+        try {
+            const isEditing = !!editingMember.isExisting;
+            const action = isEditing ? 'updatePseMember' : 'addPseMember';
+            const res = await fetch('/api/bi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action, 
+                    pseId: editingMember.pseId, 
+                    name: editingMember.name,
+                    maxCapacity: editingMember.maxCapacity, 
+                    isActive: editingMember.isActive 
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setLocalConfig((prev: any) => {
+                    if (!prev) return prev;
+                    const n = JSON.parse(JSON.stringify(prev));
+                    if (isEditing) {
+                        const idx = n.pseWorkloads.findIndex((m: any) => m.pseId === editingMember.pseId);
+                        if (idx > -1) n.pseWorkloads[idx] = { ...n.pseWorkloads[idx], ...editingMember };
+                    } else {
+                        n.pseWorkloads.push({
+                            ...editingMember,
+                            activeProjects: 0, activeLeads: 0, activePartners: 0, loadPercentage: 0
+                        });
+                    }
+                    setConfig({ pseWorkloads: n.pseWorkloads });
+                    return n;
+                });
+                setEditingMember(null);
+                syncData({ silent: true });
+            }
+        } catch (err) {
+            alert("Failed to update workload settings.");
         } finally {
             setSubmitting(false);
         }
@@ -231,6 +368,7 @@ export default function B2BBoardPage() {
                         {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
                         {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
                         {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
+                        {activeTab === 'stats' && <button onClick={() => setEditingMember({ pseId: '', name: '', maxCapacity: 30, isActive: true, isExisting: false })} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-zinc-900 text-white hover:bg-zinc-800"><Plus size={14} /> Add PSE Member</button>}
                     </div>
 
                     <button
@@ -254,201 +392,202 @@ export default function B2BBoardPage() {
                                 <button key={p} onClick={() => setPriorityFilter(p)} className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-all whitespace-nowrap ${priorityFilter === p ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}>{p} Priority</button>
                             ))}
                         </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mr-1">Group By:</span>
+                            <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200">
+                                <button onClick={() => setGroupMode('none')} className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${groupMode === 'none' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}>None</button>
+                                <button onClick={() => setGroupMode('company')} className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${groupMode === 'company' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}>Company</button>
+                                <button onClick={() => setGroupMode('pse')} className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${groupMode === 'pse' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}>PSE</button>
+                            </div>
+                        </div>
                     </div>
                 )}
 
-                {/* TAB 1: KANBAN PROJECTS */}
                 {activeTab === 'projects' && (
-                    <div className="flex gap-6 overflow-x-auto pb-6 hide-scrollbar flex-nowrap items-start animate-in slide-in-from-bottom-4 duration-500" style={{ minHeight: '70vh' }}>
-                        {KANBAN_STAGES.map(stage => (
-                            <div key={stage} className="w-[320px] shrink-0 bg-zinc-100/50 border border-zinc-200 rounded-3xl flex flex-col h-full max-h-[75vh]"
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={async (e) => {
-                                    e.preventDefault();
-                                    const projectId = e.dataTransfer.getData('projectId');
-                                    if (projectId) {
-                                        setLocalConfig(prev => {
-                                            if (!prev) return prev;
-                                            const n = JSON.parse(JSON.stringify(prev));
-                                            const p = n.kanbanProjects?.find((x: any) => x.id === projectId);
-                                            if (p) p.stage = stage;
-                                            setConfig({ kanbanProjects: n.kanbanProjects });
-                                            return n;
-                                        });
-                                        fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanban', projectId, newStage: stage }) }).catch(() => alert("Fail update"));
-                                    }
-                                }}
-                            >
-                                <div className="p-4 border-b border-zinc-200/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-zinc-600">
-                                    {stage}
-                                    <span className="bg-white border border-zinc-200 text-zinc-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredProjects(stage).length}</span>
+                    <div className={`flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 ${groupMode !== 'none' ? 'flex-col items-stretch' : 'flex-nowrap items-start'}`} style={{ minHeight: '70vh' }}>
+                        {groupMode !== 'none' ? (
+                            Array.from(new Set(config.kanbanProjects?.map((p: any) => groupMode === 'company' ? p.client : p.pseId))).sort().map(groupId => {
+                                const groupLabel = groupMode === 'company' ? groupId : getPseName(groupId);
+                                return (
+                                <div key={groupId} className="space-y-4">
+                                    <div className="flex items-center gap-3 px-2">
+                                        <div className={`w-1.5 h-6 rounded-full ${groupMode === 'company' ? 'bg-blue-600' : 'bg-zinc-900'}`}></div>
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">{groupLabel || 'Unassigned'}</h3>
+                                        <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">{config.kanbanProjects?.filter((p: any) => (groupMode === 'company' ? p.client : p.pseId) === groupId).length} items</span>
+                                    </div>
+                                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+                                        {KANBAN_STAGES.map(stage => {
+                                            const items = config.kanbanProjects?.filter((p: any) => (groupMode === 'company' ? p.client : p.pseId) === groupId && p.stage === stage && (priorityFilter === 'All' || p.priority === priorityFilter)) || [];
+                                            if (items.length === 0) return null;
+                                            return (
+                                                <div key={stage} className="w-[280px] shrink-0 space-y-3">
+                                                    <div className="text-[10px] font-black uppercase tracking-tighter text-zinc-400 ml-1">{stage}</div>
+                                                    {items.map((p: any) => (
+                                                        <ProjectCard key={p.id} project={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} />
+                                                    ))}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="h-px bg-zinc-200/60 mx-2"></div>
                                 </div>
-                                <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                    {getFilteredProjects(stage).map((p: any) => {
-                                        const isDone = p.stage === 'Done';
-                                        const isLost = p.stage === 'Lost';
-                                        return (
-                                        <div key={p.id} draggable onDragStart={(e) => e.dataTransfer.setData('projectId', p.id)}
-                                            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isDone ? 'bg-emerald-50 border-emerald-200' : isLost ? 'bg-rose-50 border-rose-200' : 'bg-white border-zinc-200'}`}>
-                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : (p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDone ? 'bg-emerald-100 text-emerald-600' : isLost ? 'bg-rose-100 text-rose-600' : 'bg-blue-50 text-blue-600'}`}><Briefcase size={14} /></div>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteData('Project', p.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                </div>
-                                                <div className="flex flex-col gap-1 items-end">
-                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${isDone ? 'bg-emerald-200 text-emerald-800' : isLost ? 'bg-rose-200 text-rose-800' : 'bg-blue-100 text-blue-800'}`}>{p.stage}</span>
-                                                    <span className={`text-[8px] font-black uppercase tracking-widest ${p.priority === 'High' ? 'text-rose-500' : p.priority === 'Medium' ? 'text-amber-500' : 'text-blue-500'}`}>{p.priority}</span>
-                                                </div>
-                                            </div>
-                                            <div onClick={() => openEditModal('Project', p)}>
-                                                <h3 className={`font-bold text-base mb-1 ${isDone ? 'text-emerald-950' : isLost ? 'text-rose-950' : 'text-blue-950'}`}>{p.projectName}</h3>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${isDone ? 'text-emerald-600/70' : isLost ? 'text-rose-600/70' : 'text-blue-600/70'}`}>Client: <span className={isDone ? 'text-emerald-800' : isLost ? 'text-rose-800' : 'text-blue-800'}>{p.client}</span> &bull; PSE: <span className={isDone ? 'text-emerald-800' : isLost ? 'text-rose-800' : 'text-blue-800'}>{getPseName(p.pseId)}</span></p>
-                                                <div className="flex flex-col border-t border-blue-50 pt-3">
-                                                    <span className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 flex justify-between ${isDone ? 'text-emerald-600/50' : isLost ? 'text-rose-600/50' : 'text-blue-600/50'}`}>
-                                                        <span>Progress</span>
-                                                        <span>{p.progress || 0}%</span>
-                                                    </span>
-                                                    <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDone ? 'bg-emerald-100' : isLost ? 'bg-rose-100' : 'bg-blue-100'}`}>
-                                                        <div className={`h-full rounded-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : 'bg-blue-500'}`} style={{ width: `${p.progress || 0}%` }}></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )})}
+                            )})
+                        ) : (
+                            // Normal Kanban View
+                            KANBAN_STAGES.map(stage => (
+                                <div key={stage} className="w-[320px] shrink-0 bg-zinc-100/50 border border-zinc-200 rounded-3xl flex flex-col h-full max-h-[75vh]"
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={async (e) => {
+                                        e.preventDefault();
+                                        const projectId = e.dataTransfer.getData('projectId');
+                                        if (projectId) {
+                                            setLocalConfig(prev => {
+                                                if (!prev) return prev;
+                                                const n = JSON.parse(JSON.stringify(prev));
+                                                const p = n.kanbanProjects?.find((x: any) => x.id === projectId);
+                                                if (p) p.stage = stage;
+                                                setConfig({ kanbanProjects: n.kanbanProjects });
+                                                return n;
+                                            });
+                                            fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanban', projectId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                        }
+                                    }}
+                                >
+                                    <div className="p-4 border-b border-zinc-200/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-zinc-600">
+                                        {stage}
+                                        <span className="bg-white border border-zinc-200 text-zinc-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredProjects(stage).length}</span>
+                                    </div>
+                                    <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
+                                        {getFilteredProjects(stage).map((p: any) => <ProjectCard key={p.id} project={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} />)}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 )}
 
-                {/* TAB 2: LEADS SUPPORT (KANBAN) */}
                 {activeTab === 'leads' && (
-                    <div className="flex gap-6 overflow-x-auto pb-6 hide-scrollbar flex-nowrap items-start animate-in slide-in-from-bottom-4 duration-500" style={{ minHeight: '70vh' }}>
-                        {PRESALES_STAGES.map(stage => (
-                            <div key={stage} className="w-[320px] shrink-0 bg-emerald-50/30 border border-emerald-100 rounded-3xl flex flex-col h-full max-h-[75vh]"
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={async (e) => {
-                                    e.preventDefault();
-                                    const leadId = e.dataTransfer.getData('leadId');
-                                    if (leadId) {
-                                        setLocalConfig(prev => {
-                                            if (!prev) return prev;
-                                            const n = JSON.parse(JSON.stringify(prev));
-                                            const p = n.kanbanLeads?.find((x: any) => x.id === leadId);
-                                            if (p) p.stage = stage;
-                                            setConfig({ kanbanLeads: n.kanbanLeads });
-                                            return n;
-                                        });
-                                        fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanLead', leadId, newStage: stage }) }).catch(() => alert("Fail update"));
-                                    }
-                                }}
-                            >
-                                <div className="p-4 border-b border-emerald-100/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-emerald-800">
-                                    {stage}
-                                    <span className="bg-white border border-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredLeads(stage).length}</span>
-                                </div>
-                                <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                    {getFilteredLeads(stage).map((l: any) => {
-                                        const isDone = false; // Closed Won removed
-                                        const isLost = l.stage === 'Closed Lost';
-                                        return (
-                                        <div key={l.id} draggable onDragStart={(e) => e.dataTransfer.setData('leadId', l.id)}
-                                            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isDone ? 'bg-emerald-50 border-emerald-200' : isLost ? 'bg-rose-50 border-rose-200' : 'bg-white border-zinc-200'}`}>
-                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : (l.priority || 'Medium') === 'High' ? 'bg-rose-500' : (l.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDone ? 'bg-emerald-100 text-emerald-600' : isLost ? 'bg-rose-100 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}><Target size={14} /></div>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteData('Lead', l.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
-                                                        <Trash2 size={12} />
-                                                    </button>
+                    <div className={`flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 ${groupMode !== 'none' ? 'flex-col items-stretch' : 'flex-nowrap items-start'}`} style={{ minHeight: '70vh' }}>
+                        {groupMode !== 'none' ? (
+                            Array.from(new Set(config.kanbanLeads?.map((l: any) => groupMode === 'company' ? l.name : l.pseId))).sort().map(groupId => {
+                                const groupLabel = groupMode === 'company' ? groupId : getPseName(groupId);
+                                return (
+                                <div key={groupId} className="space-y-4">
+                                    <div className="flex items-center gap-3 px-2">
+                                        <div className={`w-1.5 h-6 rounded-full ${groupMode === 'company' ? 'bg-emerald-600' : 'bg-zinc-900'}`}></div>
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">{groupLabel || 'Unassigned'}</h3>
+                                        <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">{config.kanbanLeads?.filter((l: any) => (groupMode === 'company' ? l.name : l.pseId) === groupId).length} items</span>
+                                    </div>
+                                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+                                        {PRESALES_STAGES.map(stage => {
+                                            const items = config.kanbanLeads?.filter((l: any) => (groupMode === 'company' ? l.name : l.pseId) === groupId && l.stage === stage && (priorityFilter === 'All' || l.priority === priorityFilter)) || [];
+                                            if (items.length === 0) return null;
+                                            return (
+                                                <div key={stage} className="w-[280px] shrink-0 space-y-3">
+                                                    <div className="text-[10px] font-black uppercase tracking-tighter text-zinc-400 ml-1">{stage}</div>
+                                                    {items.map((l: any) => (
+                                                        <LeadCard key={l.id} lead={l} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />
+                                                    ))}
                                                 </div>
-                                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${isDone ? 'bg-emerald-200 text-emerald-800' : isLost ? 'bg-rose-200 text-rose-800' : getStageColor(l.stage)}`}>{l.stage}</span>
-                                            </div>
-                                            <div onClick={() => openEditModal('Lead', l)}>
-                                                <h3 className={`font-bold text-base mb-1 ${isDone ? 'text-emerald-950' : isLost ? 'text-rose-950' : 'text-emerald-950'}`}>{l.name}</h3>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${isDone ? 'text-emerald-600/70' : isLost ? 'text-rose-600/70' : 'text-emerald-600/70'}`}>Support: <span className={isDone ? 'text-emerald-800' : isLost ? 'text-rose-800' : 'text-emerald-800'}>{getPseName(l.pseId)}</span></p>
-                                                <div className="flex flex-col border-t border-emerald-50 pt-3">
-                                                    <span className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 flex justify-between ${isDone ? 'text-emerald-600/50' : isLost ? 'text-rose-600/50' : 'text-emerald-600/50'}`}>
-                                                        <span>Progress</span>
-                                                        <span>{l.progress || 0}%</span>
-                                                    </span>
-                                                    <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDone ? 'bg-emerald-100' : isLost ? 'bg-rose-100' : 'bg-emerald-100'}`}>
-                                                        <div className={`h-full rounded-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${l.progress || 0}%` }}></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )})}
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="h-px bg-zinc-200/60 mx-2"></div>
                                 </div>
-                            </div>
-                        ))}
+                            )})
+                        ) : (
+                            PRESALES_STAGES.map(stage => (
+                                <div key={stage} className="w-[320px] shrink-0 bg-emerald-50/30 border border-emerald-100 rounded-3xl flex flex-col h-full max-h-[75vh]"
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={async (e) => {
+                                        e.preventDefault();
+                                        const leadId = e.dataTransfer.getData('leadId');
+                                        if (leadId) {
+                                            setLocalConfig(prev => {
+                                                if (!prev) return prev;
+                                                const n = JSON.parse(JSON.stringify(prev));
+                                                const p = n.kanbanLeads?.find((x: any) => x.id === leadId);
+                                                if (p) p.stage = stage;
+                                                setConfig({ kanbanLeads: n.kanbanLeads });
+                                                return n;
+                                            });
+                                            fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanLead', leadId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                        }
+                                    }}
+                                >
+                                    <div className="p-4 border-b border-emerald-100/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-emerald-800">
+                                        {stage}
+                                        <span className="bg-white border border-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredLeads(stage).length}</span>
+                                    </div>
+                                    <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
+                                        {getFilteredLeads(stage).map((l: any) => <LeadCard key={l.id} lead={l} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />)}
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 )}
 
-                {/* TAB 3: PARTNERS DIRECTORY (KANBAN) */}
                 {activeTab === 'partners' && (
-                    <div className="flex gap-6 overflow-x-auto pb-6 hide-scrollbar flex-nowrap items-start animate-in slide-in-from-bottom-4 duration-500" style={{ minHeight: '70vh' }}>
-                        {PARTNER_STAGES.map(stage => (
-                            <div key={stage} className="w-[320px] shrink-0 bg-purple-50/30 border border-purple-100 rounded-3xl flex flex-col h-full max-h-[75vh]"
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={async (e) => {
-                                    e.preventDefault();
-                                    const partnerId = e.dataTransfer.getData('partnerId');
-                                    if (partnerId) {
-                                        setLocalConfig(prev => {
-                                            if (!prev) return prev;
-                                            const n = JSON.parse(JSON.stringify(prev));
-                                            const p = n.kanbanPartners?.find((x: any) => x.id === partnerId);
-                                            if (p) p.stage = stage;
-                                            setConfig({ kanbanPartners: n.kanbanPartners });
-                                            return n;
-                                        });
-                                        fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanPartner', partnerId, newStage: stage }) }).catch(() => alert("Fail update"));
-                                    }
-                                }}
-                            >
-                                <div className="p-4 border-b border-purple-200/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-purple-800">
-                                    {stage}
-                                    <span className="bg-white border border-purple-200 text-purple-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredPartners(stage).length}</span>
+                    <div className={`flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 ${groupMode !== 'none' ? 'flex-col items-stretch' : 'flex-nowrap items-start'}`} style={{ minHeight: '70vh' }}>
+                        {groupMode !== 'none' ? (
+                            Array.from(new Set(config.kanbanPartners?.map((p: any) => groupMode === 'company' ? p.name : p.pseId))).sort().map(groupId => {
+                                const groupLabel = groupMode === 'company' ? groupId : getPseName(groupId);
+                                return (
+                                <div key={groupId} className="space-y-4">
+                                    <div className="flex items-center gap-3 px-2">
+                                        <div className={`w-1.5 h-6 rounded-full ${groupMode === 'company' ? 'bg-purple-600' : 'bg-zinc-900'}`}></div>
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">{groupLabel || 'Unassigned'}</h3>
+                                        <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">{config.kanbanPartners?.filter((p: any) => (groupMode === 'company' ? p.name : p.pseId) === groupId).length} items</span>
+                                    </div>
+                                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+                                        {PARTNER_STAGES.map(stage => {
+                                            const items = config.kanbanPartners?.filter((p: any) => (groupMode === 'company' ? p.name : p.pseId) === groupId && (p.stage || 'Sourcing') === stage && (priorityFilter === 'All' || p.priority === priorityFilter)) || [];
+                                            if (items.length === 0) return null;
+                                            return (
+                                                <div key={stage} className="w-[280px] shrink-0 space-y-3">
+                                                    <div className="text-[10px] font-black uppercase tracking-tighter text-zinc-400 ml-1">{stage}</div>
+                                                    {items.map((p: any) => (
+                                                        <PartnerCard key={p.id} partner={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />
+                                                    ))}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="h-px bg-zinc-200/60 mx-2"></div>
                                 </div>
-                                <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                    {getFilteredPartners(stage).map((p: any) => (
-                                        <div key={p.id} draggable onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)}
-                                            className="bg-white border border-zinc-200 shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
-                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${(p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center"><Users size={14} /></div>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteData('Partner', p.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                </div>
-                                                <div className="flex flex-col gap-1 items-end">
-                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${getStageColor(p.stage || 'Sourcing')}`}>{p.stage || 'Sourcing'}</span>
-                                                    <span className="text-[8px] font-black uppercase tracking-widest text-purple-400">{p.type}</span>
-                                                </div>
-                                            </div>
-                                            <div onClick={() => openEditModal('Partner', p)}>
-                                                <h3 className="font-bold text-purple-950 text-base mb-1">{p.name}</h3>
-                                                <p className="text-[10px] font-black text-purple-600/70 uppercase tracking-widest mb-3">PIC: <span className="text-purple-800">{getPseName(p.pseId)}</span></p>
-                                                <div className="flex flex-col border-t border-purple-50 pt-3">
-                                                    <span className="text-[9px] text-purple-600/50 font-bold uppercase tracking-widest mb-1.5 flex justify-between">
-                                                        <span>Progress</span>
-                                                        <span>{p.progress || 0}%</span>
-                                                    </span>
-                                                    <div className="w-full h-1.5 bg-purple-100 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${p.progress || 0}%` }}></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
+                            )})
+                        ) : (
+                            PARTNER_STAGES.map(stage => (
+                                <div key={stage} className="w-[320px] shrink-0 bg-purple-50/30 border border-purple-100 rounded-3xl flex flex-col h-full max-h-[75vh]"
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={async (e) => {
+                                        e.preventDefault();
+                                        const partnerId = e.dataTransfer.getData('partnerId');
+                                        if (partnerId) {
+                                            setLocalConfig(prev => {
+                                                if (!prev) return prev;
+                                                const n = JSON.parse(JSON.stringify(prev));
+                                                const p = n.kanbanPartners?.find((x: any) => x.id === partnerId);
+                                                if (p) p.stage = stage;
+                                                setConfig({ kanbanPartners: n.kanbanPartners });
+                                                return n;
+                                            });
+                                            fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanPartner', partnerId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                        }
+                                    }}
+                                >
+                                    <div className="p-4 border-b border-purple-200/60 bg-white/50 rounded-t-3xl font-black text-[11px] uppercase tracking-widest flex justify-between items-center text-purple-800">
+                                        {stage}
+                                        <span className="bg-white border border-purple-200 text-purple-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredPartners(stage).length}</span>
+                                    </div>
+                                    <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
+                                        {getFilteredPartners(stage).map((p: any) => <PartnerCard key={p.id} partner={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />)}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 )}
 
@@ -480,9 +619,15 @@ export default function B2BBoardPage() {
                                 <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 mb-6">Capacity Utilization (%)</h2>
                                 <div className="space-y-6">
                                     {config.pseWorkloads.map(pse => (
-                                        <div key={pse.pseId}>
+                                        <div key={pse.pseId} className="group relative">
                                             <div className="flex justify-between text-xs font-bold mb-2">
-                                                <span className="text-zinc-800">{pse.name}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-zinc-800">{pse.name}</span>
+                                                    {!pse.isActive && <span className="text-[8px] font-black bg-zinc-100 text-zinc-400 px-1.5 py-0.5 rounded uppercase">Inactive</span>}
+                                                    <button onClick={() => setEditingMember({ ...pse, isExisting: true, maxCapacity: pse.maxCapacity || 30, isActive: pse.isActive ?? true })} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all opacity-40 group-hover:opacity-100">
+                                                        <Globe size={12} />
+                                                    </button>
+                                                </div>
                                                 <span className={`${pse.loadPercentage > 90 ? 'text-rose-500' : pse.loadPercentage > 70 ? 'text-amber-500' : 'text-emerald-500'}`}>{pse.loadPercentage}%</span>
                                             </div>
                                             <div className="w-full bg-zinc-100 h-3 rounded-full overflow-hidden">
@@ -492,6 +637,7 @@ export default function B2BBoardPage() {
                                                 <span>{pse.activeProjects} Proj</span>
                                                 <span>{pse.activeLeads} Lead</span>
                                                 <span>{pse.activePartners} Ptnr</span>
+                                                <span className="ml-auto text-zinc-300">Max: {pse.maxCapacity || 30}pts</span>
                                             </div>
                                         </div>
                                     ))}
@@ -609,6 +755,55 @@ export default function B2BBoardPage() {
                                     <Globe size={14} className="text-emerald-400" /> Convert to Active Project
                                 </button>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== EDIT MEMBER SETTINGS MODAL ========== */}
+            {editingMember && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl flex flex-col">
+                        <div className="flex items-center justify-between p-6 border-b border-zinc-100">
+                            <h3 className="text-lg font-black text-zinc-900">Workload Settings</h3>
+                            <button onClick={() => setEditingMember(null)} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full"><X size={16} /></button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            {!editingMember.isExisting && (
+                                <div className="space-y-4 animate-in slide-in-from-top-2">
+                                    <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase tracking-widest">Login ID (Unique)</label><input type="text" placeholder="e.g. john_doe" value={editingMember.pseId} onChange={(e) => setEditingMember({ ...editingMember, pseId: e.target.value })} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium" /></div>
+                                    <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase tracking-widest">Full Name</label><input type="text" placeholder="e.g. John Doe" value={editingMember.name} onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium" /></div>
+                                </div>
+                            )}
+                            {editingMember.isExisting && (
+                                <div>
+                                    <h4 className="text-sm font-bold text-zinc-900 mb-1">{editingMember.name}</h4>
+                                    <p className="text-[10px] text-zinc-400 uppercase font-black tracking-widest">Adjust resource capacity allocation</p>
+                                </div>
+                            )}
+                            
+                            <div>
+                                <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-3 uppercase tracking-widest">
+                                    <span>Max Points Capacity</span>
+                                    <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-xs">{editingMember.maxCapacity} Pts</span>
+                                </label>
+                                <input type="range" min="5" max="50" step="5" value={editingMember.maxCapacity} onChange={(e) => setEditingMember({ ...editingMember, maxCapacity: Number(e.target.value) })} className="w-full accent-zinc-900 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer" />
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                                <div>
+                                    <p className="text-xs font-bold text-zinc-900">Active Status</p>
+                                    <p className="text-[10px] text-zinc-400 font-medium">Show in assign lists</p>
+                                </div>
+                                <button onClick={() => setEditingMember({ ...editingMember, isActive: !editingMember.isActive })} className={`w-12 h-6 rounded-full transition-all relative ${editingMember.isActive ? 'bg-emerald-500' : 'bg-zinc-300'}`}>
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${editingMember.isActive ? 'right-1' : 'left-1'}`}></div>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-zinc-100 bg-zinc-50 rounded-b-3xl flex justify-end">
+                            <button disabled={submitting} onClick={handleUpdateMember} className="w-full py-3 bg-zinc-900 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-zinc-800 transition shadow-lg">
+                                {submitting ? 'Updating...' : editingMember.isExisting ? 'Update Settings' : 'Add Member'}
+                            </button>
                         </div>
                     </div>
                 </div>

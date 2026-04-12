@@ -14,6 +14,8 @@ import {
   deleteKanbanProject,
   deleteKanbanLead,
   deleteKanbanPartner,
+  updatePseMember,
+  addPseMember,
 } from '../../services/biService';
 
 export async function GET() {
@@ -72,6 +74,12 @@ export async function POST(request: Request) {
       
       case 'deleteKanbanPartner':
         return NextResponse.json(await deleteKanbanPartner(body.id));
+      
+      case 'updatePseMember':
+        return NextResponse.json(await updatePseMember(body.pseId, body.maxCapacity, body.isActive));
+      
+      case 'addPseMember':
+        return NextResponse.json(await addPseMember(body.pseId, body.name, body.maxCapacity, body.isActive));
 
       default:
         return NextResponse.json({ success: false, message: 'Unknown action' });

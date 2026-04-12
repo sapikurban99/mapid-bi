@@ -151,7 +151,7 @@ export async function getAllBIData() {
     pseId: r.pse_id,
     isActive: r.is_active,
     type: r.type || 'Technology',
-    stage: r.stage || 'Lead Generation',
+    stage: r.stage || 'Sourcing',
     progress: r.progress || 0,
     priority: r.priority || 'Medium',
     notes: r.notes || '',
@@ -333,6 +333,26 @@ export async function deleteKanbanLead(id: string) {
 
 export async function deleteKanbanPartner(id: string) {
   const { error } = await supabase.from('pse_partners').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function updatePseMember(pseId: string, maxCapacity: number, isActive: boolean) {
+  const { error } = await supabase.from('pse_members').update({
+    max_capacity: maxCapacity,
+    is_active: isActive,
+  }).eq('id', pseId);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function addPseMember(pseId: string, name: string, maxCapacity: number, isActive: boolean) {
+  const { error } = await supabase.from('pse_members').insert({
+    id: pseId,
+    name: name,
+    max_capacity: maxCapacity,
+    is_active: isActive,
+  });
   if (error) throw new Error(error.message);
   return { success: true };
 }

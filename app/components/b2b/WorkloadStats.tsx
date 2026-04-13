@@ -16,7 +16,7 @@ export default function WorkloadStats({ config }: { config: SiteConfig }) {
         Projects: p.activeProjects * 3, // Weight 3
         Leads: p.activeLeads * 1, // Weight 1
         Partners: p.activePartners * 1, // Weight 1
-        Total: p.loadScore,
+        Total: p.totalPoints,
         Max: p.maxCapacity,
     }));
 
@@ -88,7 +88,7 @@ export default function WorkloadStats({ config }: { config: SiteConfig }) {
                                     <td className="px-6 py-4 text-center font-medium">{pse.activeProjects}</td>
                                     <td className="px-6 py-4 text-center font-medium">{pse.activeLeads}</td>
                                     <td className="px-6 py-4 text-center font-medium">{pse.activePartners}</td>
-                                    <td className="px-6 py-4 text-center font-black text-blue-600">{pse.loadScore} <span className="text-[10px] text-zinc-400 font-medium ml-1">/ {pse.maxCapacity}</span></td>
+                                    <td className="px-6 py-4 text-center font-black text-blue-600">{pse.totalPoints} <span className="text-[10px] text-zinc-400 font-medium ml-1">/ {pse.maxCapacity}</span></td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             <div className="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden">

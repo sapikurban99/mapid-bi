@@ -32,24 +32,39 @@ export default function StrategyHome() {
   const b2cMetrics = useMemo(() => {
     // Academy: from Supabase revenue table (fetched via /api/bi)
     const revenueRows = biData?.revenue || [];
-    const q2Revenue = revenueRows.filter((r: any) => r.quarter?.includes('Q2') && r.quarter?.includes('2026'));
+    const q2Revenue = revenueRows.filter((r: any) => {
+        const q = String(r.quarter || '').toUpperCase();
+        return q.includes('Q2') && q.includes('2026');
+    });
 
-    const academyActual = q2Revenue
-      .filter((r: any) => r.subProduct?.toLowerCase().includes('academy'))
-      .reduce((sum: number, r: any) => sum + (r.actual || 0), 0);
+    const academyRows = q2Revenue.filter((r: any) => r.subProduct?.toLowerCase().includes('academy'));
+    const academyActual = academyRows.reduce((sum: number, r: any) => sum + (Number(r.actual) || 0), 0);
+    const academyTargetFromDB = academyRows.reduce((sum: number, r: any) => sum + (Number(r.target) || 0), 0);
 
     // Platform: from devserver (live payment data)
     const platformActual = allPayments
       .filter((p: any) => p.status === 'success' && p.payment_methode?.toLowerCase() === 'midtrans')
       .reduce((sum: number, p: any) => sum + (p.detail_amount?.total || p.total || 0), 0);
 
-    const academyTarget = 60000000;
+    const academyTarget = academyTargetFromDB > 0 ? academyTargetFromDB : 60000000;
     const platformTarget = 40000000;
 
     return {
-      academy: { actual: academyActual, target: academyTarget, percent: Math.min(Math.round((academyActual / academyTarget) * 100), 100) },
-      platform: { actual: platformActual, target: platformTarget, percent: Math.min(Math.round((platformActual / platformTarget) * 100), 100) },
-      total: { actual: academyActual + platformActual, target: academyTarget + platformTarget, percent: Math.min(Math.round(((academyActual + platformActual) / (academyTarget + platformTarget)) * 100), 100) },
+      academy: { 
+          actual: academyActual, 
+          target: academyTarget, 
+          percent: Math.min(Math.round((academyActual / academyTarget) * 100), 100) 
+      },
+      platform: { 
+          actual: platformActual, 
+          target: platformTarget, 
+          percent: Math.min(Math.round((platformActual / platformTarget) * 100), 100) 
+      },
+      total: { 
+          actual: academyActual + platformActual, 
+          target: academyTarget + platformTarget, 
+          percent: Math.min(Math.round(((academyActual + platformActual) / (academyTarget + platformTarget)) * 100), 100) 
+      },
       isLoading: biLoading || platformLoading,
     };
   }, [biData, allPayments, biLoading, platformLoading]);

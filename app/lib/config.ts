@@ -381,14 +381,39 @@ export async function loadConfigFromSupabase(): Promise<SiteConfig> {
     try {
         const res = await fetch('/api/bi?includeConfig=true');
         const json = await res.json();
-        if (json.adminConfig) {
-            const merged = deepMerge(DEFAULT_CONFIG, json.adminConfig) as SiteConfig;
+        
+        if (json && !json.isError) {
+            // 1. Get base config from adminConfig record
+            const baseConfig = json.adminConfig 
+                ? (deepMerge(DEFAULT_CONFIG, json.adminConfig) as SiteConfig)
+                : { ...DEFAULT_CONFIG };
+            
+            // 2. Assemble biData from top-level keys returned by getAllBIData()
+            baseConfig.biData = {
+                socials: json.socials || [],
+                campaigns: json.campaigns || [],
+                revenue: json.revenue || [],
+                pipeline: json.pipeline || [],
+                projects: json.projects || [],
+                docs: json.docs || [],
+                userGrowth: json.userGrowth || [],
+                trends: json.trends || [],
+                academy: json.academy || [],
+                budget: json.budget || []
+            };
+
+            // 3. Map Kanban data
+            if (json.kanbanProjects) baseConfig.kanbanProjects = json.kanbanProjects;
+            if (json.kanbanLeads) baseConfig.kanbanLeads = json.kanbanLeads;
+            if (json.kanbanPartners) baseConfig.kanbanPartners = json.kanbanPartners;
+            if (json.pseWorkloads) baseConfig.pseWorkloads = json.pseWorkloads;
+
             // Cache to localStorage
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-            return merged;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(baseConfig));
+            return baseConfig;
         }
-    } catch {
-        // Fallback to localStorage
+    } catch (err) {
+        console.warn('Error loading config from Supabase:', err);
     }
     return getConfig();
 }

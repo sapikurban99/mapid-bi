@@ -31,120 +31,20 @@ export default function MinimalistDashboard() {
   const [socialSecondaryMonth, setSocialSecondaryMonth] = useState('All');
   const [socialSecondaryWeek, setSocialSecondaryWeek] = useState('All');
   const [errorMsg, setErrorMsg] = useState<any>(null);
-
-  const [webhookRevenue, setWebhookRevenue] = useState<any[] | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [config, setConfigState] = useState(() => {
+      return typeof window === 'undefined' ? (require('../lib/config').DEFAULT_CONFIG) : (require('../lib/config').getConfig());
+  });
 
   useEffect(() => {
-    async function fetchWebhookRevenue() {
-      try {
-        const res = await fetch('/api/n8n/get-revenue');
-        if (res.ok) {
-          const json = await res.json();
-          // The proxy route returns { success: true, data: [...] }
-          let n8nData = [];
-           if (json && json.data) {
-              let rawData = json.data;
-              if (typeof rawData === 'string') {
-                  try { rawData = JSON.parse(rawData); } catch(e) {}
-              }
-              n8nData = Array.isArray(rawData) ? rawData : (Array.isArray(rawData.data) ? rawData.data : [rawData]);
-           } else {
-              n8nData = Array.isArray(json) ? json : json.revenue || [];
-           }
-          
-          if (n8nData && n8nData.length > 0) {
-             const totals = typeof n8nData[0] === 'string' ? JSON.parse(n8nData[0]) : n8nData[0];
-             const isQuarterFormat = Object.keys(totals).some(k => k.match(/\d{4}-q\d/i) || k.match(/q\d/i));
-             const hasRecognizedKey = isQuarterFormat ? true : Object.keys(totals).some(k => k.toLowerCase().includes('revenue') || k.toLowerCase().includes('platform') || k.toLowerCase().includes('academy'));
-             
-             if (hasRecognizedKey) {
-                 const mappedRevenue: any[] = [];
-                 
-                 if (isQuarterFormat) {
-                     for (const [quarterKey, quarterData] of Object.entries(totals)) {
-                         let quarterStr = quarterKey;
-                         const qMatch = quarterKey.match(/^(\d{4})-(Q\d)$/i);
-                         if (qMatch) quarterStr = `${qMatch[2].toUpperCase()} ${qMatch[1]}`;
-                         
-                         for (const key of Object.keys(quarterData as any)) {
-                             const lowerKey = key.toLowerCase();
-                             let matchedProduct = '';
-                             if (lowerKey.includes('platform')) matchedProduct = 'Platform';
-                             else if (lowerKey.includes('academy')) matchedProduct = 'Webgis Academy';
-                             else if (lowerKey.includes('analytics')) matchedProduct = 'Location Analytics';
-                             else if (lowerKey.includes('thematic')) matchedProduct = 'Thematic Class';
-                             
-                             if (matchedProduct) {
-                                 const actualValue = Number((quarterData as any)[key]) || 0;
-                                 const existing = (data?.revenue || []).find((r: any) => 
-                                     (r.subProduct?.toLowerCase().includes(matchedProduct.toLowerCase()) || 
-                                     matchedProduct.toLowerCase().includes(r.subProduct?.toLowerCase())) &&
-                                     r.quarter === quarterStr
-                                 );
-                                 
-                                 const target = existing?.target || 0;
-                                 const achievement = target > 0 ? Number(((actualValue / target) * 100).toFixed(2)) : 0;
-                                 
-                                 mappedRevenue.push({
-                                     subProduct: existing?.subProduct || matchedProduct,
-                                     quarter: quarterStr,
-                                     target: target,
-                                     actual: actualValue,
-                                     achievement: achievement
-                                 });
-                             }
-                         }
-                     }
-                 } else {
-                     const currentYear = new Date().getFullYear();
-                     const currentQuarterNum = Math.floor(new Date().getMonth() / 3) + 1;
-                     const currentQuarterStr = `Q${currentQuarterNum} ${currentYear}`;
-
-                     for (const key of Object.keys(totals)) {
-                         const lowerKey = key.toLowerCase();
-                         let matchedProduct = '';
-                         if (lowerKey.includes('platform')) matchedProduct = 'Platform';
-                         else if (lowerKey.includes('academy')) matchedProduct = 'Webgis Academy';
-                         else if (lowerKey.includes('analytics')) matchedProduct = 'Location Analytics';
-                         else if (lowerKey.includes('thematic')) matchedProduct = 'Thematic Class';
-                         
-                         if (matchedProduct) {
-                             const actualValue = Number(totals[key]) || 0;
-                             const existing = (data?.revenue || []).find((r: any) => 
-                                 (r.subProduct?.toLowerCase().includes(matchedProduct.toLowerCase()) || 
-                                 matchedProduct.toLowerCase().includes(r.subProduct?.toLowerCase())) &&
-                                 r.quarter === currentQuarterStr
-                             );
-                             
-                             const target = existing?.target || 0;
-                             const achievement = target > 0 ? Number(((actualValue / target) * 100).toFixed(2)) : 0;
-                             
-                             mappedRevenue.push({
-                                 subProduct: existing?.subProduct || matchedProduct,
-                                 quarter: currentQuarterStr,
-                                 target: target,
-                                 actual: actualValue,
-                                 achievement: achievement
-                             });
-                         }
-                     }
-                 }
-
-                 // Prevent the webhook push from hiding data of previous quarters
-                 const existingUnmatched = (data?.revenue || []).filter((r: any) => 
-                     !mappedRevenue.some(m => m.subProduct === r.subProduct && m.quarter === r.quarter)
-                 );
-                 setWebhookRevenue([...mappedRevenue, ...existingUnmatched]);
-             } else {
-                 setWebhookRevenue(n8nData);
-             }
-          }
-        }
-      } catch (err) {
-        console.warn('Error fetching webhook revenue:', err);
+    setMounted(true);
+    const interval = setInterval(() => {
+      const c = require('../lib/config').getConfig();
+      if (c.biData && Object.keys(c.biData).length > 0) {
+        setConfigState(c);
       }
-    }
-    fetchWebhookRevenue();
+    }, 500);
+    return () => clearInterval(interval);
   }, []);
 
   // Custom Recharts Tooltip
@@ -162,28 +62,15 @@ export default function MinimalistDashboard() {
     return null;
   };
 
-  const [config, setConfigState] = useState(() => getConfig());
-  useEffect(() => {
-    // Wait briefly for global data provider to finish
-    // then get config
-    const interval = setInterval(() => {
-      const c = getConfig();
-      if (c.biData && Object.keys(c.biData).length > 0) {
-        setConfigState(c);
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const data = config.biData; // Use globally cached data
+  const data = config.biData; // Defined here for all hooks
 
   // Auto-fill filters based on available data
   useEffect(() => {
     const socialsData = data?.socials || [];
     if (socialsData.length > 0 && socialPrimaryMonth === 'All' && activeTab === 'B2C') {
       // Find all unique periods (month + week)
-      const periods = Array.from(new Set(socialsData.map(s => `${normalizeMonth(s.month)}|${s.week}`)))
-        .map(p => {
+      const periods = Array.from(new Set(socialsData.map((s: any) => `${normalizeMonth(s.month)}|${s.week}`)))
+        .map((p: any) => {
           const [month, week] = p.split('|');
           return { month, week, sortKey: `${month}-${week}` };
         })
@@ -212,7 +99,16 @@ export default function MinimalistDashboard() {
       const periods = Array.from(new Set((data.campaigns as any[]).map(c => c.period).filter(Boolean))).sort().reverse();
       if (periods.length > 0) setB2cPeriod(periods[0]);
     }
-  }, [data, activeTab]);
+  }, [data, activeTab, mounted]);
+
+  // Pre-hydration check
+  if (!mounted) {
+      return (
+          <main className="min-h-screen bg-zinc-50 flex items-center justify-center">
+              <Loader2 className="animate-spin text-zinc-300" size={32} />
+          </main>
+      );
+  }
 
   const visibleTabs = Object.entries(config.tabsVisible)
     .filter(([, visible]) => visible)
@@ -278,7 +174,7 @@ export default function MinimalistDashboard() {
   };
 
   // --- CALCULATIONS ---
-  const activeRevenueData = webhookRevenue || data?.revenue || [];
+  const activeRevenueData = data?.revenue || [];
 
   const b2cPeriods = new Set<string>();
   (data?.campaigns || []).forEach((c: any) => { if (c.period) b2cPeriods.add(c.period); });
@@ -520,7 +416,7 @@ export default function MinimalistDashboard() {
                 };
 
                 const uniqueMetrics = Array.from(new Set(socialsData.map((d: any) => `${d.platform}|${d.metric}`)));
-                const comparisonRows = uniqueMetrics.map(key => {
+                const comparisonRows = uniqueMetrics.map((key: any) => {
                   const [platform, metric] = key.split('|');
                   const primary = getComparisonValue(socialsData, socialPrimaryMonth, socialPrimaryWeek, platform, metric, 'latest');
                   const secondary = getComparisonValue(socialsData, socialSecondaryMonth, socialSecondaryWeek, platform, metric, 'earliest');
@@ -839,12 +735,12 @@ export default function MinimalistDashboard() {
         {activeTab === 'Academy' && (() => {
           // --- DATA TRANSFORMS FOR ACADEMY ---
           const validAcademyData = config.biData?.academy || [];
-          const academyPrograms = Array.from(new Set(validAcademyData.map(a => a.program))).sort();
+          const academyPrograms = Array.from(new Set(validAcademyData.map((a: any) => a.program))).sort();
 
           return (
             <div className="space-y-12 animate-in fade-in">
               {academyPrograms.map((program: any) => {
-                const programData = validAcademyData.filter(a => a.program === program);
+                const programData = validAcademyData.filter((a: any) => a.program === program);
 
                 // Sort natural by batch (Batch 1, Batch 2... Batch 10)
                 const sortedData = [...programData].sort((a, b) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { useGrowthData } from './useGrowthData';
@@ -40,18 +40,26 @@ interface LeadItem {
 }
 
 export default function UserGrowthIntelligencePage() {
-    // Agregasi Data Tren (Helper for labels)
-    const currentMonthName = useMemo(() => {
-        return new Date().toLocaleString('id-ID', { month: 'short' });
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
     }, []);
 
+    // Agregasi Data Tren (Helper for labels)
+    const currentMonthName = useMemo(() => {
+        if (!mounted) return '';
+        return new Date().toLocaleString('id-ID', { month: 'short' });
+    }, [mounted]);
+
     const currentQuarter = useMemo(() => {
+        if (!mounted) return 1;
         return Math.floor(new Date().getMonth() / 3) + 1;
-    }, []);
+    }, [mounted]);
 
     const dynamicFilterOptions = useMemo(() => ({
         timeRanges: [
-            { label: `Bulan Ini (${currentMonthName})`, value: 'this_month' },
+            { label: `Bulan Ini (${currentMonthName || '...'})`, value: 'this_month' },
             { label: 'Hari Ini', value: 'today' },
             { label: '7 Hari Terakhir', value: '7d' },
             { label: `Kuartal Ini (Q${currentQuarter})`, value: 'this_quarter' },
@@ -99,8 +107,9 @@ export default function UserGrowthIntelligencePage() {
     const SUCCESS_PAYMENTS_PER_PAGE = 10;
 
     const successTableRef = useRef<HTMLDivElement>(null);
-
     const [blastType, setBlastType] = useState<'leads' | 'registers'>('leads');
+    const [showFunnelModal, setShowFunnelModal] = useState(false);
+    const [funnelGroup, setFunnelGroup] = useState<'checkout' | 'paid' | 'unpaid'>('checkout');
 
     const handleBlastConfirm = async () => {
         setBlasting(true);
@@ -523,8 +532,24 @@ export default function UserGrowthIntelligencePage() {
 
         const totalConvForLic = Object.values(licenseCounts).reduce((sum, c) => sum + c, 0);
 
+        // Logic for Funnel: Checkout vs Paid
+        const checkoutUsersList = leads.filter(l => l.status === 'Checkout' || l.status === 'Active' || l.status === 'Expired');
+        const paidUsersList = leads.filter(l => l.status === 'Active');
+        const totalCheckoutsCount = checkoutUsersList.length;
+        const totalPaidCount = paidUsersList.length;
+
         return {
-            headlines: { newRegisters: totalNewRegisters, paidConversions: totalPaidConversions, unpaidCheckouts, totalRevenue, successTransactions, successPaymentsList },
+            headlines: { 
+                newRegisters: totalNewRegisters, 
+                paidConversions: totalPaidCount, 
+                totalCheckouts: totalCheckoutsCount,
+                unpaidCheckouts, 
+                totalRevenue, 
+                successTransactions, 
+                successPaymentsList,
+                checkoutUsersList,
+                paidUsersList
+            },
             trends: aggregatedTrends,
             industryBreakdown: industryBreakdown.slice(0, 5),
             licenseBreakdown: {
@@ -588,6 +613,14 @@ export default function UserGrowthIntelligencePage() {
             return true;
         });
     }, [filteredData.filteredNewRegisters, newRegFilters]);
+
+    if (!mounted) {
+        return (
+            <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+                <Loader2 className="animate-spin text-zinc-300" size={32} />
+            </div>
+        );
+    }
 
     return (
         <main className="min-h-screen bg-zinc-50 font-sans pb-24 text-zinc-900 selection:bg-zinc-900 selection:text-white">
@@ -902,16 +935,19 @@ export default function UserGrowthIntelligencePage() {
                         {/* 1. HEADLINE METRICS (FUNNEL) */}
                         <section className="animate-in fade-in duration-500 flex flex-col lg:flex-row gap-8">
                             <div className="flex-1 flex flex-col gap-4">
-                                {/* Step 1: New Regist */}
-                                <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-sm relative z-20 transition hover:shadow-md hover:border-zinc-300">
+                                {/* Step 1: Checkout Initiated */}
+                                <div 
+                                    onClick={() => { setFunnelGroup('checkout'); setShowFunnelModal(true); }}
+                                    className="bg-white border border-zinc-200 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-sm relative z-20 transition hover:shadow-md hover:border-zinc-300 cursor-pointer group"
+                                >
                                     <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
-                                        <div className="w-14 h-14 bg-blue-50 text-blue-500 flex items-center justify-center rounded-2xl shadow-inner"><Users size={28} /></div>
+                                        <div className="w-14 h-14 bg-blue-50 text-blue-500 flex items-center justify-center rounded-2xl shadow-inner group-hover:bg-blue-100 transition-colors"><CreditCard size={28} /></div>
                                         <div>
                                             <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 1: Top of Funnel</h4>
-                                            <p className="text-2xl font-black tracking-tight text-zinc-900">New Registered Users</p>
+                                            <p className="text-2xl font-black tracking-tight text-zinc-900">Checkout Initiated</p>
                                         </div>
                                     </div>
-                                    <div className="text-5xl font-black tracking-tighter">{filteredData.headlines.newRegisters.toLocaleString('id-ID')}</div>
+                                    <div className="text-5xl font-black tracking-tighter text-zinc-900 group-hover:text-blue-600 transition-colors">{filteredData.headlines.totalCheckouts.toLocaleString('id-ID')}</div>
                                 </div>
 
                                 {/* Arrow Connector */}
@@ -920,15 +956,18 @@ export default function UserGrowthIntelligencePage() {
                                 </div>
 
                                 {/* Step 2: Paid User */}
-                                <div className="bg-white border border-zinc-200 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-sm relative z-20 w-[90%] mx-auto transition hover:shadow-md hover:border-zinc-300">
+                                <div 
+                                    onClick={() => { setFunnelGroup('paid'); setShowFunnelModal(true); }}
+                                    className="bg-white border border-zinc-200 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center md:items-center gap-6 shadow-sm relative z-20 w-[90%] mx-auto transition hover:shadow-md hover:border-zinc-300 cursor-pointer group"
+                                >
                                     <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
-                                        <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner"><Target size={28} /></div>
+                                        <div className="w-14 h-14 bg-emerald-50 text-emerald-500 flex items-center justify-center rounded-2xl shadow-inner group-hover:bg-emerald-100 transition-colors"><Target size={28} /></div>
                                         <div>
                                             <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Step 2: Activation</h4>
                                             <p className="text-2xl font-black tracking-tight text-zinc-900">Paid Conversions</p>
                                         </div>
                                     </div>
-                                    <div className="text-5xl font-black tracking-tighter">{filteredData.headlines.paidConversions.toLocaleString('id-ID')}</div>
+                                    <div className="text-5xl font-black tracking-tighter text-zinc-900 group-hover:text-emerald-600 transition-colors">{filteredData.headlines.paidConversions.toLocaleString('id-ID')}</div>
                                 </div>
 
                                 {/* Arrow Connector */}
@@ -946,7 +985,7 @@ export default function UserGrowthIntelligencePage() {
                                         </div>
                                     </div>
                                     <div className="text-6xl font-black tracking-tighter text-emerald-400 drop-shadow-md">
-                                        {filteredData.headlines.newRegisters > 0 ? ((filteredData.headlines.paidConversions / filteredData.headlines.newRegisters) * 100).toFixed(1) : 0}%
+                                        {filteredData.headlines.totalCheckouts > 0 ? ((filteredData.headlines.paidConversions / filteredData.headlines.totalCheckouts) * 100).toFixed(1) : 0}%
                                     </div>
                                 </div>
                             </div>
@@ -1578,6 +1617,86 @@ export default function UserGrowthIntelligencePage() {
                                         Tidak ada data transaksi sukses untuk kombinasi filter ini.
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- FUNNEL USER LIST MODAL --- */}
+                {showFunnelModal && (
+                    <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-3xl w-full max-w-5xl shadow-2xl animate-in slide-in-from-bottom-8 duration-300 overflow-hidden flex flex-col max-h-[85vh]">
+                            <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-zinc-50 shrink-0">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-12 h-12 ${funnelGroup === 'checkout' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'} rounded-2xl flex items-center justify-center shadow-inner`}>
+                                        {funnelGroup === 'checkout' ? <CreditCard size={20} /> : <Target size={20} />}
+                                    </div>
+                                    <div>
+                                        <h2 className="font-black text-xl text-zinc-900">
+                                            {funnelGroup === 'checkout' ? 'Checkout Initiated Users' : 'Paid Conversion Users'}
+                                        </h2>
+                                        <p className="text-xs font-bold text-zinc-500 mt-1">
+                                            List of unique users who reached this funnel stage
+                                        </p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowFunnelModal(false)} className="text-zinc-400 hover:text-zinc-900 p-2 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-full transition"><X size={20} /></button>
+                            </div>
+
+                            <div className="overflow-y-auto w-full p-6">
+                                <div className="overflow-x-auto rounded-xl border border-zinc-200 shadow-sm">
+                                    <table className="w-full text-sm text-left whitespace-nowrap">
+                                        <thead className="bg-zinc-100 text-[10px] text-zinc-500 font-black tracking-widest border-b border-zinc-200 sticky top-0 z-10">
+                                            <tr className="uppercase whitespace-nowrap">
+                                                <th className="px-6 py-4 text-left">User</th>
+                                                <th className="px-6 py-4">Industry</th>
+                                                <th className="px-6 py-4">Phone</th>
+                                                <th className="px-6 py-4">Plan / License</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4">Last Activity</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-100 bg-white">
+                                            {(funnelGroup === 'checkout' ? filteredData.headlines.checkoutUsersList : filteredData.headlines.paidUsersList).map((user: any, idx: number) => (
+                                                <tr key={user._id || idx} className="hover:bg-zinc-50 transition">
+                                                    <td className="px-6 py-4">
+                                                        <p className="font-bold text-zinc-900">{user.name}</p>
+                                                        <p className="text-[10px] text-zinc-500 font-medium">{user.email}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-xs text-zinc-600 font-medium px-2 py-0.5 bg-zinc-100 rounded">{user.industry}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs font-medium text-zinc-500">
+                                                        {user.phone}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-900">{user.plan}</span>
+                                                            <span className="text-[9px] text-zinc-400">{user.licenseType}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border ${
+                                                            user.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                            user.status === 'Checkout' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                            'bg-zinc-50 text-zinc-500 border-zinc-100'
+                                                        }`}>
+                                                            {user.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-[10px] font-bold text-zinc-400 uppercase">
+                                                        {user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : '-'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {(funnelGroup === 'checkout' ? filteredData.headlines.checkoutUsersList : filteredData.headlines.paidUsersList).length === 0 && (
+                                                <tr>
+                                                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">No users found for this stage.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>

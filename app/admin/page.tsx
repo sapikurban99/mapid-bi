@@ -437,152 +437,30 @@ export default function AdminPage() {
         }
     };
 
-    const handleFetchN8nRevenue = async () => {
-        if (!confirm('Fetch revenue data from n8n and save to Supabase? This will overwrite existing revenue data in the database.')) return;
+    const handleSyncRevenueFromSupabase = async () => {
+        if (!confirm('Sync revenue data from Supabase payments table? This will re-calculate achievement based on existing targets.')) return;
         try {
             setLoadingBiData(true);
-            setBiLoadMsg('Fetching from n8n (proxy)...');
-            const res = await fetch('/api/n8n/get-revenue');
-            if (res.ok) {
-                const json = await res.json();
-                let n8nData = [];
-                if (json && json.data) {
-                   // If n8n returned a stringified JSON inside `data`, parse it first
-                   let rawData = json.data;
-                   if (typeof rawData === 'string') {
-                       try { rawData = JSON.parse(rawData); } catch(e) {}
-                   }
-                   n8nData = Array.isArray(rawData) ? rawData : (Array.isArray(rawData.data) ? rawData.data : [rawData]);
-                } else {
-                   n8nData = Array.isArray(json) ? json : json.revenue || [];
-                }
+            setBiLoadMsg('Aggregating payments from Supabase...');
+            const res = await fetch('/api/revenue/sync', { method: 'POST' });
+            const json = await res.json();
+            
+            if (res.ok && json.success) {
+                setBiLoadMsg(`✓ ${json.message}`);
+                syncData({ silent: true }); // Refresh global data provider
                 
-                if (n8nData && n8nData.length > 0) {
-                    const totals = typeof n8nData[0] === 'string' ? JSON.parse(n8nData[0]) : n8nData[0];
-                    const isQuarterFormat = Object.keys(totals).some(k => k.match(/\d{4}-q\d/i) || k.match(/q\d/i));
-                    const hasRecognizedKey = isQuarterFormat ? true : Object.keys(totals).some(k => k.toLowerCase().includes('revenue') || k.toLowerCase().includes('platform') || k.toLowerCase().includes('academy'));
-                    
-                    if (hasRecognizedKey) {
-                        setBiLoadMsg('Mapping and Saving to Supabase...');
-                        setLocalConfig(prev => {
-                            const n = JSON.parse(JSON.stringify(prev));
-                            if (!n.biData) n.biData = {};
-                            const existingRevenue = n.biData.revenue || [];
-                            
-                            const mappedRevenue: any[] = [];
-                            
-                            if (isQuarterFormat) {
-                                for (const [quarterKey, quarterData] of Object.entries(totals)) {
-                                    let quarterStr = quarterKey;
-                                    const qMatch = quarterKey.match(/^(\d{4})-(Q\d)$/i);
-                                    if (qMatch) quarterStr = `${qMatch[2].toUpperCase()} ${qMatch[1]}`;
-                                    
-                                    for (const key of Object.keys(quarterData as any)) {
-                                        const lowerKey = key.toLowerCase();
-                                        let matchedProduct = '';
-                                        if (lowerKey.includes('platform')) matchedProduct = 'Platform';
-                                        else if (lowerKey.includes('academy')) matchedProduct = 'Webgis Academy';
-                                        else if (lowerKey.includes('analytics')) matchedProduct = 'Location Analytics';
-                                        else if (lowerKey.includes('thematic')) matchedProduct = 'Thematic Class';
-                                        
-                                        if (matchedProduct) {
-                                            const actualValue = Number((quarterData as any)[key]) || 0;
-                                            const existing = existingRevenue.find((r: any) => 
-                                                (r.subProduct?.toLowerCase().includes(matchedProduct.toLowerCase()) || 
-                                                matchedProduct.toLowerCase().includes(r.subProduct?.toLowerCase())) && 
-                                                r.quarter === quarterStr
-                                            );
-                                            
-                                            const target = existing?.target || 0;
-                                            const achievement = target > 0 ? Number(((actualValue / target) * 100).toFixed(2)) : 0;
-                                            
-                                            mappedRevenue.push({
-                                                subProduct: existing?.subProduct || matchedProduct,
-                                                quarter: quarterStr,
-                                                target: target,
-                                                actual: actualValue,
-                                                achievement: achievement
-                                            });
-                                        }
-                                    }
-                                }
-                            } else {
-                                const currentYear = new Date().getFullYear();
-                                const currentQuarterNum = Math.floor(new Date().getMonth() / 3) + 1;
-                                const currentQuarterStr = `Q${currentQuarterNum} ${currentYear}`;
-
-                                for (const key of Object.keys(totals)) {
-                                    const lowerKey = key.toLowerCase();
-                                    let matchedProduct = '';
-                                    if (lowerKey.includes('platform')) matchedProduct = 'Platform';
-                                    else if (lowerKey.includes('academy')) matchedProduct = 'Webgis Academy';
-                                    else if (lowerKey.includes('analytics')) matchedProduct = 'Location Analytics';
-                                    else if (lowerKey.includes('thematic')) matchedProduct = 'Thematic Class';
-                                    
-                                    if (matchedProduct) {
-                                        const actualValue = Number(totals[key]) || 0;
-                                        const existing = existingRevenue.find((r: any) => 
-                                            (r.subProduct?.toLowerCase().includes(matchedProduct.toLowerCase()) || 
-                                            matchedProduct.toLowerCase().includes(r.subProduct?.toLowerCase())) && 
-                                            r.quarter === currentQuarterStr
-                                        );
-                                        
-                                        const target = existing?.target || 0;
-                                        const achievement = target > 0 ? Number(((actualValue / target) * 100).toFixed(2)) : 0;
-                                        
-                                        mappedRevenue.push({
-                                            subProduct: existing?.subProduct || matchedProduct,
-                                            quarter: currentQuarterStr,
-                                            target: target,
-                                            actual: actualValue,
-                                            achievement: achievement
-                                        });
-                                    }
-                                }
-                            }
-
-                            // Keep any existing revenue items that didn't match the webhook's products EXACTLY for the same quarter
-                            const existingUnmatched = existingRevenue.filter((r: any) => 
-                                !mappedRevenue.some(m => m.subProduct === r.subProduct && m.quarter === r.quarter)
-                            );
-                             
-                            n.biData.revenue = [...mappedRevenue, ...existingUnmatched];
-                            
-                            // Background save
-                            saveConfigToSupabase(n).then(result => {
-                                setBiLoadMsg('✓ n8n data saved: ' + result.message);
-                                setTimeout(() => setBiLoadMsg(''), 4000);
-                            });
-                            return n;
-                        });
-                    } else {
-                        setBiLoadMsg('Format not recognized. Check console for details.');
-                        console.log('n8nData Format Unrecognized:', n8nData);
-                        setLocalConfig(prev => {
-                            const n = JSON.parse(JSON.stringify(prev));
-                            if (!n.biData) n.biData = {};
-                            n.biData.revenue = n8nData;
-                            saveConfigToSupabase(n).then(result => {
-                                setBiLoadMsg('✓ n8n data saved: ' + result.message);
-                                setTimeout(() => setBiLoadMsg(''), 4000);
-                            });
-                            return n;
-                        });
-                    }
-                } else {
-                    setBiLoadMsg('No revenue data from n8n.');
-                    setTimeout(() => setBiLoadMsg(''), 4000);
-                }
+                // Reload local state to show changes immediately
+                const freshConfig = await loadConfigFromSupabase();
+                setLocalConfig(freshConfig);
             } else {
-                setBiLoadMsg('Failed to fetch from n8n.');
-                setTimeout(() => setBiLoadMsg(''), 4000);
+                setBiLoadMsg(`Sync failed: ${json.message || 'Unknown error'}`);
             }
         } catch (err) {
             console.warn(err);
-            setBiLoadMsg('Error fetching from n8n.');
-            setTimeout(() => setBiLoadMsg(''), 4000);
+            setBiLoadMsg('Error connecting to sync API.');
         } finally {
             setLoadingBiData(false);
+            setTimeout(() => setBiLoadMsg(''), 4000);
         }
     };
 
@@ -1043,8 +921,8 @@ export default function AdminPage() {
 
                                         <div className="flex flex-wrap items-center justify-start lg:justify-end gap-3 shrink-0">
                                             {biSubTab === 'revenue' && (
-                                                <button onClick={handleFetchN8nRevenue} disabled={loadingBiData} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-100 h-[44px] whitespace-nowrap">
-                                                    {loadingBiData ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />} Get Data n8n
+                                                <button onClick={handleSyncRevenueFromSupabase} disabled={loadingBiData} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-100 h-[44px] whitespace-nowrap">
+                                                    {loadingBiData ? <Loader2 size={14} className="animate-spin" /> : <TrendingUp size={14} />} Sync from Payments
                                                 </button>
                                             )}
                                             {biSubTab === 'socials' && (

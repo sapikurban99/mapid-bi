@@ -2,24 +2,25 @@
 import { useEffect, useState } from 'react';
 import { useGlobalData } from '../components/GlobalDataProvider';
 import { getConfig, SiteConfig, setConfig } from '../lib/config';
-import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2 } from 'lucide-react';
+import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 // --- Sub-components (Cards) ---
 const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
     const isDone = p.stage === 'Done';
     const isLost = p.stage === 'Lost';
+    const isFrozen = p.stage === 'Freeze';
     return (
         <div draggable onDragStart={(e) => e.dataTransfer.setData('projectId', p.id)}
-            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isDone ? 'bg-emerald-50 border-emerald-200' : isLost ? 'bg-rose-50 border-rose-200' : 'bg-white border-zinc-200'}`}>
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : (p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isDone ? 'bg-emerald-50 border-emerald-200' : isLost ? 'bg-rose-50 border-rose-200' : isFrozen ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-zinc-200'}`}>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : isFrozen ? 'bg-slate-400' : (p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDone ? 'bg-emerald-100 text-emerald-600' : isLost ? 'bg-rose-100 text-rose-600' : 'bg-blue-50 text-blue-600'}`}><Briefcase size={14} /></div>
                     <button onClick={(e) => { e.stopPropagation(); onDelete('Project', p.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
                 </div>
                 <div className="flex flex-col gap-1 items-end text-right">
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${isDone ? 'bg-emerald-200 text-emerald-800' : isLost ? 'bg-rose-200 text-rose-800' : 'bg-blue-100 text-blue-800'}`}>{p.stage}</span>
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${isDone ? 'bg-emerald-200 text-emerald-800' : isLost ? 'bg-rose-200 text-rose-800' : isFrozen ? 'bg-slate-200 text-slate-800' : 'bg-blue-100 text-blue-800'}`}>{p.stage}</span>
                     <span className={`text-[8px] font-black uppercase tracking-widest ${p.priority === 'High' ? 'text-rose-500' : p.priority === 'Medium' ? 'text-amber-500' : 'text-blue-500'}`}>{p.priority}</span>
                 </div>
             </div>
@@ -43,16 +44,17 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
 
 const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any) => {
     const isLost = l.stage === 'Closed Lost';
+    const isFrozen = l.stage === 'Freeze';
     return (
         <div draggable onDragStart={(e) => e.dataTransfer.setData('leadId', l.id)}
-            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isLost ? 'bg-rose-50 border-rose-200' : 'bg-white border-zinc-200'}`}>
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${isLost ? 'bg-rose-500' : (l.priority || 'Medium') === 'High' ? 'bg-rose-500' : (l.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isLost ? 'bg-rose-50 border-rose-200' : isFrozen ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-zinc-200'}`}>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${isLost ? 'bg-rose-500' : isFrozen ? 'bg-slate-400' : (l.priority || 'Medium') === 'High' ? 'bg-rose-500' : (l.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isLost ? 'bg-rose-100 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}><Target size={14} /></div>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isLost ? 'bg-rose-100 text-rose-600' : isFrozen ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-600'}`}><Target size={14} /></div>
                     <button onClick={(e) => { e.stopPropagation(); onDelete('Lead', l.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
                 </div>
-                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border ${isLost ? 'bg-rose-200 text-rose-800' : getStageColor(l.stage)}`}>{l.stage}</span>
+                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border ${isLost ? 'bg-rose-200 text-rose-800' : isFrozen ? 'bg-slate-200 text-slate-800 border-slate-300' : getStageColor(l.stage)}`}>{l.stage}</span>
             </div>
             <div onClick={() => onEdit('Lead', l)}>
                 <h3 className="font-bold text-zinc-900 text-base mb-1">{l.name}</h3>
@@ -71,35 +73,38 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any)
     );
 };
 
-const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor }: any) => (
-    <div draggable onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)}
-        className="bg-white border border-zinc-200 shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
-        <div className={`absolute top-0 left-0 w-1.5 h-full ${(p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
-        <div className="flex justify-between items-start mb-4">
-            <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center"><Users size={14} /></div>
-                <button onClick={(e) => { e.stopPropagation(); onDelete('Partner', p.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
-            </div>
-            <div className="text-right">
-                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md block mb-1 border ${getStageColor(p.stage || 'Sourcing')}`}>{p.stage || 'Sourcing'}</span>
-                <span className="text-[8px] font-black uppercase tracking-widest text-purple-400">{p.type}</span>
-            </div>
-        </div>
-        <div onClick={() => onEdit('Partner', p)}>
-            <h3 className="font-bold text-purple-950 text-base mb-1">{p.name}</h3>
-            <p className="text-[10px] font-black text-purple-600/70 uppercase tracking-widest mb-3">PIC: <span className="text-purple-800">{getPseName(p.pseId)}</span></p>
-            <div className="flex flex-col border-t border-purple-50 pt-3">
-                <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
-                    <span className="text-purple-600/50">Syncing</span>
-                    <span className="text-purple-500">{p.progress || 0}%</span>
+const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor }: any) => {
+    const isFrozen = p.stage === 'Freeze';
+    return (
+        <div draggable onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)}
+            className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isFrozen ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-zinc-200'}`}>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${isFrozen ? 'bg-slate-400' : (p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isFrozen ? 'bg-slate-100 text-slate-600' : 'bg-purple-50 text-purple-600'}`}><Users size={14} /></div>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete('Partner', p.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
                 </div>
-                <div className="w-full h-1.5 bg-purple-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-purple-500 rounded-full" style={{ width: `${p.progress || 0}%` }}></div>
+                <div className="text-right">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md block mb-1 border ${isFrozen ? 'bg-slate-200 text-slate-800 border-slate-300' : getStageColor(p.stage || 'Sourcing')}`}>{p.stage || 'Sourcing'}</span>
+                    <span className={`text-[8px] font-black uppercase tracking-widest ${isFrozen ? 'text-slate-400' : 'text-purple-400'}`}>{p.type}</span>
                 </div>
             </div>
+            <div onClick={() => onEdit('Partner', p)}>
+                <h3 className="font-bold text-purple-950 text-base mb-1">{p.name}</h3>
+                <p className="text-[10px] font-black text-purple-600/70 uppercase tracking-widest mb-3">PIC: <span className="text-purple-800">{getPseName(p.pseId)}</span></p>
+                <div className="flex flex-col border-t border-purple-50 pt-3">
+                    <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
+                        <span className="text-purple-600/50">Syncing</span>
+                        <span className="text-purple-500">{p.progress || 0}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-purple-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${p.progress || 0}%` }}></div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 export default function B2BBoardPage() {
     const { syncData, isLoading: globalIsLoading } = useGlobalData();
@@ -109,6 +114,7 @@ export default function B2BBoardPage() {
     const [priorityFilter, setPriorityFilter] = useState('All');
     const [groupMode, setGroupMode] = useState<'none' | 'company' | 'pse'>('none');
     const [showArchived, setShowArchived] = useState(false);
+    const [showPointsInfo, setShowPointsInfo] = useState(false);
 
     // Modals State
     const [isAddingProject, setIsAddingProject] = useState(false);
@@ -126,9 +132,9 @@ export default function B2BBoardPage() {
     const [editingMember, setEditingMember] = useState<any>(null);
 
     // Kanban Stages (Sesuai SOP)
-    const KANBAN_STAGES = ['Technical Handover', 'Feasibility & Design', 'Demo / POC', 'Development & Data', 'Internal Testing', 'UAT with Client', 'Training & Go Live', 'Value Review', 'Done', 'Lost'];
-    const PRESALES_STAGES = ['Lead Generation', 'Discovery Meeting', 'MoM & BRD Creation', 'Technical Handover', 'Feasibility Check', 'Solution Design & FRD', 'Validation & Demo', 'Commercial Negotiation', 'Closed Lost'];
-    const PARTNER_STAGES = ['Sourcing', 'Approached', 'Negotiation', 'Onboarded', 'Active', 'Archived'];
+    const KANBAN_STAGES = ['Technical Handover', 'Feasibility & Design', 'Demo / POC', 'Development & Data', 'Internal Testing', 'UAT with Client', 'Training & Go Live', 'Value Review', 'Freeze', 'Done', 'Lost'];
+    const PRESALES_STAGES = ['Lead Generation', 'Discovery Meeting', 'MoM & BRD Creation', 'Technical Handover', 'Feasibility Check', 'Solution Design & FRD', 'Validation & Demo', 'Commercial Negotiation', 'Freeze', 'Closed Lost'];
+    const PARTNER_STAGES = ['Sourcing', 'Approached', 'Negotiation', 'Onboarded', 'Active', 'Freeze', 'Archived'];
 
     useEffect(() => {
         setLocalConfig(getConfig());
@@ -141,6 +147,7 @@ export default function B2BBoardPage() {
 
     // Helper: Hitung warna badge stage
     const getStageColor = (stage: string) => {
+        if (stage === 'Freeze') return 'bg-slate-100 text-slate-600 border-slate-200';
         const index = PRESALES_STAGES.indexOf(stage);
         if (index < 3) return 'bg-zinc-100 text-zinc-500 border-zinc-200'; 
         if (index < 6) return 'bg-blue-50 text-blue-600 border-blue-100';
@@ -597,18 +604,23 @@ export default function B2BBoardPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Chart 1: Proportional Composition */}
                             <div className="bg-white border border-zinc-200 p-6 rounded-3xl shadow-sm">
-                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 mb-6">Workload Composition (Points)</h2>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900">Workload Composition (Weighted)</h2>
+                                    <button onClick={() => setShowPointsInfo(true)} className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+                                        <HelpCircle size={18} />
+                                    </button>
+                                </div>
                                 <div className="h-72 w-full">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={config.pseWorkloads} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f4f4f5" />
                                             <XAxis type="number" tick={{ fontSize: 10, fill: '#a1a1aa', fontWeight: 900 }} axisLine={false} tickLine={false} />
                                             <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 900 }} axisLine={false} tickLine={false} width={80} />
-                                            <Tooltip cursor={{ fill: '#f4f4f5' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }} />
+                                            <Tooltip cursor={{ fill: '#f4f4f5' }} labelStyle={{ color: "#18181b", fontWeight: 900, fontSize: "14px", marginBottom: "8px" }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }} />
                                             <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }} />
-                                            <Bar dataKey="activeProjects" name="Projects (x3)" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-                                            <Bar dataKey="activeLeads" name="Leads (x1)" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                                            <Bar dataKey="activePartners" name="Partners (x1)" stackId="a" fill="#a855f7" radius={[0, 4, 4, 0]} />
+                                            <Bar dataKey="activeProjects" name="Projects (Weight)" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                                            <Bar dataKey="activeLeads" name="Leads (Weight)" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                                            <Bar dataKey="activePartners" name="Partners (Weight)" stackId="a" fill="#a855f7" radius={[0, 4, 4, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -628,15 +640,18 @@ export default function B2BBoardPage() {
                                                         <Globe size={12} />
                                                     </button>
                                                 </div>
-                                                <span className={`${pse.loadPercentage > 90 ? 'text-rose-500' : pse.loadPercentage > 70 ? 'text-amber-500' : 'text-emerald-500'}`}>{pse.loadPercentage}%</span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] font-black text-zinc-300 uppercase tracking-tighter">{pse.totalPoints} / {pse.maxCapacity} PTS</span>
+                                                    <span className={`${pse.loadPercentage > 90 ? 'text-rose-500' : pse.loadPercentage > 70 ? 'text-amber-500' : 'text-emerald-500'}`}>{pse.loadPercentage}%</span>
+                                                </div>
                                             </div>
                                             <div className="w-full bg-zinc-100 h-3 rounded-full overflow-hidden">
                                                 <div className={`h-full rounded-full transition-all duration-1000 ${pse.loadPercentage > 90 ? 'bg-rose-500' : pse.loadPercentage > 70 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${Math.min(pse.loadPercentage, 100)}%` }}></div>
                                             </div>
                                             <div className="flex gap-4 mt-2 text-[9px] font-black uppercase tracking-widest text-zinc-400">
-                                                <span>{pse.activeProjects} Proj</span>
-                                                <span>{pse.activeLeads} Lead</span>
-                                                <span>{pse.activePartners} Ptnr</span>
+                                                <span>{pse.activeProjectsCount} Proj</span>
+                                                <span>{pse.activeLeadsCount} Lead</span>
+                                                <span>{pse.activePartnersCount} Ptnr</span>
                                                 <span className="ml-auto text-zinc-300">Max: {pse.maxCapacity || 30}pts</span>
                                             </div>
                                         </div>
@@ -654,7 +669,7 @@ export default function B2BBoardPage() {
                     <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col">
                         <div className="flex items-center justify-between p-6 border-b border-zinc-100">
                             <h3 className="text-lg font-black text-zinc-900">{editingItemId ? 'Edit Project' : 'Add New Project'}</h3>
-                            <button onClick={() => setIsAddingProject(false)} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full"><X size={16} /></button>
+                            <button onClick={() => setIsAddingProject(false)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Client Name</label><input type="text" value={newProject.client} onChange={(e) => setNewProject((p: any) => ({ ...p, client: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
@@ -703,7 +718,7 @@ export default function B2BBoardPage() {
                     <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl flex flex-col">
                         <div className="flex items-center justify-between p-6 border-b border-zinc-100">
                             <h3 className="text-lg font-black text-zinc-900">{editingItemId ? 'Edit Lead Support' : 'Add Lead Support'}</h3>
-                            <button onClick={() => setIsAddingLead(false)} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full"><X size={16} /></button>
+                            <button onClick={() => setIsAddingLead(false)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Company / Lead Name</label><input type="text" value={newLead.name} onChange={(e) => setNewLead((p: any) => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-zinc-900" /></div>
@@ -766,7 +781,7 @@ export default function B2BBoardPage() {
                     <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl flex flex-col">
                         <div className="flex items-center justify-between p-6 border-b border-zinc-100">
                             <h3 className="text-lg font-black text-zinc-900">Workload Settings</h3>
-                            <button onClick={() => setEditingMember(null)} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full"><X size={16} /></button>
+                            <button onClick={() => setEditingMember(null)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
                         </div>
                         <div className="p-6 space-y-6">
                             {!editingMember.isExisting && (
@@ -815,7 +830,7 @@ export default function B2BBoardPage() {
                     <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl flex flex-col">
                         <div className="flex items-center justify-between p-6 border-b border-zinc-100">
                             <h3 className="text-lg font-black text-zinc-900">{editingItemId ? 'Edit Partner' : 'Add Partner'}</h3>
-                            <button onClick={() => setIsAddingPartner(false)} className="p-2 bg-zinc-100 hover:bg-zinc-200 rounded-full"><X size={16} /></button>
+                            <button onClick={() => setIsAddingPartner(false)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Partner Name</label><input type="text" value={newPartner.name} onChange={(e) => setNewPartner((p: any) => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900" /></div>
@@ -872,6 +887,71 @@ export default function B2BBoardPage() {
                 .hide-scrollbar::-webkit-scrollbar { display: none; }
                 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}} />
+            {/* ========== POINTS INFO MODAL (INDONESIA) ========== */}
+            {showPointsInfo && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden">
+                        <div className="p-8">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 className="text-xl font-black text-zinc-900 mb-1">Aturan Bobot Kerja (Points)</h3>
+                                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Sistem Transparansi Beban Kerja PSE</p>
+                                </div>
+                                <button onClick={() => setShowPointsInfo(false)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={20} /></button>
+                            </div>
+
+                            <div className="space-y-6">
+                                <p className="text-sm text-zinc-600 leading-relaxed">
+                                    Beban kerja setiap anggota tim dihitung berdasarkan poin. Setiap tipe tugas memiliki **Bobot Dasar**, yang kemudian dikalikan dengan **Prioritas** tugas tersebut.
+                                </p>
+
+                                <div className="bg-zinc-50 rounded-2xl overflow-hidden border border-zinc-100">
+                                    <table className="w-full text-left text-[11px]">
+                                        <thead>
+                                            <tr className="bg-zinc-100/50 border-b border-zinc-200">
+                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Tipe Tugas</th>
+                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Low (0.5x)</th>
+                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Med (1.0x)</th>
+                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">High (1.5x)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-200/50 font-bold text-zinc-700">
+                                            <tr>
+                                                <td className="px-4 py-3 bg-blue-50/30 text-blue-700">Project (3 pts)</td>
+                                                <td className="px-4 py-3 text-center">1.5</td>
+                                                <td className="px-4 py-3 text-center bg-blue-50/50">3.0</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">4.5</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="px-4 py-3 bg-emerald-50/30 text-emerald-700">Lead (1 pt)</td>
+                                                <td className="px-4 py-3 text-center">0.5</td>
+                                                <td className="px-4 py-3 text-center bg-emerald-50/50">1.0</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">1.5</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="px-4 py-3 bg-purple-50/30 text-purple-700">Partner (1 pt)</td>
+                                                <td className="px-4 py-3 text-center">0.5</td>
+                                                <td className="px-4 py-3 text-center bg-purple-50/50">1.0</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">1.5</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-4">
+                                    <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center shrink-0 shadow-sm"><Target size={14} /></div>
+                                    <div>
+                                        <p className="text-xs font-black text-blue-900 uppercase tracking-tight mb-0.5">Kapasitas Maksimal (Limit)</p>
+                                        <p className="text-[11px] text-blue-700 leading-tight">Secara default, setiap PSE memiliki limit 30 poin. Status **Freeze**, **Done**, dan **Lost** tidak akan menambah beban poin.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button onClick={() => setShowPointsInfo(false)} className="w-full mt-8 py-4 bg-zinc-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-zinc-800 transition-all shadow-xl">Dimengerti</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

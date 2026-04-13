@@ -159,22 +159,46 @@ export async function getAllBIData() {
 
   // --- PSE Workload Calculation ---
   const pseWorkloads = (pseMembers || []).map(pse => {
-    const maxCap = pse.max_capacity || 15;
-    const activeProjects = (kanbanProjects || []).filter(p => p.pse_id === pse.id && p.stage !== 'Done').length;
-    const activeLeads = (kanbanLeads || []).filter(l => l.pse_id === pse.id && l.is_closed === false).length;
-    const activePartners = (kanbanPartners || []).filter(p => p.pse_id === pse.id && p.is_active === true).length;
-    const totalPoints = (activeProjects * 3) + (activeLeads * 1) + (activePartners * 1);
+    const maxCap = pse.max_capacity || 30;
+
+    // Weight Multipliers
+    const getWeight = (prio: string) => {
+      const p = (prio || 'Medium').toLowerCase();
+      if (p === 'high') return 1.5;
+      if (p === 'low') return 0.5;
+      return 1.0;
+    };
+
+    const projItems = (kanbanProjects || []).filter(p => 
+      p.pse_id === pse.id && !['Done', 'Lost', 'Freeze'].includes(p.stage)
+    );
+    const leadItems = (kanbanLeads || []).filter(l => 
+      l.pse_id === pse.id && l.is_closed === false && l.stage !== 'Freeze'
+    );
+    const partnerItems = (kanbanPartners || []).filter(p => 
+      p.pse_id === pse.id && p.is_active === true && p.stage !== 'Freeze'
+    );
+
+    const projectPoints = projItems.reduce((sum, p) => sum + (3 * getWeight(p.priority)), 0);
+    const leadPoints = leadItems.reduce((sum, l) => sum + (1 * getWeight(l.priority)), 0);
+    const partnerPoints = partnerItems.reduce((sum, p) => sum + (1 * getWeight(p.priority)), 0);
+
+    const totalPoints = projectPoints + leadPoints + partnerPoints;
     const loadPercentage = maxCap > 0 ? Math.round((totalPoints / maxCap) * 100) : 0;
 
     return {
       pseId: pse.id,
       name: pse.name,
-      activeProjects,
-      activeLeads,
-      activePartners,
+      activeProjectsCount: projItems.length,
+      activeLeadsCount: leadItems.length,
+      activePartnersCount: partnerItems.length,
+      activeProjects: projectPoints, // For Charts
+      activeLeads: leadPoints,        // For Charts
+      activePartners: partnerPoints,  // For Charts
       totalPoints,
       maxCapacity: maxCap,
       loadPercentage,
+      isActive: pse.is_active,
     };
   });
 

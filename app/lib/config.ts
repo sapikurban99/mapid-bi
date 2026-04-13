@@ -141,12 +141,14 @@ export interface KanbanPartnerItem {
 export interface KanbanPSEWorkload {
     pseId: string;
     name: string;
-    activeProjects: number;
-    activeLeads: number;
-    activePartners: number;
+    activeProjects: number; // Weighted Points sum
+    activeLeads: number;    // Weighted Points sum
+    activePartners: number; // Weighted Points sum
+    activeProjectsCount: number;
+    activeLeadsCount: number;
+    activePartnersCount: number;
     totalPoints: number;
     maxCapacity: number;
-    loadScore: number;
     loadPercentage: number;
     isActive?: boolean;
     isExisting?: boolean;

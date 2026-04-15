@@ -1,9 +1,61 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useGlobalData } from '../components/GlobalDataProvider';
 import { getConfig, SiteConfig, setConfig } from '../lib/config';
-import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle } from 'lucide-react';
+import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
+
+// --- Filter Chip Dropdown Component ---
+const FilterChipDropdown = ({ label, options, selected, onChange, color = 'blue' }: {
+    label: string;
+    options: string[];
+    selected: string[];
+    onChange: (val: string[]) => void;
+    color?: string;
+}) => {
+    const [open, setOpen] = useState(false);
+    const isActive = selected.length > 0;
+    const colorMap: Record<string, string> = {
+        blue: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
+        emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+        purple: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
+        amber: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+        rose: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100',
+        zinc: 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200',
+    };
+    return (
+        <div className="relative">
+            <button onClick={() => setOpen(!open)} className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl border transition-all whitespace-nowrap ${isActive ? colorMap[color] : 'bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50'}`}>
+                <Filter size={10} />
+                {label} {isActive && <span className="bg-white/80 text-[9px] px-1.5 py-0.5 rounded-md font-black">{selected.length}</span>}
+                <ChevronDown size={10} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+                    <div className="absolute top-full left-0 mt-1 z-50 bg-white rounded-xl border border-zinc-200 shadow-xl min-w-[180px] max-h-[240px] overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-1 duration-150">
+                        <div className="p-1.5">
+                            {options.map(opt => (
+                                <label key={opt} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-50 cursor-pointer transition-colors">
+                                    <input type="checkbox" checked={selected.includes(opt)} onChange={(e) => {
+                                        if (e.target.checked) onChange([...selected, opt]);
+                                        else onChange(selected.filter(s => s !== opt));
+                                    }} className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5" />
+                                    <span className="text-[11px] font-bold text-zinc-700 truncate">{opt}</span>
+                                </label>
+                            ))}
+                        </div>
+                        {selected.length > 0 && (
+                            <div className="border-t border-zinc-100 p-1.5">
+                                <button onClick={() => { onChange([]); setOpen(false); }} className="w-full text-[10px] font-black uppercase text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors">Clear</button>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
 
 // --- Sub-components (Cards) ---
 const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
@@ -45,11 +97,12 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
 const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any) => {
     const isLost = l.stage === 'Closed Lost';
     const isFrozen = l.stage === 'Freeze';
+    const hasValue = l.forecastedValue && l.forecastedValue > 0;
     return (
         <div draggable onDragStart={(e) => e.dataTransfer.setData('leadId', l.id)}
             className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isLost ? 'bg-rose-50 border-rose-200' : isFrozen ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-zinc-200'}`}>
             <div className={`absolute top-0 left-0 w-1.5 h-full ${isLost ? 'bg-rose-500' : isFrozen ? 'bg-slate-400' : (l.priority || 'Medium') === 'High' ? 'bg-rose-500' : (l.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isLost ? 'bg-rose-100 text-rose-600' : isFrozen ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-600'}`}><Target size={14} /></div>
                     <button onClick={(e) => { e.stopPropagation(); onDelete('Lead', l.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
@@ -58,7 +111,29 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any)
             </div>
             <div onClick={() => onEdit('Lead', l)}>
                 <h3 className="font-bold text-zinc-900 text-base mb-1">{l.name}</h3>
-                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-3">Support: <span className="text-zinc-600">{getPseName(l.pseId)}</span></p>
+                {/* PIC Sales & PSE row */}
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mb-2">
+                    {l.picSales && <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-widest"><UserCheck size={9} className="inline mr-0.5 -mt-0.5" /> Sales: <span className="text-amber-800">{l.picSales}</span></p>}
+                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">PSE: <span className="text-zinc-600">{getPseName(l.pseId)}</span></p>
+                </div>
+                {/* Forecasted Value */}
+                {hasValue && (
+                    <div className="flex items-center gap-1.5 mb-2">
+                        <DollarSign size={10} className="text-emerald-500" />
+                        <span className="text-[10px] font-black text-emerald-700">IDR {(l.forecastedValue / 1000000).toFixed(0)}M</span>
+                        {l.probability > 0 && <span className="text-[9px] font-bold text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">{Math.round(l.probability * 100)}%</span>}
+                    </div>
+                )}
+                {/* Contact info row */}
+                {(l.contactName || l.contactNumber) && (
+                    <div className="flex items-center gap-2 mb-2 text-[9px] text-zinc-400 font-bold">
+                        {l.contactName && <span className="truncate max-w-[120px]">{l.contactName}</span>}
+                        {l.contactNumber && <span className="flex items-center gap-0.5"><Phone size={8} /> {l.contactNumber.substring(0, 15)}</span>}
+                    </div>
+                )}
+                {/* Next Step */}
+                {l.nextStep && <p className="text-[10px] text-zinc-500 bg-zinc-50 px-2 py-1 rounded-lg mb-2 line-clamp-2 italic">&rarr; {l.nextStep}</p>}
+                {/* Progress bar */}
                 <div className="flex flex-col border-t border-emerald-50 pt-3">
                     <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
                         <span className="text-zinc-400">Progress</span>
@@ -111,10 +186,12 @@ export default function B2BBoardPage() {
     const [config, setLocalConfig] = useState<SiteConfig | null>(null);
     const [loadingBiData, setLoadingBiData] = useState(false);
     const [activeTab, setActiveTab] = useState<'projects' | 'leads' | 'partners' | 'stats'>('projects');
-    const [priorityFilter, setPriorityFilter] = useState('All');
-    const [groupMode, setGroupMode] = useState<'none' | 'company' | 'pse'>('none');
     const [showArchived, setShowArchived] = useState(false);
     const [showPointsInfo, setShowPointsInfo] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Dynamic filter state: Record<columnName, selectedValues[]>
+    const [filters, setFilters] = useState<Record<string, string[]>>({});
 
     // Modals State
     const [isAddingProject, setIsAddingProject] = useState(false);
@@ -124,7 +201,7 @@ export default function B2BBoardPage() {
     
     // Forms State
     const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' });
-    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '' });
+    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '' });
     const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' });
 
     const [editingItemType, setEditingItemType] = useState<'Project' | 'Lead' | 'Partner' | null>(null);
@@ -136,14 +213,15 @@ export default function B2BBoardPage() {
     const PRESALES_STAGES = ['Lead Generation', 'Discovery Meeting', 'MoM & BRD Creation', 'Technical Handover', 'Feasibility Check', 'Solution Design & FRD', 'Validation & Demo', 'Commercial Negotiation', 'Freeze', 'Closed Lost'];
     const PARTNER_STAGES = ['Sourcing', 'Approached', 'Negotiation', 'Onboarded', 'Active', 'Freeze', 'Archived'];
 
+    // CRM Status mapping - keep CRM status as-is for leads
+    const CRM_STATUSES = ['Lead', 'Contacted', 'Demo/Call of Interest', 'Feasibility Check', 'Proposal made', 'Negotiation', 'POC', 'Won', 'Lost', 'Fridge'];
+
     useEffect(() => {
         setLocalConfig(getConfig());
     }, [globalIsLoading]);
 
-    if (!config) return <div className="p-8 text-center text-zinc-500 font-bold uppercase tracking-widest text-xs">Loading Workspace...</div>;
-
     // Helper: Cari nama PSE dari ID
-    const getPseName = (id: string) => config.pseWorkloads?.find((p: any) => p.pseId === id)?.name || 'Unknown PSE';
+    const getPseName = (id: string) => config?.pseWorkloads?.find((p: any) => p.pseId === id)?.name || 'Unknown PSE';
 
     // Helper: Hitung warna badge stage
     const getStageColor = (stage: string) => {
@@ -154,10 +232,72 @@ export default function B2BBoardPage() {
         return 'bg-emerald-50 text-emerald-600 border-emerald-100'; 
     };
 
+    // --- Dynamic filter logic ---
+    const updateFilter = (column: string, values: string[]) => {
+        setFilters(prev => {
+            const next = { ...prev };
+            if (values.length === 0) delete next[column];
+            else next[column] = values;
+            return next;
+        });
+    };
+
+    const clearAllFilters = () => {
+        setFilters({});
+        setSearchQuery('');
+    };
+
+    const hasActiveFilters = Object.keys(filters).length > 0 || searchQuery.length > 0;
+
+    // Extract unique values per column for filter dropdowns
+    const getUniqueProjectValues = useMemo(() => {
+        const projects = config?.kanbanProjects || [];
+        return {
+            stages: [...new Set(projects.map((p: any) => p.stage))].sort(),
+            priorities: ['High', 'Medium', 'Low'],
+            pse: [...new Set(projects.map((p: any) => getPseName(p.pseId)).filter(Boolean))].sort(),
+            clients: [...new Set(projects.map((p: any) => p.client).filter(Boolean))].sort(),
+        };
+    }, [config?.kanbanProjects]);
+
+    const getUniqueLeadValues = useMemo(() => {
+        const leads = config?.kanbanLeads || [];
+        return {
+            stages: [...new Set(leads.map((l: any) => l.stage))].sort(),
+            priorities: ['High', 'Medium', 'Low'],
+            pse: [...new Set(leads.map((l: any) => getPseName(l.pseId)).filter(Boolean))].sort(),
+            picSales: [...new Set(leads.map((l: any) => l.picSales).filter(Boolean))].sort(),
+            companies: [...new Set(leads.map((l: any) => l.name).filter(Boolean))].sort(),
+        };
+    }, [config?.kanbanLeads]);
+
+    const getUniquePartnerValues = useMemo(() => {
+        const partners = config?.kanbanPartners || [];
+        return {
+            stages: [...new Set(partners.map((p: any) => p.stage || 'Sourcing'))].sort(),
+            priorities: ['High', 'Medium', 'Low'],
+            pse: [...new Set(partners.map((p: any) => getPseName(p.pseId)).filter(Boolean))].sort(),
+            types: [...new Set(partners.map((p: any) => p.type).filter(Boolean))].sort(),
+        };
+    }, [config?.kanbanPartners]);
+
+    // Guard: render nothing until config is loaded (MUST be after all hooks)
+    if (!config) return <div className="p-8 text-center text-zinc-500 font-bold uppercase tracking-widest text-xs">Loading Workspace...</div>;
+
+    // Apply filters + search to items
+    const matchesSearch = (item: any) => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return Object.values(item).some(v => v && String(v).toLowerCase().includes(q));
+    };
+
     const getFilteredProjects = (stage: string) => {
         return config?.kanbanProjects?.filter((p: any) => {
             if (p.stage !== stage) return false;
-            if (priorityFilter !== 'All' && (p.priority || 'Medium') !== priorityFilter) return false;
+            if (filters.priority && !filters.priority.includes(p.priority || 'Medium')) return false;
+            if (filters.pse && !filters.pse.includes(getPseName(p.pseId))) return false;
+            if (filters.client && !filters.client.includes(p.client)) return false;
+            if (!matchesSearch(p)) return false;
             return true;
         }) || [];
     };
@@ -165,7 +305,11 @@ export default function B2BBoardPage() {
     const getFilteredLeads = (stage: string) => {
         return config?.kanbanLeads?.filter((l: any) => {
             if (l.stage !== stage) return false;
-            if (priorityFilter !== 'All' && (l.priority || 'Medium') !== priorityFilter) return false;
+            if (filters.priority && !filters.priority.includes(l.priority || 'Medium')) return false;
+            if (filters.pse && !filters.pse.includes(getPseName(l.pseId))) return false;
+            if (filters.picSales && !filters.picSales.includes(l.picSales)) return false;
+            if (filters.company && !filters.company.includes(l.name)) return false;
+            if (!matchesSearch(l)) return false;
             return true;
         }) || [];
     };
@@ -173,7 +317,10 @@ export default function B2BBoardPage() {
     const getFilteredPartners = (stage: string) => {
         return config?.kanbanPartners?.filter((p: any) => {
             if ((p.stage || 'Sourcing') !== stage) return false;
-            if (priorityFilter !== 'All' && (p.priority || 'Medium') !== priorityFilter) return false;
+            if (filters.priority && !filters.priority.includes(p.priority || 'Medium')) return false;
+            if (filters.pse && !filters.pse.includes(getPseName(p.pseId))) return false;
+            if (filters.type && !filters.type.includes(p.type)) return false;
+            if (!matchesSearch(p)) return false;
             return true;
         }) || [];
     };
@@ -373,7 +520,7 @@ export default function B2BBoardPage() {
                 <div className="flex justify-between items-center mb-6 animate-in fade-in duration-300">
                     <div>
                         {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
-                        {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
+                        {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
                         {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
                         {activeTab === 'stats' && <button onClick={() => setEditingMember({ pseId: '', name: '', maxCapacity: 30, isActive: true, isExisting: false })} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-zinc-900 text-white hover:bg-zinc-800"><Plus size={14} /> Add PSE Member</button>}
                     </div>
@@ -391,58 +538,65 @@ export default function B2BBoardPage() {
                     </button>
                 </div>
 
-                {/* FILTER BAR OPTIONS */}
+                {/* DYNAMIC FILTER BAR */}
                 {activeTab !== 'stats' && (
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 mt-2 animate-in fade-in duration-300">
-                        <div className="flex bg-zinc-100 p-1 rounded-xl w-full sm:w-fit overflow-x-auto hide-scrollbar">
-                            {['All', 'High', 'Medium', 'Low'].map(p => (
-                                <button key={p} onClick={() => setPriorityFilter(p)} className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-all whitespace-nowrap ${priorityFilter === p ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}>{p} Priority</button>
-                            ))}
+                    <div className="flex flex-col gap-3 mb-6 mt-2 animate-in fade-in duration-300">
+                        {/* Search + Clear row */}
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex-1 max-w-md">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search across all fields..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 text-xs font-medium bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-300 text-zinc-900 placeholder:text-zinc-400"
+                                />
+                            </div>
+                            {hasActiveFilters && (
+                                <button onClick={clearAllFilters} className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition-all whitespace-nowrap">
+                                    <X size={10} /> Clear All
+                                </button>
+                            )}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mr-1">Group By:</span>
-                            <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200">
-                                <button onClick={() => setGroupMode('none')} className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${groupMode === 'none' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}>None</button>
-                                <button onClick={() => setGroupMode('company')} className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${groupMode === 'company' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}>Company</button>
-                                <button onClick={() => setGroupMode('pse')} className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${groupMode === 'pse' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}>PSE</button>
-                            </div>
+                        {/* Filter chips row */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            {activeTab === 'projects' && (
+                                <>
+                                    <FilterChipDropdown label="Stage" options={getUniqueProjectValues.stages} selected={filters.stage || []} onChange={(v) => updateFilter('stage', v)} color="blue" />
+                                    <FilterChipDropdown label="Priority" options={getUniqueProjectValues.priorities} selected={filters.priority || []} onChange={(v) => updateFilter('priority', v)} color="amber" />
+                                    <FilterChipDropdown label="PSE" options={getUniqueProjectValues.pse} selected={filters.pse || []} onChange={(v) => updateFilter('pse', v)} color="zinc" />
+                                    <FilterChipDropdown label="Client" options={getUniqueProjectValues.clients} selected={filters.client || []} onChange={(v) => updateFilter('client', v)} color="purple" />
+                                </>
+                            )}
+                            {activeTab === 'leads' && (
+                                <>
+                                    <FilterChipDropdown label="Stage" options={getUniqueLeadValues.stages} selected={filters.stage || []} onChange={(v) => updateFilter('stage', v)} color="emerald" />
+                                    <FilterChipDropdown label="Priority" options={getUniqueLeadValues.priorities} selected={filters.priority || []} onChange={(v) => updateFilter('priority', v)} color="amber" />
+                                    <FilterChipDropdown label="PSE" options={getUniqueLeadValues.pse} selected={filters.pse || []} onChange={(v) => updateFilter('pse', v)} color="zinc" />
+                                    <FilterChipDropdown label="PIC Sales" options={getUniqueLeadValues.picSales} selected={filters.picSales || []} onChange={(v) => updateFilter('picSales', v)} color="rose" />
+                                    <FilterChipDropdown label="Company" options={getUniqueLeadValues.companies} selected={filters.company || []} onChange={(v) => updateFilter('company', v)} color="blue" />
+                                </>
+                            )}
+                            {activeTab === 'partners' && (
+                                <>
+                                    <FilterChipDropdown label="Stage" options={getUniquePartnerValues.stages} selected={filters.stage || []} onChange={(v) => updateFilter('stage', v)} color="purple" />
+                                    <FilterChipDropdown label="Priority" options={getUniquePartnerValues.priorities} selected={filters.priority || []} onChange={(v) => updateFilter('priority', v)} color="amber" />
+                                    <FilterChipDropdown label="PSE" options={getUniquePartnerValues.pse} selected={filters.pse || []} onChange={(v) => updateFilter('pse', v)} color="zinc" />
+                                    <FilterChipDropdown label="Type" options={getUniquePartnerValues.types} selected={filters.type || []} onChange={(v) => updateFilter('type', v)} color="rose" />
+                                </>
+                            )}
                         </div>
                     </div>
                 )}
 
                 {activeTab === 'projects' && (
-                    <div className={`flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 ${groupMode !== 'none' ? 'flex-col items-stretch' : 'flex-nowrap items-start'}`} style={{ minHeight: '70vh' }}>
-                        {groupMode !== 'none' ? (
-                            Array.from(new Set(config.kanbanProjects?.map((p: any) => groupMode === 'company' ? p.client : p.pseId))).sort().map(groupId => {
-                                const groupLabel = groupMode === 'company' ? groupId : getPseName(groupId);
-                                return (
-                                <div key={groupId} className="space-y-4">
-                                    <div className="flex items-center gap-3 px-2">
-                                        <div className={`w-1.5 h-6 rounded-full ${groupMode === 'company' ? 'bg-blue-600' : 'bg-zinc-900'}`}></div>
-                                        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">{groupLabel || 'Unassigned'}</h3>
-                                        <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">{config.kanbanProjects?.filter((p: any) => (groupMode === 'company' ? p.client : p.pseId) === groupId).length} items</span>
-                                    </div>
-                                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-                                        {KANBAN_STAGES.map(stage => {
-                                            const items = config.kanbanProjects?.filter((p: any) => (groupMode === 'company' ? p.client : p.pseId) === groupId && p.stage === stage && (priorityFilter === 'All' || p.priority === priorityFilter)) || [];
-                                            if (items.length === 0) return null;
-                                            return (
-                                                <div key={stage} className="w-[280px] shrink-0 space-y-3">
-                                                    <div className="text-[10px] font-black uppercase tracking-tighter text-zinc-400 ml-1">{stage}</div>
-                                                    {items.map((p: any) => (
-                                                        <ProjectCard key={p.id} project={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} />
-                                                    ))}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="h-px bg-zinc-200/60 mx-2"></div>
-                                </div>
-                            )})
-                        ) : (
-                            // Normal Kanban View
-                            KANBAN_STAGES.map(stage => (
+                    <div className="flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 flex-nowrap items-start" style={{ minHeight: '70vh' }}>
+                        {KANBAN_STAGES.map(stage => {
+                            // If stage filter is active and this stage isn't selected, skip column entirely
+                            if (filters.stage && filters.stage.length > 0 && !filters.stage.includes(stage)) return null;
+                            return (
                                 <div key={stage} className="w-[320px] shrink-0 bg-zinc-100/50 border border-zinc-200 rounded-3xl flex flex-col h-full max-h-[75vh]"
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={async (e) => {
@@ -469,42 +623,16 @@ export default function B2BBoardPage() {
                                         {getFilteredProjects(stage).map((p: any) => <ProjectCard key={p.id} project={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} />)}
                                     </div>
                                 </div>
-                            ))
-                        )}
+                            );
+                        })}
                     </div>
                 )}
 
                 {activeTab === 'leads' && (
-                    <div className={`flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 ${groupMode !== 'none' ? 'flex-col items-stretch' : 'flex-nowrap items-start'}`} style={{ minHeight: '70vh' }}>
-                        {groupMode !== 'none' ? (
-                            Array.from(new Set(config.kanbanLeads?.map((l: any) => groupMode === 'company' ? l.name : l.pseId))).sort().map(groupId => {
-                                const groupLabel = groupMode === 'company' ? groupId : getPseName(groupId);
-                                return (
-                                <div key={groupId} className="space-y-4">
-                                    <div className="flex items-center gap-3 px-2">
-                                        <div className={`w-1.5 h-6 rounded-full ${groupMode === 'company' ? 'bg-emerald-600' : 'bg-zinc-900'}`}></div>
-                                        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">{groupLabel || 'Unassigned'}</h3>
-                                        <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">{config.kanbanLeads?.filter((l: any) => (groupMode === 'company' ? l.name : l.pseId) === groupId).length} items</span>
-                                    </div>
-                                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-                                        {PRESALES_STAGES.map(stage => {
-                                            const items = config.kanbanLeads?.filter((l: any) => (groupMode === 'company' ? l.name : l.pseId) === groupId && l.stage === stage && (priorityFilter === 'All' || l.priority === priorityFilter)) || [];
-                                            if (items.length === 0) return null;
-                                            return (
-                                                <div key={stage} className="w-[280px] shrink-0 space-y-3">
-                                                    <div className="text-[10px] font-black uppercase tracking-tighter text-zinc-400 ml-1">{stage}</div>
-                                                    {items.map((l: any) => (
-                                                        <LeadCard key={l.id} lead={l} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />
-                                                    ))}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="h-px bg-zinc-200/60 mx-2"></div>
-                                </div>
-                            )})
-                        ) : (
-                            PRESALES_STAGES.map(stage => (
+                    <div className="flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 flex-nowrap items-start" style={{ minHeight: '70vh' }}>
+                        {PRESALES_STAGES.map(stage => {
+                            if (filters.stage && filters.stage.length > 0 && !filters.stage.includes(stage)) return null;
+                            return (
                                 <div key={stage} className="w-[320px] shrink-0 bg-emerald-50/30 border border-emerald-100 rounded-3xl flex flex-col h-full max-h-[75vh]"
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={async (e) => {
@@ -531,42 +659,16 @@ export default function B2BBoardPage() {
                                         {getFilteredLeads(stage).map((l: any) => <LeadCard key={l.id} lead={l} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />)}
                                     </div>
                                 </div>
-                            ))
-                        )}
+                            );
+                        })}
                     </div>
                 )}
 
                 {activeTab === 'partners' && (
-                    <div className={`flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 ${groupMode !== 'none' ? 'flex-col items-stretch' : 'flex-nowrap items-start'}`} style={{ minHeight: '70vh' }}>
-                        {groupMode !== 'none' ? (
-                            Array.from(new Set(config.kanbanPartners?.map((p: any) => groupMode === 'company' ? p.name : p.pseId))).sort().map(groupId => {
-                                const groupLabel = groupMode === 'company' ? groupId : getPseName(groupId);
-                                return (
-                                <div key={groupId} className="space-y-4">
-                                    <div className="flex items-center gap-3 px-2">
-                                        <div className={`w-1.5 h-6 rounded-full ${groupMode === 'company' ? 'bg-purple-600' : 'bg-zinc-900'}`}></div>
-                                        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">{groupLabel || 'Unassigned'}</h3>
-                                        <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">{config.kanbanPartners?.filter((p: any) => (groupMode === 'company' ? p.name : p.pseId) === groupId).length} items</span>
-                                    </div>
-                                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-                                        {PARTNER_STAGES.map(stage => {
-                                            const items = config.kanbanPartners?.filter((p: any) => (groupMode === 'company' ? p.name : p.pseId) === groupId && (p.stage || 'Sourcing') === stage && (priorityFilter === 'All' || p.priority === priorityFilter)) || [];
-                                            if (items.length === 0) return null;
-                                            return (
-                                                <div key={stage} className="w-[280px] shrink-0 space-y-3">
-                                                    <div className="text-[10px] font-black uppercase tracking-tighter text-zinc-400 ml-1">{stage}</div>
-                                                    {items.map((p: any) => (
-                                                        <PartnerCard key={p.id} partner={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />
-                                                    ))}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="h-px bg-zinc-200/60 mx-2"></div>
-                                </div>
-                            )})
-                        ) : (
-                            PARTNER_STAGES.map(stage => (
+                    <div className="flex gap-6 overflow-x-auto pb-6 hide-scrollbar animate-in slide-in-from-bottom-4 duration-500 flex-nowrap items-start" style={{ minHeight: '70vh' }}>
+                        {PARTNER_STAGES.map(stage => {
+                            if (filters.stage && filters.stage.length > 0 && !filters.stage.includes(stage)) return null;
+                            return (
                                 <div key={stage} className="w-[320px] shrink-0 bg-purple-50/30 border border-purple-100 rounded-3xl flex flex-col h-full max-h-[75vh]"
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={async (e) => {
@@ -593,8 +695,8 @@ export default function B2BBoardPage() {
                                         {getFilteredPartners(stage).map((p: any) => <PartnerCard key={p.id} partner={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />)}
                                     </div>
                                 </div>
-                            ))
-                        )}
+                            );
+                        })}
                     </div>
                 )}
 
@@ -602,7 +704,6 @@ export default function B2BBoardPage() {
                 {activeTab === 'stats' && config.pseWorkloads && (
                     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Chart 1: Proportional Composition */}
                             <div className="bg-white border border-zinc-200 p-6 rounded-3xl shadow-sm">
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900">Workload Composition (Weighted)</h2>
@@ -626,7 +727,6 @@ export default function B2BBoardPage() {
                                 </div>
                             </div>
 
-                            {/* Chart 2: Capacity Limits */}
                             <div className="bg-white border border-zinc-200 p-6 rounded-3xl shadow-sm">
                                 <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 mb-6">Capacity Utilization (%)</h2>
                                 <div className="space-y-6">
@@ -712,27 +812,35 @@ export default function B2BBoardPage() {
                 </div>
             )}
 
-            {/* ========== ADD LEAD MODAL ========== */}
+            {/* ========== ADD LEAD MODAL (with CRM Fields) ========== */}
             {isAddingLead && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl flex flex-col">
+                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
                         <div className="flex items-center justify-between p-6 border-b border-zinc-100">
-                            <h3 className="text-lg font-black text-zinc-900">{editingItemId ? 'Edit Lead Support' : 'Add Lead Support'}</h3>
+                            <h3 className="text-lg font-black text-zinc-900">{editingItemId ? 'Edit Lead / CRM Entry' : 'Add Lead Support'}</h3>
                             <button onClick={() => setIsAddingLead(false)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
                         </div>
-                        <div className="p-6 space-y-4">
-                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Company / Lead Name</label><input type="text" value={newLead.name} onChange={(e) => setNewLead((p: any) => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-zinc-900" /></div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PSE Support</label>
-                                <select value={newLead.pseId} onChange={(e) => setNewLead((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                    <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
-                                </select>
+                        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
+                            {/* Basic Info */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Company / Lead Name</label><input type="text" value={newLead.name} onChange={(e) => setNewLead((p: any) => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-zinc-900" /></div>
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Contact Name</label><input type="text" value={newLead.contactName || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, contactName: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-zinc-900" /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Mail size={10} className="inline mr-1 -mt-0.5" />Contact Email</label><input type="email" value={newLead.contactEmail || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, contactEmail: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" /></div>
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Phone size={10} className="inline mr-1 -mt-0.5" />Contact Number</label><input type="text" value={newLead.contactNumber || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, contactNumber: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" /></div>
+                            </div>
+
+                            {/* Assignment */}
+                            <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Current Stage</label>
-                                    <select value={newLead.stage} onChange={(e) => setNewLead((p: any) => ({ ...p, stage: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                        {PRESALES_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC Sales</label>
+                                    <input type="text" value={newLead.picSales || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, picSales: e.target.value }))} placeholder="e.g. Rani, Titan" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PSE Support</label>
+                                    <select value={newLead.pseId} onChange={(e) => setNewLead((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
                                     </select>
                                 </div>
                                 <div>
@@ -744,16 +852,46 @@ export default function B2BBoardPage() {
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Stage & Commercials */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Current Stage</label>
+                                    <select value={newLead.stage} onChange={(e) => setNewLead((p: any) => ({ ...p, stage: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        {PRESALES_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><DollarSign size={10} className="inline mr-1 -mt-0.5" />Forecasted Value (IDR)</label>
+                                    <input type="number" value={newLead.forecastedValue || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, forecastedValue: Number(e.target.value) }))} placeholder="0" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Probability (%)</label>
+                                    <input type="number" min="0" max="100" value={newLead.probability ? Math.round(newLead.probability * 100) : ''} onChange={(e) => setNewLead((p: any) => ({ ...p, probability: Number(e.target.value) / 100 }))} placeholder="0-100" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
+                                </div>
+                            </div>
+
+                            {/* Dates */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Calendar size={10} className="inline mr-1 -mt-0.5" />Demo Date</label><input type="date" value={newLead.demoDate || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, demoDate: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" /></div>
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Calendar size={10} className="inline mr-1 -mt-0.5" />Expected Close</label><input type="date" value={newLead.expectedCloseDate || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, expectedCloseDate: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" /></div>
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Last Interacted</label><input type="date" value={newLead.lastInteractedOn || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, lastInteractedOn: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" /></div>
+                            </div>
+
+                            {/* Progress */}
                             <div>
                                 <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">
-                                    <span>Progress</span>
+                                    <span>Progress to Won</span>
                                     <span>{newLead.progress || 0}%</span>
                                 </label>
                                 <input type="range" min="0" max="100" value={newLead.progress || 0} onChange={(e) => setNewLead((p: any) => ({ ...p, progress: Number(e.target.value) }))} className="w-full accent-emerald-600 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer" />
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Notes</label>
-                                <textarea rows={2} value={newLead.notes || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, notes: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-zinc-900"></textarea>
+
+                            {/* Next Step & Notes */}
+                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Next Step</label><input type="text" value={newLead.nextStep || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, nextStep: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" /></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Proposal Link</label><input type="url" value={newLead.proposalLink || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, proposalLink: e.target.value }))} placeholder="https://..." className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" /></div>
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Notes</label><textarea rows={1} value={newLead.notes || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, notes: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-zinc-900"></textarea></div>
                             </div>
                         </div>
                         <div className="p-6 border-t border-zinc-100 bg-zinc-50 rounded-b-3xl flex flex-col gap-3">
@@ -763,7 +901,7 @@ export default function B2BBoardPage() {
                                         <Trash2 size={14} /> Delete
                                     </button>
                                 ) : <div></div>}
-                                <button disabled={submitting} onClick={() => handleSaveData('Lead', newLead, setNewLead, setIsAddingLead, () => setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '' }))} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase rounded-xl hover:bg-emerald-700">{submitting ? 'Saving...' : editingItemId ? 'Update Lead' : 'Save Lead'}</button>
+                                <button disabled={submitting} onClick={() => handleSaveData('Lead', newLead, setNewLead, setIsAddingLead, () => setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '' }))} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase rounded-xl hover:bg-emerald-700">{submitting ? 'Saving...' : editingItemId ? 'Update Lead' : 'Save Lead'}</button>
                             </div>
                             {editingItemId && editingItemType === 'Lead' && (
                                 <button onClick={() => handleConvertToProject(newLead)} className="w-full py-3 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-800 transition-all shadow-lg flex items-center justify-center gap-2">

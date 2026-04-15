@@ -94,10 +94,35 @@ export default function MinimalistDashboard() {
       }
     }
 
-    // Also auto-fill B2C period if empty
-    if (data?.campaigns && data.campaigns.length > 0 && b2cPeriod === 'All' && activeTab === 'B2C') {
-      const periods = Array.from(new Set((data.campaigns as any[]).map(c => c.period).filter(Boolean))).sort().reverse();
-      if (periods.length > 0) setB2cPeriod(periods[0]);
+    // Identify Current Quarter (e.g., "Q2 2026")
+    const now = new Date();
+    const currentQuarterStr = `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`;
+
+    // Auto-fill B2C period (Campaigns & Revenue)
+    if (data?.revenue && data.revenue.length > 0 && b2cPeriod === 'All') {
+      const b2cPeriods = Array.from(new Set((data.revenue as any[]).map((r: any) => r.quarter).filter(Boolean))).sort().reverse();
+      if (b2cPeriods.includes(currentQuarterStr)) {
+          setB2cPeriod(currentQuarterStr);
+      } else if (b2cPeriods.length > 0) {
+          setB2cPeriod(b2cPeriods[0] as string); // Fallback to latest
+      }
+    } else if (data?.campaigns && data.campaigns.length > 0 && b2cPeriod === 'All') {
+      const campPeriods = Array.from(new Set((data.campaigns as any[]).map((c: any) => c.period).filter(Boolean))).sort().reverse();
+      if (campPeriods.includes(currentQuarterStr)) {
+          setB2cPeriod(currentQuarterStr);
+      } else if (campPeriods.length > 0) {
+          setB2cPeriod(campPeriods[0] as string);
+      }
+    }
+
+    // Auto-fill B2B Quarter
+    if (data?.pipeline && data.pipeline.length > 0 && b2bQuarter === 'All') {
+        const b2bPeriods = Array.from(new Set((data.pipeline as any[]).map((p: any) => p.quarter).filter(Boolean))).sort().reverse();
+        if (b2bPeriods.includes(currentQuarterStr)) {
+            setB2bQuarter(currentQuarterStr);
+        } else if (b2bPeriods.length > 0) {
+            setB2bQuarter(b2bPeriods[0] as string);
+        }
     }
   }, [data, activeTab, mounted]);
 

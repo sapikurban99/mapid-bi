@@ -16,10 +16,33 @@ import {
   deleteKanbanPartner,
   updatePseMember,
   addPseMember,
+  getStandupByDate,
+  getStandupByRange,
+  addStandupTask,
+  editStandupTask,
+  deleteStandupTask,
+  updateStandupStatus,
 } from '../../services/biService';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    
+    // Handle standup-specific GET requests
+    const standupDate = searchParams.get('standupDate');
+    const standupStart = searchParams.get('standupStart');
+    const standupEnd = searchParams.get('standupEnd');
+    
+    if (standupDate) {
+      const data = await getStandupByDate(standupDate);
+      return NextResponse.json({ success: true, data });
+    }
+    
+    if (standupStart && standupEnd) {
+      const data = await getStandupByRange(standupStart, standupEnd);
+      return NextResponse.json({ success: true, data });
+    }
+
     const data = await getAllBIData();
     return NextResponse.json(data);
   } catch (error: any) {
@@ -80,6 +103,19 @@ export async function POST(request: Request) {
       
       case 'addPseMember':
         return NextResponse.json(await addPseMember(body.pseId, body.name, body.maxCapacity, body.isActive));
+
+      // Daily Standup Actions
+      case 'addStandupTask':
+        return NextResponse.json(await addStandupTask(body));
+      
+      case 'editStandupTask':
+        return NextResponse.json(await editStandupTask(body.id, body));
+      
+      case 'deleteStandupTask':
+        return NextResponse.json(await deleteStandupTask(body.id));
+      
+      case 'updateStandupStatus':
+        return NextResponse.json(await updateStandupStatus(body.id, body.status));
 
       default:
         return NextResponse.json({ success: false, message: 'Unknown action' });

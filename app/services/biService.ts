@@ -143,6 +143,17 @@ export async function getAllBIData() {
     progress: r.progress || 0,
     priority: r.priority || 'Medium',
     notes: r.notes || '',
+    picSales: r.pic_sales || '',
+    contactName: r.contact_name || '',
+    contactEmail: r.contact_email || '',
+    contactNumber: r.contact_number || '',
+    forecastedValue: r.forecasted_value || 0,
+    probability: r.probability || 0,
+    demoDate: r.demo_date || '',
+    expectedCloseDate: r.expected_close_date || '',
+    lastInteractedOn: r.last_interacted_on || '',
+    nextStep: r.next_step || '',
+    proposalLink: r.proposal_link || '',
   }));
 
   const mappedKanbanPartners = (kanbanPartners || []).map(r => ({
@@ -282,6 +293,17 @@ export async function addKanbanLead(payload: any) {
     progress: payload.progress || 0,
     priority: payload.priority || 'Medium',
     notes: payload.notes || '',
+    pic_sales: payload.picSales || null,
+    contact_name: payload.contactName || null,
+    contact_email: payload.contactEmail || null,
+    contact_number: payload.contactNumber || null,
+    forecasted_value: payload.forecastedValue || 0,
+    probability: payload.probability || 0,
+    demo_date: payload.demoDate || null,
+    expected_close_date: payload.expectedCloseDate || null,
+    last_interacted_on: payload.lastInteractedOn || null,
+    next_step: payload.nextStep || null,
+    proposal_link: payload.proposalLink || null,
   }).select('id').single();
   if (error) throw new Error(error.message);
   return { success: true, newId: data.id };
@@ -296,6 +318,17 @@ export async function editKanbanLead(id: string, payload: any) {
     progress: payload.progress || 0,
     priority: payload.priority || 'Medium',
     notes: payload.notes || '',
+    pic_sales: payload.picSales || null,
+    contact_name: payload.contactName || null,
+    contact_email: payload.contactEmail || null,
+    contact_number: payload.contactNumber || null,
+    forecasted_value: payload.forecastedValue || 0,
+    probability: payload.probability || 0,
+    demo_date: payload.demoDate || null,
+    expected_close_date: payload.expectedCloseDate || null,
+    last_interacted_on: payload.lastInteractedOn || null,
+    next_step: payload.nextStep || null,
+    proposal_link: payload.proposalLink || null,
   }).eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };
@@ -377,6 +410,85 @@ export async function addPseMember(pseId: string, name: string, maxCapacity: num
     max_capacity: maxCapacity,
     is_active: isActive,
   });
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+// ========================================
+// Daily Standup CRUD
+// ========================================
+
+export async function getStandupByDate(date: string) {
+  const { data, error } = await supabase
+    .from('daily_standup')
+    .select('*')
+    .eq('date', date)
+    .order('member_name');
+  if (error) throw new Error(error.message);
+  return (data || []).map(r => ({
+    id: r.id,
+    date: r.date,
+    memberName: r.member_name,
+    task: r.task,
+    status: r.status || 'In Progress',
+    notes: r.notes || '',
+    hambatan: r.hambatan || '',
+  }));
+}
+
+export async function getStandupByRange(startDate: string, endDate: string) {
+  const { data, error } = await supabase
+    .from('daily_standup')
+    .select('*')
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date')
+    .order('member_name');
+  if (error) throw new Error(error.message);
+  return (data || []).map(r => ({
+    id: r.id,
+    date: r.date,
+    memberName: r.member_name,
+    task: r.task,
+    status: r.status || 'In Progress',
+    notes: r.notes || '',
+    hambatan: r.hambatan || '',
+  }));
+}
+
+export async function addStandupTask(payload: any) {
+  const { data, error } = await supabase.from('daily_standup').insert({
+    date: payload.date,
+    member_name: payload.memberName,
+    task: payload.task,
+    status: payload.status || 'In Progress',
+    notes: payload.notes || '',
+    hambatan: payload.hambatan || '',
+  }).select('id').single();
+  if (error) throw new Error(error.message);
+  return { success: true, newId: data.id };
+}
+
+export async function editStandupTask(id: string, payload: any) {
+  const { error } = await supabase.from('daily_standup').update({
+    task: payload.task,
+    status: payload.status,
+    notes: payload.notes || '',
+    hambatan: payload.hambatan || '',
+    member_name: payload.memberName,
+  }).eq('id', id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function deleteStandupTask(id: string) {
+  const { error } = await supabase.from('daily_standup').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function updateStandupStatus(id: string, status: string) {
+  const { error } = await supabase.from('daily_standup').update({ status }).eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };
 }

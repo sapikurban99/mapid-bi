@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, Target, Settings, Menu, LogOut, PanelLeftClose, PanelRightClose, Briefcase } from "lucide-react";
+import { Activity, LayoutDashboard, Target, Settings, Menu, LogOut, PanelLeftClose, PanelRightClose, Briefcase, Calendar } from "lucide-react";
 import { getConfig } from "../lib/config";
 import { useEffect, useState } from "react";
 import { useGlobalData } from "./GlobalDataProvider";
@@ -23,6 +23,7 @@ export default function SidebarNav() {
         { href: '/', label: 'Strategy & RACI', icon: Target },
         { href: '/dashboard', label: 'BI Dashboard', icon: LayoutDashboard },
         { href: '/b2b-board', label: 'B2B Delivery & Ops', icon: Briefcase },
+        { href: '/daily-standup', label: 'Daily Standup', icon: Calendar },
         { href: '/growth', label: 'Growth Intelligence', icon: Activity },
         { href: '/admin', label: 'Admin Panel', icon: Settings },
     ];

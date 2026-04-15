@@ -124,6 +124,28 @@ export interface KanbanLeadItem {
     progress?: number;
     priority?: string;
     notes?: string;
+    // CRM Fields
+    picSales?: string;
+    contactName?: string;
+    contactEmail?: string;
+    contactNumber?: string;
+    forecastedValue?: number;
+    probability?: number;
+    demoDate?: string;
+    expectedCloseDate?: string;
+    lastInteractedOn?: string;
+    nextStep?: string;
+    proposalLink?: string;
+}
+
+export interface StandupTask {
+    id: string;
+    date: string;
+    memberName: string;
+    task: string;
+    status: 'Done' | 'In Progress';
+    notes?: string;
+    hambatan?: string;
 }
 
 export interface KanbanPartnerItem {

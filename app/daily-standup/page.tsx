@@ -6,14 +6,14 @@ import { Plus, X, Loader2, ChevronLeft, ChevronRight, Calendar, CheckCircle2, Cl
 const TEAM_MEMBERS = ['Fariz', 'Dwi', 'Wina', 'Annisa', 'Lossa', 'Amel', 'Hadi', 'Zhafran'];
 
 const MEMBER_COLORS: Record<string, { bg: string; border: string; text: string; light: string; dot: string; btn: string }> = {
-    'Fariz':   { bg: 'bg-blue-50',    border: 'border-blue-200',   text: 'text-blue-700',   light: 'bg-blue-100',   dot: 'bg-blue-500',   btn: 'bg-blue-600 hover:bg-blue-700' },
-    'Dwi':     { bg: 'bg-emerald-50', border: 'border-emerald-200',text: 'text-emerald-700',light: 'bg-emerald-100',dot: 'bg-emerald-500',btn: 'bg-emerald-600 hover:bg-emerald-700' },
-    'Wina':    { bg: 'bg-purple-50',  border: 'border-purple-200', text: 'text-purple-700', light: 'bg-purple-100', dot: 'bg-purple-500', btn: 'bg-purple-600 hover:bg-purple-700' },
-    'Annisa':  { bg: 'bg-rose-50',    border: 'border-rose-200',   text: 'text-rose-700',   light: 'bg-rose-100',   dot: 'bg-rose-500',   btn: 'bg-rose-600 hover:bg-rose-700' },
-    'Lossa':   { bg: 'bg-amber-50',   border: 'border-amber-200',  text: 'text-amber-700',  light: 'bg-amber-100',  dot: 'bg-amber-500',  btn: 'bg-amber-600 hover:bg-amber-700' },
-    'Amel':    { bg: 'bg-cyan-50',    border: 'border-cyan-200',   text: 'text-cyan-700',   light: 'bg-cyan-100',   dot: 'bg-cyan-500',   btn: 'bg-cyan-600 hover:bg-cyan-700' },
-    'Hadi':    { bg: 'bg-indigo-50',  border: 'border-indigo-200', text: 'text-indigo-700', light: 'bg-indigo-100', dot: 'bg-indigo-500', btn: 'bg-indigo-600 hover:bg-indigo-700' },
-    'Zhafran': { bg: 'bg-teal-50',    border: 'border-teal-200',   text: 'text-teal-700',   light: 'bg-teal-100',   dot: 'bg-teal-500',   btn: 'bg-teal-600 hover:bg-teal-700' },
+    'Fariz': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', light: 'bg-blue-100', dot: 'bg-blue-500', btn: 'bg-blue-600 hover:bg-blue-700' },
+    'Dwi': { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', light: 'bg-emerald-100', dot: 'bg-emerald-500', btn: 'bg-emerald-600 hover:bg-emerald-700' },
+    'Wina': { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', light: 'bg-purple-100', dot: 'bg-purple-500', btn: 'bg-purple-600 hover:bg-purple-700' },
+    'Annisa': { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', light: 'bg-rose-100', dot: 'bg-rose-500', btn: 'bg-rose-600 hover:bg-rose-700' },
+    'Lossa': { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', light: 'bg-amber-100', dot: 'bg-amber-500', btn: 'bg-amber-600 hover:bg-amber-700' },
+    'Amel': { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700', light: 'bg-cyan-100', dot: 'bg-cyan-500', btn: 'bg-cyan-600 hover:bg-cyan-700' },
+    'Hadi': { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', light: 'bg-indigo-100', dot: 'bg-indigo-500', btn: 'bg-indigo-600 hover:bg-indigo-700' },
+    'Zhafran': { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', light: 'bg-teal-100', dot: 'bg-teal-500', btn: 'bg-teal-600 hover:bg-teal-700' },
 };
 
 const getColor = (name: string) => MEMBER_COLORS[name] || { bg: 'bg-zinc-50', border: 'border-zinc-200', text: 'text-zinc-700', light: 'bg-zinc-100', dot: 'bg-zinc-500', btn: 'bg-zinc-600 hover:bg-zinc-700' };
@@ -57,6 +57,11 @@ export default function DailyStandupPage() {
     const [memberFilter, setMemberFilter] = useState<string[]>([]);
     const [statusFilter, setStatusFilter] = useState<string>('All');
 
+    // Custom Filter State
+    const [isRangeMode, setIsRangeMode] = useState(false);
+    const [startDate, setStartDate] = useState(formatDate(new Date()));
+    const [endDate, setEndDate] = useState(formatDate(new Date()));
+
     // Modal State
     const [isAdding, setIsAdding] = useState(false);
     const [editingTask, setEditingTask] = useState<StandupTask | null>(null);
@@ -68,7 +73,11 @@ export default function DailyStandupPage() {
     const fetchTasks = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/bi?standupDate=${dateStr}`);
+            let url = `/api/bi?standupDate=${dateStr}`;
+            if (isRangeMode) {
+                url = `/api/bi?standupStart=${startDate}&standupEnd=${endDate}`;
+            }
+            const res = await fetch(url);
             const json = await res.json();
             if (json.success) setTasks(json.data || []);
         } catch (err) {
@@ -89,8 +98,13 @@ export default function DailyStandupPage() {
         }
     };
 
-    useEffect(() => { fetchTasks(); }, [dateStr]);
-    useEffect(() => { if (viewMode === 'weekly') fetchWeekTasks(); }, [viewMode, dateStr]);
+    useEffect(() => {
+        if (viewMode !== 'weekly') fetchTasks();
+    }, [dateStr, isRangeMode, startDate, endDate]);
+
+    useEffect(() => {
+        if (viewMode === 'weekly') fetchWeekTasks();
+    }, [viewMode, dateStr]);
 
     const goToPrev = () => { const d = new Date(currentDate); d.setDate(d.getDate() - 1); setCurrentDate(d); };
     const goToNext = () => { const d = new Date(currentDate); d.setDate(d.getDate() + 1); setCurrentDate(d); };
@@ -261,16 +275,47 @@ export default function DailyStandupPage() {
 
                 {/* Date nav + Action bar */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                    <div className="flex items-center gap-2">
-                        <button onClick={goToPrev} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-700 shadow-sm"><ChevronLeft size={16} /></button>
-                        <button onClick={goToToday} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-700 shadow-sm">Today</button>
-                        <input type="date" value={dateStr} onChange={(e) => setCurrentDate(new Date(e.target.value + 'T00:00:00'))} className="px-3 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-900 shadow-sm" />
-                        <button onClick={goToNext} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-700 shadow-sm"><ChevronRight size={16} /></button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-xl shadow-sm">
+                            <button
+                                onClick={() => setIsRangeMode(false)}
+                                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${!isRangeMode ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                            >Single</button>
+                            <button
+                                onClick={() => setIsRangeMode(true)}
+                                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${isRangeMode ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                            >Range</button>
+                        </div>
+
+                        {!isRangeMode ? (
+                            <div className="flex items-center gap-2">
+                                <button onClick={goToPrev} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-700 shadow-sm"><ChevronLeft size={16} /></button>
+                                <button onClick={goToToday} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-700 shadow-sm">Today</button>
+                                <input type="date" value={dateStr} onChange={(e) => setCurrentDate(new Date(e.target.value + 'T00:00:00'))} className="px-3 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-900 shadow-sm" />
+                                <button onClick={goToNext} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-700 shadow-sm"><ChevronRight size={16} /></button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 bg-white border border-slate-200 p-1 rounded-xl shadow-sm">
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-2 py-1 text-[10px] font-bold border-none focus:ring-0 text-slate-900" />
+                                <span className="text-[10px] font-black text-slate-400">TO</span>
+                                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-2 py-1 text-[10px] font-bold border-none focus:ring-0 text-slate-900" />
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-2">
                         {/* Member filter chips */}
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap items-center gap-1 group/members">
+                            <div className="flex items-center gap-1 mr-1 pr-1 border-r border-slate-200">
+                                <button
+                                    onClick={() => setMemberFilter([])}
+                                    className={`px-2 py-1 text-[8px] font-black uppercase tracking-tighter rounded-md transition-all ${memberFilter.length === 0 ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                >All</button>
+                                <button
+                                    onClick={() => setMemberFilter([...TEAM_MEMBERS])}
+                                    className="px-2 py-1 text-[8px] font-black uppercase tracking-tighter rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                >Select All</button>
+                            </div>
                             {TEAM_MEMBERS.map(m => {
                                 const active = memberFilter.includes(m);
                                 const c = getColor(m);
@@ -278,7 +323,7 @@ export default function DailyStandupPage() {
                                     <button key={m} onClick={() => {
                                         if (active) setMemberFilter(prev => prev.filter(x => x !== m));
                                         else setMemberFilter(prev => [...prev, m]);
-                                    }} className={`px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border transition-all ${active ? `${c.bg} ${c.border} ${c.text}` : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}>{m}</button>
+                                    }} className={`px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border transition-all ${active ? `${c.bg} ${c.border} ${c.text}` : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}>{m}</button>
                                 );
                             })}
                         </div>
@@ -562,7 +607,8 @@ export default function DailyStandupPage() {
                 </div>
             )}
 
-            <style dangerouslySetInnerHTML={{__html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }

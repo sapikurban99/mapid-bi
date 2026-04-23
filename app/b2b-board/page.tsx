@@ -290,7 +290,6 @@ export default function B2BBoardPage() {
         'Freeze': 0,
         'Closed Lost': 0,
         // Projects
-        'Technical Handover': 0.4,
         'Feasibility & Design': 0.5,
         'Demo / POC': 0.6,
         'Development & Data': 0.7,

@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useGlobalData } from '../components/GlobalDataProvider';
 import { getConfig, SiteConfig, setConfig } from '../lib/config';
-import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck } from 'lucide-react';
+import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck, CheckCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 // --- Filter Chip Dropdown Component ---
@@ -57,11 +57,14 @@ const FilterChipDropdown = ({ label, options, selected, onChange, color = 'blue'
     );
 };
 
+const SALES_TEAM = ['Titan', 'Rani'];
+
 // --- Sub-components (Cards) ---
 const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
     const isDone = p.stage === 'Done';
     const isLost = p.stage === 'Lost';
     const isFrozen = p.stage === 'Freeze';
+    const hasValue = p.forecastedValue && p.forecastedValue > 0;
     return (
         <div draggable onDragStart={(e) => e.dataTransfer.setData('projectId', p.id)}
             className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isDone ? 'bg-emerald-50 border-emerald-200' : isLost ? 'bg-rose-50 border-rose-200' : isFrozen ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-zinc-200'}`}>
@@ -77,9 +80,36 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
                 </div>
             </div>
             <div onClick={() => onEdit('Project', p)}>
-                <h3 className={`font-bold text-base mb-1 ${isDone ? 'text-emerald-950' : isLost ? 'text-rose-950' : 'text-blue-950'}`}>{p.projectName}</h3>
-                {p.client && <p className="text-[10px] font-black uppercase text-zinc-400 mb-1">Client: <span className="text-zinc-600">{p.client}</span></p>}
-                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-3 truncate">PSE: <span className="text-zinc-600">{getPseName(p.pseId)}</span></p>
+                <h3 className={`font-bold text-base mb-1 ${isDone ? 'text-emerald-950' : isLost ? 'text-rose-950' : 'text-blue-950'}`}>{p.client || p.projectName}</h3>
+                <p className="text-[10px] font-black uppercase text-zinc-400 mb-1">Project: <span className="text-zinc-600">{p.projectName}</span></p>
+                
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mb-2">
+                    {p.picSales && <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-widest"><UserCheck size={9} className="inline mr-0.5 -mt-0.5" /> Sales: <span className="text-amber-800">{p.picSales}</span></p>}
+                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">PSE: <span className="text-zinc-600">{getPseName(p.pseId)}</span></p>
+                </div>
+
+                {hasValue && (
+                    <div className="flex items-center gap-1.5 mb-2">
+                        <DollarSign size={10} className="text-blue-500" />
+                        <span className="text-[10px] font-black text-blue-700">IDR {(p.forecastedValue / 1000000).toFixed(0)}M</span>
+                    </div>
+                )}
+
+                {(p.contactName || p.contactNumber) && (
+                    <div className="flex items-center gap-2 mb-2 text-[9px] text-zinc-400 font-bold">
+                        {p.contactName && <span className="truncate max-w-[120px]">{p.contactName}</span>}
+                        {p.contactNumber && <span className="flex items-center gap-0.5"><Phone size={8} /> {p.contactNumber.substring(0, 15)}</span>}
+                    </div>
+                )}
+
+                {p.closeDate && (
+                    <div className="flex items-center gap-1.5 mb-2 text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-lg w-fit">
+                        <Calendar size={10} /> Close: {new Date(p.closeDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                )}
+
+                {p.nextStep && <p className="text-[10px] text-zinc-500 bg-zinc-50 px-2 py-1 rounded-lg mb-2 line-clamp-2 italic">&rarr; {p.nextStep}</p>}
+                
                 <div className="flex flex-col border-t border-zinc-50 pt-3">
                     <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
                         <span className="text-zinc-400">Progress</span>
@@ -111,11 +141,11 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any)
             </div>
             <div onClick={() => onEdit('Lead', l)}>
                 <h3 className="font-bold text-zinc-900 text-base mb-1">{l.name}</h3>
-                {/* PIC Sales & PSE row */}
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 mb-2">
                     {l.picSales && <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-widest"><UserCheck size={9} className="inline mr-0.5 -mt-0.5" /> Sales: <span className="text-amber-800">{l.picSales}</span></p>}
                     <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">PSE: <span className="text-zinc-600">{getPseName(l.pseId)}</span></p>
                 </div>
+                {l.partnerId && <p className="text-[9px] font-black text-purple-600/80 uppercase tracking-widest mb-2"><Users size={9} className="inline mr-0.5 -mt-0.5" /> Partner: <span className="text-purple-800">Linked</span></p>}
                 {/* Forecasted Value */}
                 {hasValue && (
                     <div className="flex items-center gap-1.5 mb-2">
@@ -166,7 +196,40 @@ const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor }
             </div>
             <div onClick={() => onEdit('Partner', p)}>
                 <h3 className="font-bold text-purple-950 text-base mb-1">{p.name}</h3>
-                <p className="text-[10px] font-black text-purple-600/70 uppercase tracking-widest mb-3">PIC: <span className="text-purple-800">{getPseName(p.pseId)}</span></p>
+                
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mb-2">
+                    {p.picPartner && <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-widest"><UserCheck size={9} className="inline mr-0.5 -mt-0.5" /> PIC: <span className="text-amber-800">{p.picPartner}</span></p>}
+                    <p className="text-[10px] font-black text-purple-600/70 uppercase tracking-widest">PSE: <span className="text-purple-800">{getPseName(p.pseId)}</span></p>
+                </div>
+
+                {(p.contactName || p.contactNumber) && (
+                    <div className="flex items-center gap-2 mb-2 text-[9px] text-zinc-400 font-bold">
+                        {p.contactName && <span className="truncate max-w-[120px]">{p.contactName}</span>}
+                        {p.contactNumber && <span className="flex items-center gap-0.5"><Phone size={8} /> {p.contactNumber.substring(0, 15)}</span>}
+                    </div>
+                )}
+
+                {p.nextStep && <p className="text-[10px] text-zinc-500 bg-zinc-50 px-2 py-1 rounded-lg mb-2 line-clamp-2 italic">&rarr; {p.nextStep}</p>}
+                
+                {/* Leads Section Indicator */}
+                {p.leadsCount > 0 && (
+                    <div className="mt-3 pt-3 border-t border-zinc-100">
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="bg-purple-100 text-purple-700 text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-widest">{p.leadsCount} Leads Generated</span>
+                        </div>
+                        <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1">
+                            {p.leads?.map((l: any) => (
+                                <div key={l.id} className="bg-zinc-50 border border-zinc-100 p-2 rounded-lg flex flex-col gap-0.5">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-zinc-800 truncate max-w-[150px]">{l.name}</span>
+                                        <span className="text-[8px] font-black text-zinc-400 uppercase tracking-tighter">{l.stage}</span>
+                                    </div>
+                                    {l.forecastedValue > 0 && <span className="text-[8px] font-black text-emerald-600">IDR {(l.forecastedValue / 1000000).toFixed(0)}M</span>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
                 <div className="flex flex-col border-t border-purple-50 pt-3">
                     <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
                         <span className="text-purple-600/50">Syncing</span>
@@ -185,7 +248,7 @@ export default function B2BBoardPage() {
     const { syncData, isLoading: globalIsLoading } = useGlobalData();
     const [config, setLocalConfig] = useState<SiteConfig | null>(null);
     const [loadingBiData, setLoadingBiData] = useState(false);
-    const [activeTab, setActiveTab] = useState<'projects' | 'leads' | 'partners' | 'stats'>('projects');
+    const [activeTab, setActiveTab] = useState<'projects' | 'leads' | 'partners' | 'stats' | 'sales' | 'revenue'>('projects');
     const [showArchived, setShowArchived] = useState(false);
     const [showPointsInfo, setShowPointsInfo] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -200,9 +263,9 @@ export default function B2BBoardPage() {
     const [submitting, setSubmitting] = useState(false);
     
     // Forms State
-    const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' });
-    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '' });
-    const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' });
+    const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', probability: 0.4 });
+    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '' });
+    const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' });
 
     const [editingItemType, setEditingItemType] = useState<'Project' | 'Lead' | 'Partner' | null>(null);
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -212,6 +275,32 @@ export default function B2BBoardPage() {
     const KANBAN_STAGES = ['Technical Handover', 'Feasibility & Design', 'Demo / POC', 'Development & Data', 'Internal Testing', 'UAT with Client', 'Training & Go Live', 'Value Review', 'Freeze', 'Done', 'Lost'];
     const PRESALES_STAGES = ['Lead Generation', 'Discovery Meeting', 'MoM & BRD Creation', 'Technical Handover', 'Feasibility Check', 'Solution Design & FRD', 'Validation & Demo', 'Commercial Negotiation', 'Freeze', 'Closed Lost'];
     const PARTNER_STAGES = ['Sourcing', 'Approached', 'Negotiation', 'Onboarded', 'Active', 'Freeze', 'Archived'];
+
+    // Hardcoded Probability & Progress Mapping
+    const PROBABILITY_MAP: Record<string, number> = {
+        // Leads
+        'Lead Generation': 0.1,
+        'Discovery Meeting': 0.2,
+        'MoM & BRD Creation': 0.3,
+        'Technical Handover': 0.4,
+        'Feasibility Check': 0.5,
+        'Solution Design & FRD': 0.6,
+        'Validation & Demo': 0.8,
+        'Commercial Negotiation': 0.9,
+        'Freeze': 0,
+        'Closed Lost': 0,
+        // Projects
+        'Technical Handover': 0.4,
+        'Feasibility & Design': 0.5,
+        'Demo / POC': 0.6,
+        'Development & Data': 0.7,
+        'Internal Testing': 0.8,
+        'UAT with Client': 0.9,
+        'Training & Go Live': 1.0,
+        'Value Review': 1.0,
+        'Done': 1.0,
+        'Lost': 0
+    };
 
     // CRM Status mapping - keep CRM status as-is for leads
     const CRM_STATUSES = ['Lead', 'Contacted', 'Demo/Call of Interest', 'Feasibility Check', 'Proposal made', 'Negotiation', 'POC', 'Won', 'Lost', 'Fridge'];
@@ -322,6 +411,9 @@ export default function B2BBoardPage() {
             if (filters.type && !filters.type.includes(p.type)) return false;
             if (!matchesSearch(p)) return false;
             return true;
+        }).map((p: any) => {
+            const partnerLeads = config?.kanbanLeads?.filter((l: any) => l.partnerId === p.id) || [];
+            return { ...p, leadsCount: partnerLeads.length, leads: partnerLeads };
         }) || [];
     };
 
@@ -510,7 +602,10 @@ export default function B2BBoardPage() {
                         <button onClick={() => setActiveTab('projects')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'projects' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><Briefcase size={14} /> Projects</button>
                         <button onClick={() => setActiveTab('leads')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'leads' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><Target size={14} /> Leads</button>
                         <button onClick={() => setActiveTab('partners')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'partners' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><Users size={14} /> Partners</button>
-                        <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><BarChart3 size={14} /> PSE Stats</button>
+                        <div className="w-px h-6 bg-zinc-200 mx-1"></div>
+                        <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><BarChart3 size={14} /> PSE</button>
+                        <button onClick={() => setActiveTab('sales')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'sales' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><UserCheck size={14} /> Sales</button>
+                        <button onClick={() => setActiveTab('revenue')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'revenue' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><DollarSign size={14} /> Revenue</button>
                     </div>
                 </div>
             </header>
@@ -539,7 +634,7 @@ export default function B2BBoardPage() {
                 </div>
 
                 {/* DYNAMIC FILTER BAR */}
-                {activeTab !== 'stats' && (
+                {['projects', 'leads', 'partners'].includes(activeTab) && (
                     <div className="flex flex-col gap-3 mb-6 mt-2 animate-in fade-in duration-300">
                         {/* Search + Clear row */}
                         <div className="flex items-center gap-3">
@@ -761,20 +856,256 @@ export default function B2BBoardPage() {
                         </div>
                     </div>
                 )}
+
+                {/* TAB 5: SALES STATS */}
+                {activeTab === 'sales' && (
+                    <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                        {(() => {
+                            const salesData = SALES_TEAM.map(name => {
+                                const activeLeads = (config.kanbanLeads || []).filter((l: any) => l.picSales === name && !['Freeze', 'Closed Lost'].includes(l.stage));
+                                const wonLeads = (config.kanbanLeads || []).filter((l: any) => l.picSales === name && l.stage === 'Commercial Negotiation'); // Approaching Won
+                                const activeProjects = (config.kanbanProjects || []).filter((p: any) => p.picSales === name && !['Freeze', 'Done', 'Lost'].includes(p.stage));
+                                const activePartners = (config.kanbanPartners || []).filter((p: any) => p.picPartner === name && p.isActive !== false);
+
+                                const potentialValue = activeLeads.reduce((acc: number, l: any) => acc + (Number(l.forecastedValue) || 0), 0);
+                                const totalValue = activeProjects.reduce((acc: number, p: any) => acc + (Number(p.forecastedValue) || 0), 0);
+
+                                return {
+                                    name,
+                                    activeLeads: activeLeads.length,
+                                    wonLeads: wonLeads.length,
+                                    activeProjects: activeProjects.length,
+                                    activePartners: activePartners.length,
+                                    potentialValue,
+                                    totalValue
+                                };
+                            });
+
+                            return (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {salesData.map(data => (
+                                        <div key={data.name} className="bg-white border border-zinc-200 p-6 rounded-3xl shadow-sm">
+                                            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-zinc-100">
+                                                <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 shadow-inner">
+                                                    <UserCheck size={20} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-black text-zinc-900 tracking-tight">{data.name}</h3>
+                                                    <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Sales Representative</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-xl">
+                                                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active Leads</span>
+                                                    <span className="text-sm font-black text-emerald-600">{data.activeLeads}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-xl">
+                                                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active Projects</span>
+                                                    <span className="text-sm font-black text-blue-600">{data.activeProjects}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-3 bg-zinc-50 rounded-xl">
+                                                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active Partners</span>
+                                                    <span className="text-sm font-black text-purple-600">{data.activePartners}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-6 pt-6 border-t border-zinc-100 space-y-4">
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Potential Value (Leads)</p>
+                                                    <p className="text-lg font-mono font-black text-amber-600">IDR {(data.potentialValue / 1000000).toFixed(0)}M</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Secured Value (Projects)</p>
+                                                    <p className="text-lg font-mono font-black text-emerald-600">IDR {(data.totalValue / 1000000).toFixed(0)}M</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
+
+                {/* TAB 6: REVENUE DASHBOARD */}
+                {activeTab === 'revenue' && (
+                    <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                        {(() => {
+                            const projects = config.kanbanProjects || [];
+                            const leads = config.kanbanLeads || [];
+                            
+                            const totalRevenue = projects.reduce((acc: number, p: any) => acc + (Number(p.forecastedValue) || 0), 0);
+                            const activeProjectsRev = projects.filter((p: any) => !['Done', 'Lost', 'Freeze'].includes(p.stage)).reduce((acc: number, p: any) => acc + (Number(p.forecastedValue) || 0), 0);
+                            const doneProjectsRev = projects.filter((p: any) => p.stage === 'Done').reduce((acc: number, p: any) => acc + (Number(p.forecastedValue) || 0), 0);
+
+                            const potentialRevenue = leads.filter((l: any) => !['Closed Lost', 'Freeze'].includes(l.stage)).reduce((acc: number, l: any) => acc + (Number(l.forecastedValue) || 0), 0);
+                            const weightedPipeline = leads.filter((l: any) => !['Closed Lost', 'Freeze'].includes(l.stage)).reduce((acc: number, l: any) => acc + ((Number(l.forecastedValue) || 0) * (Number(l.probability) || 0)), 0);
+
+                            const formatIDR = (val: number) => {
+                                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+                            };
+
+                            return (
+                                <>
+                                    {/* Summary Cards */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        <div className="bg-white border border-zinc-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><DollarSign size={64} /></div>
+                                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 relative z-10">Total Pipeline Value</p>
+                                            <p className="text-2xl font-black font-mono text-zinc-900 relative z-10">{formatIDR(potentialRevenue)}</p>
+                                            <p className="text-[10px] font-bold text-zinc-500 mt-2 relative z-10">All active leads & opportunities</p>
+                                        </div>
+                                        <div className="bg-white border border-zinc-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><Target size={64} /></div>
+                                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 relative z-10">Weighted Pipeline</p>
+                                            <p className="text-2xl font-black font-mono text-emerald-600 relative z-10">{formatIDR(weightedPipeline)}</p>
+                                            <p className="text-[10px] font-bold text-zinc-500 mt-2 relative z-10">Adjusted by probability %</p>
+                                        </div>
+                                        <div className="bg-white border border-zinc-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><Briefcase size={64} /></div>
+                                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 relative z-10">Active Contracts Value</p>
+                                            <p className="text-2xl font-black font-mono text-blue-600 relative z-10">{formatIDR(activeProjectsRev)}</p>
+                                            <p className="text-[10px] font-bold text-zinc-500 mt-2 relative z-10">In-progress projects</p>
+                                        </div>
+                                        <div className="bg-white border border-zinc-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><CheckCircle size={64} /></div>
+                                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 relative z-10">Total Realized Revenue</p>
+                                            <p className="text-2xl font-black font-mono text-emerald-600 relative z-10">{formatIDR(doneProjectsRev)}</p>
+                                            <p className="text-[10px] font-bold text-zinc-500 mt-2 relative z-10">Completed & billed (Done stage)</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Visualization */}
+                                    <div className="bg-white border border-zinc-200 rounded-3xl shadow-sm p-6 mt-6">
+                                        <div className="mb-6">
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">Revenue Composition Overview</h3>
+                                            <p className="text-[10px] font-bold text-zinc-400 mt-1">Comparison of potential, active, and realized value</p>
+                                        </div>
+                                        <div className="h-64 w-full">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={[
+                                                    { name: 'Potential Pipeline', value: potentialRevenue, fill: '#f59e0b' },
+                                                    { name: 'Active Contracts', value: activeProjectsRev, fill: '#3b82f6' },
+                                                    { name: 'Realized Revenue', value: doneProjectsRev, fill: '#10b981' }
+                                                ]} margin={{ top: 20, right: 30, left: 40, bottom: 5 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f4f4f5" />
+                                                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#71717a', fontWeight: 900 }} axisLine={false} tickLine={false} />
+                                                    <YAxis tickFormatter={(val) => `Rp ${(val / 1000000).toFixed(0)}M`} tick={{ fontSize: 10, fill: '#71717a', fontWeight: 900 }} axisLine={false} tickLine={false} />
+                                                    <Tooltip cursor={{ fill: '#f4f4f5' }} formatter={(val: any) => formatIDR(Number(val) || 0)} labelStyle={{ color: "#18181b", fontWeight: 900, fontSize: "12px", marginBottom: "8px" }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }} />
+                                                    <Bar dataKey="value" radius={[6, 6, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+
+                                    {/* Tables */}
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
+                                        {/* Potential Pipeline Table */}
+                                        <div className="bg-white border border-zinc-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
+                                            <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/50">
+                                                <div>
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">Potential Revenue Pipeline</h3>
+                                                    <p className="text-[10px] font-bold text-zinc-400 mt-1">From Active Leads</p>
+                                                </div>
+                                            </div>
+                                            <div className="overflow-x-auto flex-1">
+                                                <table className="w-full text-xs text-left">
+                                                    <thead className="bg-white text-[9px] text-zinc-400 border-b border-zinc-100 font-black uppercase tracking-widest">
+                                                        <tr>
+                                                            <th className="px-6 py-4">Lead Name</th>
+                                                            <th className="px-4 py-4">Stage</th>
+                                                            <th className="px-4 py-4 text-right">Value (IDR)</th>
+                                                            <th className="px-6 py-4 text-center">Prob.</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-zinc-50">
+                                                        {leads.filter((l: any) => l.forecastedValue > 0 && !['Closed Lost', 'Freeze'].includes(l.stage)).sort((a: any, b: any) => b.forecastedValue - a.forecastedValue).map((l: any) => (
+                                                            <tr key={l.id} className="hover:bg-zinc-50 transition">
+                                                                <td className="px-6 py-4 font-bold text-zinc-900">{l.name}</td>
+                                                                <td className="px-4 py-4"><span className="px-2 py-1 bg-zinc-100 text-zinc-600 text-[9px] rounded font-black uppercase tracking-widest">{l.stage}</span></td>
+                                                                <td className="px-4 py-4 text-right font-mono font-bold text-emerald-600">{formatIDR(l.forecastedValue)}</td>
+                                                                <td className="px-6 py-4 text-center font-bold">{Math.round(l.probability * 100)}%</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        {/* Secured Revenue Table */}
+                                        <div className="bg-white border border-zinc-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
+                                            <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/50">
+                                                <div>
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900">Secured Contracts</h3>
+                                                    <p className="text-[10px] font-bold text-zinc-400 mt-1">From Projects</p>
+                                                </div>
+                                            </div>
+                                            <div className="overflow-x-auto flex-1">
+                                                <table className="w-full text-xs text-left">
+                                                    <thead className="bg-white text-[9px] text-zinc-400 border-b border-zinc-100 font-black uppercase tracking-widest">
+                                                        <tr>
+                                                            <th className="px-6 py-4">Project / Client</th>
+                                                            <th className="px-4 py-4">Stage</th>
+                                                            <th className="px-4 py-4 text-center">Close Date</th>
+                                                            <th className="px-6 py-4 text-right">Value (IDR)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-zinc-50">
+                                                        {projects.filter((p: any) => p.forecastedValue > 0 && !['Lost', 'Freeze'].includes(p.stage)).sort((a: any, b: any) => b.forecastedValue - a.forecastedValue).map((p: any) => (
+                                                            <tr key={p.id} className="hover:bg-zinc-50 transition">
+                                                                <td className="px-6 py-4">
+                                                                    <p className="font-bold text-zinc-900">{p.projectName}</p>
+                                                                    <p className="text-[9px] font-black uppercase text-zinc-400 mt-0.5">{p.client}</p>
+                                                                </td>
+                                                                <td className="px-4 py-4">
+                                                                    <span className={`px-2 py-1 text-[9px] rounded font-black uppercase tracking-widest ${p.stage === 'Done' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-50 text-blue-600'}`}>{p.stage}</span>
+                                                                </td>
+                                                                <td className="px-4 py-4 text-center font-bold text-zinc-500">
+                                                                    {p.closeDate ? new Date(p.closeDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}
+                                                                </td>
+                                                                <td className="px-6 py-4 text-right font-mono font-bold text-blue-600">{formatIDR(p.forecastedValue)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                )}
             </div>
 
             {/* ========== ADD PROJECT MODAL ========== */}
             {isAddingProject && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col">
+                    <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
                         <div className="flex items-center justify-between p-6 border-b border-zinc-100">
                             <h3 className="text-lg font-black text-zinc-900">{editingItemId ? 'Edit Project' : 'Add New Project'}</h3>
                             <button onClick={() => setIsAddingProject(false)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
                         </div>
-                        <div className="p-6 space-y-4">
-                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Client Name</label><input type="text" value={newProject.client} onChange={(e) => setNewProject((p: any) => ({ ...p, client: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
-                            <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Project Name</label><input type="text" value={newProject.projectName} onChange={(e) => setNewProject((p: any) => ({ ...p, projectName: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
+                        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
                             <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Client Name</label><input type="text" value={newProject.client} onChange={(e) => setNewProject((p: any) => ({ ...p, client: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Project Name</label><input type="text" value={newProject.projectName} onChange={(e) => setNewProject((p: any) => ({ ...p, projectName: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
+                            </div>
+                            
+                            {/* CRM Fields for Project */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Contact Name</label><input type="text" value={newProject.contactName || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, contactName: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Phone size={10} className="inline mr-1 -mt-0.5" />Contact Number</label><input type="text" value={newProject.contactNumber || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, contactNumber: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC Sales</label>
+                                    <select value={newProject.picSales || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, picSales: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select Sales...</option>{SALES_TEAM.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PSE Assignee</label>
                                     <select value={newProject.pseId} onChange={(e) => setNewProject((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
@@ -783,10 +1114,29 @@ export default function B2BBoardPage() {
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Stage</label>
-                                    <select value={newProject.stage} onChange={(e) => setNewProject((p: any) => ({ ...p, stage: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                    <select value={newProject.stage} onChange={(e) => {
+                                        const stage = e.target.value;
+                                        const prob = PROBABILITY_MAP[stage] ?? 0.4;
+                                        setNewProject((p: any) => ({ ...p, stage, probability: prob, progress: Math.round(prob * 100) }));
+                                    }} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
                                         {KANBAN_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><DollarSign size={10} className="inline mr-1 -mt-0.5" />Contract Value (IDR)</label>
+                                    <input type="number" value={newProject.forecastedValue || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, forecastedValue: Number(e.target.value) }))} placeholder="0" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Calendar size={10} className="inline mr-1 -mt-0.5" />Close Date</label>
+                                    <input type="date" value={newProject.closeDate || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, closeDate: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Next Step</label>
+                                <input type="text" value={newProject.nextStep || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, nextStep: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
                             </div>
                             <div>
                                 <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">
@@ -806,7 +1156,7 @@ export default function B2BBoardPage() {
                                     <Trash2 size={14} /> Delete
                                 </button>
                             ) : <div></div>}
-                            <button disabled={submitting} onClick={() => handleSaveData('Project', newProject, setNewProject, setIsAddingProject, () => setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' }))} className="px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700">{submitting ? 'Saving...' : editingItemId ? 'Update Project' : 'Save Project'}</button>
+                            <button disabled={submitting} onClick={() => handleSaveData('Project', newProject, setNewProject, setIsAddingProject, () => setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', closeDate: '', probability: 0.4 }))} className="px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700">{submitting ? 'Saving...' : editingItemId ? 'Update Project' : 'Save Project'}</button>
                         </div>
                     </div>
                 </div>
@@ -835,7 +1185,9 @@ export default function B2BBoardPage() {
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC Sales</label>
-                                    <input type="text" value={newLead.picSales || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, picSales: e.target.value }))} placeholder="e.g. Rani, Titan" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
+                                    <select value={newLead.picSales || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, picSales: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select Sales...</option>{SALES_TEAM.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PSE Support</label>
@@ -854,10 +1206,25 @@ export default function B2BBoardPage() {
                             </div>
 
                             {/* Stage & Commercials */}
+                            <div className="grid grid-cols-2 gap-4 mb-2">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Lead Partner</label>
+                                    <select value={newLead.partnerId || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, partnerId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">No Partner (Direct)</option>
+                                        {config.kanbanPartners?.filter((ptnr: any) => ptnr.isActive !== false).map((ptnr: any) => (
+                                            <option key={ptnr.id} value={ptnr.id}>{ptnr.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Current Stage</label>
-                                    <select value={newLead.stage} onChange={(e) => setNewLead((p: any) => ({ ...p, stage: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                    <select value={newLead.stage} onChange={(e) => {
+                                        const stage = e.target.value;
+                                        const prob = PROBABILITY_MAP[stage] ?? 0;
+                                        setNewLead((p: any) => ({ ...p, stage, probability: prob, progress: Math.round(prob * 100) }));
+                                    }} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
                                         {PRESALES_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>
@@ -867,7 +1234,9 @@ export default function B2BBoardPage() {
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Probability (%)</label>
-                                    <input type="number" min="0" max="100" value={newLead.probability ? Math.round(newLead.probability * 100) : ''} onChange={(e) => setNewLead((p: any) => ({ ...p, probability: Number(e.target.value) / 100 }))} placeholder="0-100" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
+                                    <div className="w-full p-3 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-black text-zinc-500 cursor-not-allowed">
+                                        {Math.round((newLead.probability || 0) * 100)}% (Auto)
+                                    </div>
                                 </div>
                             </div>
 
@@ -965,19 +1334,34 @@ export default function B2BBoardPage() {
             {/* ========== ADD PARTNER MODAL ========== */}
             {isAddingPartner && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl flex flex-col">
+                    <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl flex flex-col max-h-[90vh]">
                         <div className="flex items-center justify-between p-6 border-b border-zinc-100">
                             <h3 className="text-lg font-black text-zinc-900">{editingItemId ? 'Edit Partner' : 'Add Partner'}</h3>
                             <button onClick={() => setIsAddingPartner(false)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
                         </div>
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
                             <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Partner Name</label><input type="text" value={newPartner.name} onChange={(e) => setNewPartner((p: any) => ({ ...p, name: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900" /></div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC (PSE)</label>
-                                <select value={newPartner.pseId} onChange={(e) => setNewPartner((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                    <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
-                                </select>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Contact Name</label><input type="text" value={newPartner.contactName || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, contactName: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900" /></div>
+                                <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Phone size={10} className="inline mr-1 -mt-0.5" />Contact Number</label><input type="text" value={newPartner.contactNumber || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, contactNumber: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900" /></div>
                             </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC Sales</label>
+                                    <select value={newPartner.picPartner || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, picPartner: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select Sales...</option>{SALES_TEAM.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC (PSE)</label>
+                                    <select value={newPartner.pseId} onChange={(e) => setNewPartner((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Current Stage</label>
@@ -1001,9 +1385,15 @@ export default function B2BBoardPage() {
                                 </label>
                                 <input type="range" min="0" max="100" value={newPartner.progress || 0} onChange={(e) => setNewPartner((p: any) => ({ ...p, progress: Number(e.target.value) }))} className="w-full accent-purple-600 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer" />
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Notes</label>
-                                <textarea rows={2} value={newPartner.notes || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, notes: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900"></textarea>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Next Step</label>
+                                    <input type="text" value={newPartner.nextStep || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, nextStep: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Notes</label>
+                                    <textarea rows={1} value={newPartner.notes || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, notes: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900"></textarea>
+                                </div>
                             </div>
                         </div>
                         <div className="p-6 border-t border-zinc-100 bg-zinc-50 rounded-b-3xl flex justify-between items-center">

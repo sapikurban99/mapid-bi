@@ -132,6 +132,13 @@ export async function getAllBIData() {
     progress: r.progress_pct,
     priority: r.priority,
     notes: r.notes || '',
+    picSales: r.pic_sales || '',
+    contactName: r.contact_name || '',
+    contactNumber: r.contact_number || '',
+    forecastedValue: r.forecasted_value || 0,
+    nextStep: r.next_step || '',
+    closeDate: r.close_date || '',
+    probability: r.probability || 0,
   }));
 
   const mappedKanbanLeads = (kanbanLeads || []).map(r => ({
@@ -154,6 +161,7 @@ export async function getAllBIData() {
     lastInteractedOn: r.last_interacted_on || '',
     nextStep: r.next_step || '',
     proposalLink: r.proposal_link || '',
+    partnerId: r.partner_id || '',
   }));
 
   const mappedKanbanPartners = (kanbanPartners || []).map(r => ({
@@ -166,6 +174,10 @@ export async function getAllBIData() {
     progress: r.progress || 0,
     priority: r.priority || 'Medium',
     notes: r.notes || '',
+    picPartner: r.pic_partner || '',
+    contactName: r.contact_name || '',
+    contactNumber: r.contact_number || '',
+    nextStep: r.next_step || '',
   }));
 
   // --- PSE Workload Calculation ---
@@ -265,6 +277,13 @@ export async function addKanbanProject(payload: any) {
     progress_pct: payload.progress || 0,
     priority: payload.priority || 'Medium',
     notes: payload.notes || '',
+    pic_sales: payload.picSales || null,
+    contact_name: payload.contactName || null,
+    contact_number: payload.contactNumber || null,
+    forecasted_value: payload.forecastedValue || 0,
+    next_step: payload.nextStep || null,
+    close_date: payload.closeDate || null,
+    probability: payload.probability || 0,
   }).select('id').single();
   if (error) throw new Error(error.message);
   return { success: true, newId: data.id };
@@ -279,6 +298,13 @@ export async function editKanbanProject(id: string, payload: any) {
     progress_pct: payload.progress || 0,
     priority: payload.priority || 'Medium',
     notes: payload.notes || '',
+    pic_sales: payload.picSales || null,
+    contact_name: payload.contactName || null,
+    contact_number: payload.contactNumber || null,
+    forecasted_value: payload.forecastedValue || 0,
+    next_step: payload.nextStep || null,
+    close_date: payload.closeDate || null,
+    probability: payload.probability || 0,
   }).eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };
@@ -304,6 +330,7 @@ export async function addKanbanLead(payload: any) {
     last_interacted_on: payload.lastInteractedOn || null,
     next_step: payload.nextStep || null,
     proposal_link: payload.proposalLink || null,
+    partner_id: payload.partnerId || null,
   }).select('id').single();
   if (error) throw new Error(error.message);
   return { success: true, newId: data.id };
@@ -329,6 +356,7 @@ export async function editKanbanLead(id: string, payload: any) {
     last_interacted_on: payload.lastInteractedOn || null,
     next_step: payload.nextStep || null,
     proposal_link: payload.proposalLink || null,
+    partner_id: payload.partnerId || null,
   }).eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };
@@ -350,6 +378,10 @@ export async function addKanbanPartner(payload: any) {
     progress: payload.progress || 0,
     priority: payload.priority || 'Medium',
     notes: payload.notes || '',
+    pic_partner: payload.picPartner || null,
+    contact_name: payload.contactName || null,
+    contact_number: payload.contactNumber || null,
+    next_step: payload.nextStep || null,
   }).select('id').single();
   if (error) throw new Error(error.message);
   return { success: true, newId: data.id };
@@ -365,6 +397,10 @@ export async function editKanbanPartner(id: string, payload: any) {
     progress: payload.progress || 0,
     priority: payload.priority || 'Medium',
     notes: payload.notes || '',
+    pic_partner: payload.picPartner || null,
+    contact_name: payload.contactName || null,
+    contact_number: payload.contactNumber || null,
+    next_step: payload.nextStep || null,
   }).eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };

@@ -25,7 +25,6 @@ export default function SidebarNav() {
         { href: '/b2b-board', label: 'B2B Delivery & Ops', icon: Briefcase },
         { href: '/daily-standup', label: 'Daily Standup', icon: Calendar },
         { href: '/growth', label: 'Growth Intelligence', icon: Activity },
-        { href: '/admin', label: 'Admin Panel', icon: Settings },
     ];
 
     if (pathname === '/login') {

@@ -154,9 +154,30 @@ const ITEMS_PER_PAGE = 10;
 
 export default function AdminPage() {
     const { syncData, isLoading: globalIsLoading } = useGlobalData();
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [authError, setAuthError] = useState(false);
+    
     // Inisialisasi awal langsung dari cache/global state
     const [config, setLocalConfig] = useState<SiteConfig>(() => getConfig());
     const [activeSection, setActiveSection] = useState('home');
+
+    // Handle Authentication
+    useEffect(() => {
+        const savedAuth = localStorage.getItem('admin_authenticated');
+        if (savedAuth === 'true') setIsAuthenticated(true);
+    }, []);
+
+    const handleLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (passwordInput === 'mapidadmin2026') { // Password yang diminta user
+            setIsAuthenticated(true);
+            setAuthError(false);
+            localStorage.setItem('admin_authenticated', 'true');
+        } else {
+            setAuthError(true);
+        }
+    };
 
     // BI Tab State
     const [biSubTab, setBiSubTab] = useState('socials');
@@ -520,6 +541,39 @@ export default function AdminPage() {
     const filterKeys = ['status', 'stage', 'phase', 'quarter', 'month', 'format', 'category', 'industry'].filter(k => biConf?.fields.some((f: any) => f.key === k));
     const uniqueFilterValues = biFilterKey ? Array.from(new Set(sourceData.map(d => String(d[biFilterKey] || '')))).filter(Boolean) : [];
 
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+                <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] shadow-2xl animate-in fade-in zoom-in duration-300">
+                    <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center mb-8 mx-auto shadow-xl shadow-blue-500/20">
+                        <Lock className="text-white" size={24} />
+                    </div>
+                    <div className="text-center mb-8">
+                        <h1 className="text-2xl font-black text-white tracking-tight">Admin Gate</h1>
+                        <p className="text-zinc-500 text-sm font-medium mt-2">Enter management password to continue</p>
+                    </div>
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div className="relative">
+                            <input
+                                type="password"
+                                value={passwordInput}
+                                onChange={(e) => setPasswordInput(e.target.value)}
+                                placeholder="Enter Password"
+                                className={`w-full p-4 bg-zinc-800 border ${authError ? 'border-rose-500' : 'border-zinc-700'} rounded-2xl text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center`}
+                                autoFocus
+                            />
+                            {authError && <p className="text-rose-500 text-[10px] font-black uppercase tracking-widest mt-2 text-center">Incorrect Password</p>}
+                        </div>
+                        <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]">
+                            Unlock Access
+                        </button>
+                    </form>
+                    <p className="mt-8 text-center text-[10px] font-black text-zinc-600 uppercase tracking-widest">MAPID BI Dashboard • Secure Access</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <main className="min-h-screen bg-zinc-50 font-sans pb-24">
             {/* ADMIN HEADER */}
@@ -560,6 +614,9 @@ export default function AdminPage() {
                                 </div>
                             )}
                         </div>
+                        <button onClick={() => { localStorage.removeItem('admin_authenticated'); setIsAuthenticated(false); }} className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-rose-500 hover:text-white hover:bg-rose-600 bg-rose-50 rounded-lg transition">
+                            <Lock size={14} /> <span>Lock Admin</span>
+                        </button>
                         <button onClick={handleReset} className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition hidden md:flex">
                             <RotateCcw size={14} /> <span className="hidden sm:inline">Reset</span>
                         </button>

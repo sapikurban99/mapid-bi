@@ -1,29 +1,127 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import useSWR from 'swr';
 import {
   Loader2, ArrowUpRight, ArrowDownRight, Users, Target,
   Activity, FileText, FolderOpen, TableProperties, Lock,
-  TrendingUp, BarChart3, Globe, Share2, ArrowRight, Sparkles, Maximize2, Minimize2, BookOpen, MoreVertical
+  TrendingUp, BarChart3, Globe, Share2, ArrowRight, Sparkles, Maximize2, Minimize2, BookOpen, MoreVertical,
+  Layers, Zap, Plus, Edit2, Trash2, X, Save, Check
 } from 'lucide-react';
-import { getConfig } from '../lib/config';
+import { getConfig, setConfig as setConfigLS, saveConfigToSupabase } from '../lib/config';
 import LoadingProgress from '../components/LoadingProgress';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell } from 'recharts';
+import { useGrowthData } from '../growth/useGrowthData';
+import { useGlobalData } from '../components/GlobalDataProvider';
+
+const apiFetcher = (url: string) => fetch(url).then(r => r.json());
+
+// --- BI Section Edit Configs ---
+const BI_EDIT_CONFIG: Record<string, { title: string; fields: { key: string; label: string; type: string; options?: string[]; placeholder?: string }[]; empty: any }> = {
+  budget: {
+    title: 'Budget Item',
+    empty: { category: 'Operational', amount: 0, date: '', description: '' },
+    fields: [
+      { key: 'category', label: 'Category', type: 'select', options: ['Ads Spend', 'Event', 'Operational', 'Software', 'Other'] },
+      { key: 'amount', label: 'Amount (Rp)', type: 'number' },
+      { key: 'date', label: 'Date', type: 'date' },
+      { key: 'description', label: 'Description', type: 'text' },
+    ],
+  },
+  campaigns: {
+    title: 'Campaign',
+    empty: { name: '', period: '', status: 'Active', leads: 0, participants: 0, conversion: 0 },
+    fields: [
+      { key: 'name', label: 'Campaign Name', type: 'text' },
+      { key: 'period', label: 'Period', type: 'text', placeholder: 'Q2 2026' },
+      { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Ended', 'Planned'] },
+      { key: 'leads', label: 'Leads', type: 'number' },
+      { key: 'participants', label: 'Participants', type: 'number' },
+      { key: 'conversion', label: 'Conversion (%)', type: 'number' },
+    ],
+  },
+  academy: {
+    title: 'Academy Program',
+    empty: { program: '', batch: '', registrants: 0, converted: 0, conversion: 0 },
+    fields: [
+      { key: 'program', label: 'Program Name', type: 'text' },
+      { key: 'batch', label: 'Batch Label', type: 'text' },
+      { key: 'registrants', label: 'Registrants', type: 'number' },
+      { key: 'converted', label: 'Converted to Paid', type: 'number' },
+    ],
+  },
+  trends: {
+    title: 'Trend Data Point',
+    empty: { category: 'Month', label: '', revenue: 0, dealSize: 0 },
+    fields: [
+      { key: 'category', label: 'Timeframe', type: 'select', options: ['Month', 'Quarter', 'Year'] },
+      { key: 'label', label: 'Label (e.g. Q1 2026)', type: 'text' },
+      { key: 'revenue', label: 'Revenue (Millions)', type: 'number' },
+      { key: 'dealSize', label: 'Avg Deal Size (Millions)', type: 'number' },
+    ],
+  },
+  docs: {
+    title: 'Gallery / Document',
+    empty: { title: '', desc: '', link: '', format: 'Doc', category: '' },
+    fields: [
+      { key: 'title', label: 'Title', type: 'text' },
+      { key: 'format', label: 'Format', type: 'select', options: ['Doc', 'Sheet', 'Folder', 'PDF'] },
+      { key: 'category', label: 'Category Tag', type: 'text' },
+      { key: 'desc', label: 'Description', type: 'text' },
+      { key: 'link', label: 'File URL Link', type: 'text' },
+    ],
+  },
+};
+
+// --- Inline Edit Modal ---
+const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: any) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between p-6 border-b border-zinc-100">
+          <h3 className="text-lg font-black tracking-tight">{title}</h3>
+          <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-lg transition"><X size={18} /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          {fields.map((f: any) => (
+            <div key={f.key}>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1.5">{f.label}</label>
+              {f.type === 'select' ? (
+                <select value={data?.[f.key] || ''} onChange={e => onChange(f.key, e.target.value)}
+                  className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 outline-none">
+                  {f.options.map((o: string) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                  value={data?.[f.key] ?? (f.type === 'number' ? 0 : '')}
+                  onChange={e => onChange(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
+                  placeholder={f.placeholder || ''}
+                  className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 outline-none" />
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-3 p-6 border-t border-zinc-100">
+          <button onClick={onClose} className="flex-1 px-4 py-3 border border-zinc-200 text-zinc-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-50 transition">Cancel</button>
+          <button onClick={onSave} className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition flex items-center justify-center gap-2">
+            <Check size={14} /> Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function MinimalistDashboard() {
+  const { isLoading: globalIsLoading, syncData } = useGlobalData();
   const [activeTab, setActiveTab] = useState('Trends');
   const [trendCategory, setTrendCategory] = useState('All');
   const [galleryCategory, setGalleryCategory] = useState('All');
   const [b2cPeriod, setB2cPeriod] = useState('All');
-  const [b2bQuarter, setB2bQuarter] = useState('All');
-
   // Pagination states
-  const [pipelinePage, setPipelinePage] = useState(1);
-  const [revenuePage, setRevenuePage] = useState(1);
   const [projectPage, setProjectPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
-
-
 
   // States for Social & Community Comparison
   const [socialPrimaryMonth, setSocialPrimaryMonth] = useState('All');
@@ -32,20 +130,89 @@ export default function MinimalistDashboard() {
   const [socialSecondaryWeek, setSocialSecondaryWeek] = useState('All');
   const [errorMsg, setErrorMsg] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
-  const [config, setConfigState] = useState(() => {
-      return typeof window === 'undefined' ? (require('../lib/config').DEFAULT_CONFIG) : (require('../lib/config').getConfig());
-  });
+  
+  // Use config from global provider
+  const [config, setConfigState] = useState(() => getConfig());
+
+  // B2C Revenue date range filter (default: current quarter)
+  const getQuarterDates = (q: number, y: number) => {
+    const startMonth = (q - 1) * 3;
+    const start = new Date(y, startMonth, 1);
+    const end = new Date(y, startMonth + 3, 0); // last day of quarter
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+    };
+  };
+  const currentQ = Math.ceil((new Date().getMonth() + 1) / 3);
+  const currentY = new Date().getFullYear();
+  const defaultDates = getQuarterDates(currentQ, currentY);
+  const [revenueStartDate, setRevenueStartDate] = useState(defaultDates.start);
+  const [revenueEndDate, setRevenueEndDate] = useState(defaultDates.end);
+
+  // Fetch Academy revenue from Supabase revenue_payments table (dynamic date range)
+  const academyPaymentsUrl = `/api/revenue/payments?start_date=${revenueStartDate}&end_date=${revenueEndDate}&category=MAPID Academy`;
+  const { data: academyPayData, isLoading: academyLoading } = useSWR(academyPaymentsUrl, apiFetcher, { revalidateOnFocus: false });
+
+  // Fetch Live Platform Data from DevServer (dynamic date range)
+  const { allPayments, isLoading: platformLoading } = useGrowthData(revenueStartDate, revenueEndDate);
 
   useEffect(() => {
     setMounted(true);
-    const interval = setInterval(() => {
-      const c = require('../lib/config').getConfig();
-      if (c.biData && Object.keys(c.biData).length > 0) {
-        setConfigState(c);
-      }
-    }, 500);
-    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    setConfigState(getConfig());
+  }, [globalIsLoading]);
+
+  // --- Inline Edit State ---
+  const [editModal, setEditModal] = useState<{ section: string; index: number; data: any } | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  const openEditModal = (section: string, index: number = -1) => {
+    const sectionConfig = BI_EDIT_CONFIG[section];
+    if (!sectionConfig) return;
+    const existingData = index >= 0 ? (config.biData as any)?.[section]?.[index] : null;
+    setEditModal({ section, index, data: existingData ? { ...existingData } : { ...sectionConfig.empty } });
+  };
+
+  const handleEditField = (key: string, value: any) => {
+    setEditModal(prev => prev ? { ...prev, data: { ...prev.data, [key]: value } } : null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editModal) return;
+    setSaveStatus('saving');
+    const newConfig = JSON.parse(JSON.stringify(config));
+    if (!newConfig.biData) newConfig.biData = {};
+    if (!newConfig.biData[editModal.section]) newConfig.biData[editModal.section] = [];
+
+    if (editModal.index >= 0) {
+      newConfig.biData[editModal.section][editModal.index] = editModal.data;
+    } else {
+      newConfig.biData[editModal.section].push(editModal.data);
+    }
+
+    setConfigState(newConfig);
+    setConfigLS(newConfig);
+    await saveConfigToSupabase(newConfig);
+    syncData({ silent: true });
+    setEditModal(null);
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 1500);
+  };
+
+  const handleDeleteItem = async (section: string, index: number) => {
+    if (!confirm('Delete this item?')) return;
+    const newConfig = JSON.parse(JSON.stringify(config));
+    if (newConfig.biData?.[section]) {
+      newConfig.biData[section].splice(index, 1);
+      setConfigState(newConfig);
+      setConfigLS(newConfig);
+      await saveConfigToSupabase(newConfig);
+      syncData({ silent: true });
+    }
+  };
 
   // Custom Recharts Tooltip
   const CustomRechartsTooltip = ({ active, payload, label }: any) => {
@@ -115,16 +282,36 @@ export default function MinimalistDashboard() {
       }
     }
 
-    // Auto-fill B2B Quarter
-    if (data?.pipeline && data.pipeline.length > 0 && b2bQuarter === 'All') {
-        const b2bPeriods = Array.from(new Set((data.pipeline as any[]).map((p: any) => p.quarter).filter(Boolean))).sort().reverse();
-        if (b2bPeriods.includes(currentQuarterStr)) {
-            setB2bQuarter(currentQuarterStr);
-        } else if (b2bPeriods.length > 0) {
-            setB2bQuarter(b2bPeriods[0] as string);
-        }
-    }
+
   }, [data, activeTab, mounted]);
+
+  // Determine which quarter string to filter academy data by, based on selected date range
+  const selectedQuarterStr = useMemo(() => {
+    const sd = new Date(revenueStartDate);
+    const q = Math.ceil((sd.getMonth() + 1) / 3);
+    return `Q${q} ${sd.getFullYear()}`;
+  }, [revenueStartDate]);
+
+  // Calculate B2C Metrics (dynamic date range — both from live sources)
+  const b2cMetrics = useMemo(() => {
+    // Academy: from revenue_payments table (filtered by date range + category)
+    const academyActual = academyPayData?.totalAmount || 0;
+
+    // Platform: from DevServer (already filtered by date range via useGrowthData)
+    const platformActual = allPayments
+      .filter((p: any) => p.status === 'success' && p.payment_methode?.toLowerCase() === 'midtrans')
+      .reduce((sum: number, p: any) => sum + (p.detail_amount?.total || p.total || 0), 0);
+
+    const academyTarget = 60000000;
+    const platformTarget = 40000000;
+
+    return {
+      academy: { actual: academyActual, target: academyTarget, percent: academyTarget > 0 ? Math.min(Math.round((academyActual / academyTarget) * 100), 100) : 0 },
+      platform: { actual: platformActual, target: platformTarget, percent: Math.min(Math.round((platformActual / platformTarget) * 100), 100) },
+      total: { actual: academyActual + platformActual, target: academyTarget + platformTarget, percent: Math.min(Math.round(((academyActual + platformActual) / (academyTarget + platformTarget)) * 100), 100) },
+      isLoading: academyLoading || platformLoading,
+    };
+  }, [academyPayData, allPayments, academyLoading, platformLoading]);
 
   // Pre-hydration check
   if (!mounted) {
@@ -207,14 +394,7 @@ export default function MinimalistDashboard() {
   const uniqueB2cPeriods = ['All', ...Array.from(b2cPeriods).sort()];
 
   const filteredCampaigns = (data?.campaigns || []).filter((c: any) => b2cPeriod === 'All' || c.period === b2cPeriod);
-  const filteredB2cRevenue = activeRevenueData.filter((r: any) => b2cPeriod === 'All' || r.quarter === b2cPeriod);
 
-  const totalB2CActual = filteredB2cRevenue.reduce((acc: number, curr: any) => acc + curr.actual, 0) || 0;
-  const totalB2CTarget = filteredB2cRevenue.reduce((acc: number, curr: any) => acc + curr.target, 0) || 0;
-  const totalB2CAchievement = totalB2CTarget > 0 ? ((totalB2CActual / totalB2CTarget) * 100).toFixed(2) : '0.00';
-
-  const activePipeline = (data?.pipeline || []).filter((p: any) => p.stage !== 'Won');
-  const totalB2BPipeline = activePipeline.reduce((acc: number, curr: any) => acc + (curr.value || 0), 0) || 0;
 
   // --- LOGIC GRAFIK SVG PROPORSIONAL ---
   const currentTrendData = (Array.isArray(data?.trends) ? data.trends : [])
@@ -241,7 +421,7 @@ export default function MinimalistDashboard() {
       <div className="max-w-6xl mx-auto mb-10 border-b border-zinc-200 flex gap-8 overflow-x-auto hide-scrollbar">
         {config.tabsVisible.Trends && <button onClick={() => setActiveTab('Trends')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Trends' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Trends</button>}
         {config.tabsVisible.B2C && <button onClick={() => setActiveTab('B2C')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'B2C' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>B2C</button>}
-        {config.tabsVisible.B2B && <button onClick={() => setActiveTab('B2B')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'B2B' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>B2B</button>}
+
         {config.tabsVisible.Academy && <button onClick={() => setActiveTab('Academy')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Academy' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Academy</button>}
         {config.tabsVisible.Gallery && <button onClick={() => setActiveTab('Gallery')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Gallery' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Gallery</button>}
       </div>
@@ -253,7 +433,10 @@ export default function MinimalistDashboard() {
           <div className="space-y-8 animate-in fade-in">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Revenue Performance</h3>
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
+                <button onClick={() => openEditModal('trends')} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
+                  <Plus size={12} /> Add Data
+                </button>
                 {uniqueTrendCategories.length > 2 && (
                   <select value={trendCategory} onChange={(e) => setTrendCategory(e.target.value)}
                     className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
@@ -315,9 +498,17 @@ export default function MinimalistDashboard() {
                       />
                       <RechartsTooltip cursor={{ fill: 'transparent' }} content={<CustomRechartsTooltip />} />
                       <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={60}>
-                        {validTrendData.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill="#3b82f6" className="hover:opacity-80 transition-opacity cursor-pointer" />
-                        ))}
+                        {validTrendData.map((entry: any, index: number) => {
+                          const origIdx = (data?.trends || []).indexOf(entry);
+                          return (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill="#3b82f6" 
+                              className="hover:opacity-80 transition-opacity cursor-pointer" 
+                              onClick={() => openEditModal('trends', origIdx)}
+                            />
+                          );
+                        })}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -327,7 +518,13 @@ export default function MinimalistDashboard() {
               {/* Data Summary Cards */}
               <div className="space-y-6">
                 {validTrendData.slice().reverse().slice(0, 2).map((hist: any, idx: number) => (
-                  <div key={idx} className={`bg-white border border-zinc-200 p-6 rounded-2xl ${idx === 0 ? 'ring-2 ring-zinc-900 ring-offset-2 shadow-lg' : 'opacity-60'}`}>
+                  <div key={idx} className={`bg-white border border-zinc-200 p-6 rounded-2xl group relative ${idx === 0 ? 'ring-2 ring-zinc-900 ring-offset-2 shadow-lg' : 'opacity-60'}`}>
+                    <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                      {(() => { const origIdx = (data?.trends || []).indexOf(hist); return (<>
+                        <button onClick={() => openEditModal('trends', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                        <button onClick={() => handleDeleteItem('trends', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                      </>); })()}
+                    </div>
                     <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">{formatTrendLabel(hist.label)} Summary</h4>
                     <div className="text-3xl font-black tracking-tighter mb-1">Rp {hist.revenue}M</div>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Avg Deal: Rp {hist.dealSize}M</p>
@@ -336,9 +533,62 @@ export default function MinimalistDashboard() {
               </div>
             </div>
 
+            {/* Manage Trend History Section */}
+            <div className="mt-12 bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/50">
+                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Manage Trend History</h4>
+                <div className="text-[10px] font-bold text-zinc-400">{validTrendData.length} Records Total</div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-zinc-50/30 text-[10px] text-zinc-400 border-b border-zinc-100 uppercase font-black tracking-widest">
+                    <tr>
+                      <th className="px-6 py-4">Label</th>
+                      <th className="px-6 py-4">Timeframe</th>
+                      <th className="px-6 py-4">Revenue</th>
+                      <th className="px-6 py-4">Avg Deal</th>
+                      <th className="px-4 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50">
+                    {validTrendData.length === 0 ? (
+                      <tr><td colSpan={5} className="px-6 py-10 text-center text-zinc-300 font-bold uppercase tracking-widest text-xs">No historical data found</td></tr>
+                    ) : (
+                      validTrendData.slice().reverse().map((hist: any, idx: number) => {
+                        const origIdx = (data?.trends || []).indexOf(hist);
+                        return (
+                          <tr key={idx} className="hover:bg-zinc-50/50 transition group">
+                            <td className="px-6 py-4 font-bold text-zinc-900">{hist.label}</td>
+                            <td className="px-6 py-4">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block">
+                                {hist.category}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-mono font-bold text-blue-600">Rp {hist.revenue}M</td>
+                            <td className="px-6 py-4 font-mono text-zinc-500">Rp {hist.dealSize}M</td>
+                            <td className="px-4 py-4 text-right">
+                              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <button onClick={() => openEditModal('trends', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                                <button onClick={() => handleDeleteItem('trends', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* BUDGET DISBURSEMENT SECTION */}
             <div className="pt-8 border-t border-zinc-200 mt-12 mb-6">
-              <h3 className="text-xl font-black tracking-tight leading-tight mb-6">Budget Disbursement<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</span></h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-black tracking-tight leading-tight">Budget Disbursement<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</span></h3>
+                <button onClick={() => openEditModal('budget')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
+                  <Plus size={12} /> Add
+                </button>
+              </div>
               {(() => {
                 const budgetData = data?.budget || [];
                 const totalSpent = budgetData.reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
@@ -375,20 +625,30 @@ export default function MinimalistDashboard() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
                           <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                            <tr><th className="px-6 py-4">Date</th><th className="px-6 py-4">Category</th><th className="px-6 py-4 min-w-[200px]">Description</th><th className="px-6 py-4 text-right">Amount (IDR)</th></tr>
+                            <tr><th className="px-6 py-4">Date</th><th className="px-6 py-4">Category</th><th className="px-6 py-4 min-w-[200px]">Description</th><th className="px-6 py-4 text-right">Amount (IDR)</th><th className="px-4 py-4 w-16"></th></tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-100">
                             {budgetData.length === 0 ? (
-                              <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending recorded</td></tr>
+                              <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending recorded</td></tr>
                             ) : (
-                              budgetData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => (
-                                <tr key={idx} className="hover:bg-zinc-50 transition">
-                                  <td className="px-6 py-5 font-bold whitespace-nowrap">{formatDate(row.date)}</td>
-                                  <td className="px-6 py-5"><span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span></td>
-                                  <td className="px-6 py-5 text-zinc-500 font-medium italic">{row.description || '-'}</td>
-                                  <td className="px-6 py-5 text-right font-mono font-bold text-zinc-900">{formatIDR(row.amount)}</td>
-                                </tr>
-                              ))
+                              budgetData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => {
+                                // Find original index in the unsorted data
+                                const origIdx = (data?.budget || []).indexOf(row);
+                                return (
+                                  <tr key={idx} className="hover:bg-zinc-50 transition group">
+                                    <td className="px-6 py-5 font-bold whitespace-nowrap">{formatDate(row.date)}</td>
+                                    <td className="px-6 py-5"><span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span></td>
+                                    <td className="px-6 py-5 text-zinc-500 font-medium italic">{row.description || '-'}</td>
+                                    <td className="px-6 py-5 text-right font-mono font-bold text-zinc-900">{formatIDR(row.amount)}</td>
+                                    <td className="px-4 py-5">
+                                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                        <button onClick={() => openEditModal('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                                        <button onClick={() => handleDeleteItem('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
                             )}
                           </tbody>
                         </table>
@@ -552,205 +812,128 @@ export default function MinimalistDashboard() {
 
             {/* Campaign Activations */}
             <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6">Active Campaigns & Performance</h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Active Campaigns & Performance</h3>
+                <button onClick={() => openEditModal('campaigns')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
+                  <Plus size={12} /> Add
+                </button>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {filteredCampaigns.length === 0 ? (
                   <div className="col-span-full text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest w-full">No campaigns for selected period</div>
-                ) : filteredCampaigns.map((camp: any, idx: number) => (
-                  <div key={idx} className="bg-white border border-zinc-200 p-6 rounded-2xl transition hover:border-zinc-400">
-                    <div className="flex justify-between items-start mb-6">
-                      <h4 className="font-bold text-zinc-900 text-sm leading-tight">{camp.name}</h4>
-                      <div className={`text-[8px] px-2 py-0.5 font-black uppercase rounded border ${camp.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>
-                        {camp.status}
+                ) : filteredCampaigns.map((camp: any, idx: number) => {
+                  const origIdx = (data?.campaigns || []).indexOf(camp);
+                  return (
+                    <div key={idx} className="bg-white border border-zinc-200 p-6 rounded-2xl transition hover:border-zinc-400 group relative">
+                      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button onClick={() => openEditModal('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                        <button onClick={() => handleDeleteItem('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                      </div>
+                      <div className="flex justify-between items-start mb-6">
+                        <h4 className="font-bold text-zinc-900 text-sm leading-tight">{camp.name}</h4>
+                        <div className={`text-[8px] px-2 py-0.5 font-black uppercase rounded border ${camp.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>
+                          {camp.status}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 border-t border-zinc-100 pt-4">
+                        <div><div className="text-[9px] text-zinc-400 uppercase font-bold">Leads</div><div className="text-xl font-black">{camp.leads}</div></div>
+                        <div className="text-right"><div className="text-[9px] text-zinc-400 uppercase font-bold">Conv. Rate</div><div className="text-xl font-black text-zinc-900">{camp.conversion}%</div></div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 border-t border-zinc-100 pt-4">
-                      <div><div className="text-[9px] text-zinc-400 uppercase font-bold">Leads</div><div className="text-xl font-black">{camp.leads}</div></div>
-                      <div className="text-right"><div className="text-[9px] text-zinc-400 uppercase font-bold">Conv. Rate</div><div className="text-xl font-black text-zinc-900">{camp.conversion}%</div></div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* Revenue Status */}
+            {/* B2C Revenue Cards (Live — with date range filter) */}
             <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-6 font-black">B2C Product Revenue</h3>
-              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left whitespace-nowrap">
-                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                      <tr><th className="px-6 py-4">Product</th><th className="px-6 py-4">Quarter</th><th className="px-6 py-4">Actual vs Target</th><th className="px-6 py-4">Progress</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {filteredB2cRevenue.length === 0 ? (
-                        <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No revenue data for selected period</td></tr>
-                      ) : filteredB2cRevenue.map((rev: any, idx: number) => {
-                        // Format angka desimal pada row tabel agar rapi
-                        const achPct = typeof rev.achievement === 'number' ? rev.achievement.toFixed(2) : rev.achievement;
-                        return (
-                          <tr key={idx} className="hover:bg-zinc-50 transition">
-                            <td className="px-6 py-5 font-bold">{rev.subProduct}</td>
-                            <td className="px-6 py-5 font-bold text-zinc-500 text-xs">{rev.quarter || '-'}</td>
-                            <td className="px-6 py-5 text-zinc-500 font-medium">{formatIDR(rev.actual)} <span className="opacity-30 mx-2">/</span> {formatIDR(rev.target)}</td>
-                            <td className="px-6 py-5">
-                              <div className="flex items-center gap-4">
-                                <div className="w-full max-w-[120px] bg-zinc-100 h-1.5 rounded-full overflow-hidden">
-                                  <div className={`h-full ${rev.achievement >= 100 ? 'bg-emerald-500' : 'bg-zinc-900'}`} style={{ width: `${Math.min(rev.achievement, 100)}%` }}></div>
-                                </div>
-                                <span className="text-[10px] font-black">{achPct}%</span>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                    {/* BARIS TOTAL B2C */}
-                    <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
-                      <tr>
-                        <td colSpan={2} className="px-6 py-5 uppercase">Total B2C</td>
-                        <td className="px-6 py-5 font-bold">{formatIDR(totalB2CActual)} <span className="opacity-50 mx-1">/</span> {formatIDR(totalB2CTarget)}</td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-4">
-                            <div className="w-full max-w-[120px] bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                              <div className="h-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" style={{ width: `${Math.min(Number(totalB2CAchievement), 100)}%` }}></div>
-                            </div>
-                            <span className="text-emerald-400">{totalB2CAchievement}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+                <div className="flex flex-col">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">B2C Revenue Targets</h3>
+                  <p className="text-[10px] font-bold text-zinc-300 mt-1">{selectedQuarterStr} • {new Date(revenueStartDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} — {new Date(revenueEndDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* === TAB 3: B2B === */}
-        {activeTab === 'B2B' && (
-          <div className="space-y-12 animate-in fade-in">
-            {/* Pipeline Progress */}
-            <div>
-              <div className="flex justify-between items-end mb-6">
-                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Enterprise Pipeline (IDR)</h3>
-              </div>
-              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left whitespace-nowrap">
-                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 font-black uppercase tracking-widest">
-                      <tr>
-                        <th className="px-6 py-4">Client</th><th className="px-4 py-4">Stage</th><th className="px-4 py-4 text-right">Est. Value</th><th className="px-6 py-4">Action</th><th className="px-4 py-4">ETA</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {activePipeline.slice((pipelinePage - 1) * ITEMS_PER_PAGE, pipelinePage * ITEMS_PER_PAGE).map((p: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-zinc-50 transition text-zinc-900">
-                          <td className="px-6 py-4 font-bold">{p.client}</td>
-                          <td className="px-4 py-4">
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${p.stage === 'Won' ? 'bg-emerald-100 text-emerald-700' : p.stage === 'Negotiation' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-500'}`}>{p.stage}</span>
-                          </td>
-                          <td className="px-4 py-4 text-right font-mono font-bold">{formatIDR(p.value)}</td>
-                          <td className="px-6 py-4 text-zinc-400 font-medium italic truncate max-w-[200px]">{p.action}</td>
-                          <td className="px-4 py-4 font-bold uppercase tracking-tighter">{formatDate(p.eta)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
-                      <tr>
-                        <td colSpan={2} className="px-6 py-6">TOTAL PIPELINE VALUE</td>
-                        <td className="px-4 py-6 text-right text-sm text-emerald-400">{formatIDR(totalB2BPipeline)}</td>
-                        <td colSpan={2} className="px-6 py-6 text-zinc-500 text-right font-normal lowercase tracking-normal italic text-[8px]">
-                          *estimasi lead aktif (exclude won)
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-                {activePipeline.length > ITEMS_PER_PAGE && (
-                  <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
-                    <button onClick={() => setPipelinePage(p => Math.max(1, p - 1))} disabled={pipelinePage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
-                    <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {pipelinePage} of {Math.ceil(activePipeline.length / ITEMS_PER_PAGE)}</span>
-                    <button onClick={() => setPipelinePage(p => Math.min(Math.ceil(activePipeline.length / ITEMS_PER_PAGE), p + 1))} disabled={pipelinePage === Math.ceil(activePipeline.length / ITEMS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* B2B Revenue Realization */}
-            {(() => {
-              const wonPipeline = (data?.pipeline || []).filter((p: any) => p.stage === 'Won');
-
-              const getQuarter = (dateStr: string) => {
-                if (!dateStr || dateStr === '#') return 'Unknown';
-                const d = new Date(dateStr);
-                if (isNaN(d.getTime())) return 'Unknown';
-                const month = d.getMonth();
-                return `Q${Math.floor(month / 3) + 1}`;
-              };
-
-              const revenueData = wonPipeline.map((p: any) => ({
-                ...p,
-                quarter: getQuarter(p.eta)
-              }));
-
-              const uniqueQuarters = ['All', ...(Array.from(new Set(revenueData.map((d: any) => d.quarter).filter(Boolean))) as string[]).sort()];
-
-              const filteredRevenue = revenueData.filter((d: any) => b2bQuarter === 'All' || d.quarter === b2bQuarter);
-              const totalRevenue = filteredRevenue.reduce((acc: number, curr: any) => acc + (Number(curr.value) || 0), 0);
-
-              return (
-                <div className="pt-8 border-t border-zinc-200 mt-12 mb-6">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-zinc-200 pb-4 mb-6 gap-4">
-                    <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">B2B Revenue Realization <span className="text-zinc-400 font-medium text-xs ml-2">(Closed Won)</span></h3>
-                    <select value={b2bQuarter} onChange={(e) => setB2bQuarter(e.target.value)}
-                      className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
-                      {uniqueQuarters.map((q: string) => <option key={q} value={q}>{q === 'All' ? 'All Quarters' : q}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left whitespace-nowrap">
-                        <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 font-black uppercase tracking-widest">
-                          <tr>
-                            <th className="px-6 py-4">Client Name</th>
-                            <th className="px-4 py-4 text-right">Project Value</th>
-                            <th className="px-6 py-4">Close Date</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-100">
-                          {filteredRevenue.length === 0 ? (
-                            <tr><td colSpan={3} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No revenue data for selected quarter</td></tr>
-                          ) : filteredRevenue.slice((revenuePage - 1) * ITEMS_PER_PAGE, revenuePage * ITEMS_PER_PAGE).map((p: any, idx: number) => (
-                            <tr key={idx} className="hover:bg-zinc-50 transition text-zinc-900">
-                              <td className="px-6 py-4 font-bold">{p.client}</td>
-                              <td className="px-4 py-4 text-right font-mono font-bold">{formatIDR(p.value)}</td>
-                              <td className="px-6 py-4 font-bold uppercase tracking-tighter text-emerald-600">{formatDate(p.eta)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-zinc-900 text-white border-t border-zinc-800 font-black tracking-widest text-[10px]">
-                          <tr>
-                            <td className="px-6 py-6 font-bold text-zinc-400 uppercase tracking-widest">Total Realized Revenue</td>
-                            <td className="px-4 py-6 text-right text-sm text-emerald-400">{formatIDR(totalRevenue)}</td>
-                            <td></td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Quick Quarter Buttons */}
+                  {[1,2,3,4].map(q => {
+                    const dates = getQuarterDates(q, currentY);
+                    const isActive = revenueStartDate === dates.start && revenueEndDate === dates.end;
+                    return (
+                      <button key={q} onClick={() => { setRevenueStartDate(dates.start); setRevenueEndDate(dates.end); }}
+                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg border transition-all ${isActive ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'}`}>
+                        Q{q}
+                      </button>
+                    );
+                  })}
+                  <div className="hidden md:block w-px h-6 bg-zinc-200 mx-1"></div>
+                  {/* Date Range Inputs */}
+                  <input type="date" value={revenueStartDate} onChange={e => setRevenueStartDate(e.target.value)}
+                    className="bg-white border border-zinc-200 text-xs font-bold text-zinc-600 px-3 py-1.5 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none" />
+                  <span className="text-zinc-300 text-xs font-bold">—</span>
+                  <input type="date" value={revenueEndDate} onChange={e => setRevenueEndDate(e.target.value)}
+                    className="bg-white border border-zinc-200 text-xs font-bold text-zinc-600 px-3 py-1.5 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none" />
+                  {b2cMetrics.isLoading && (
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-400">
+                      <Loader2 size={12} className="animate-spin" /> Loading...
                     </div>
-                    {filteredRevenue.length > ITEMS_PER_PAGE && (
-                      <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-100 bg-white">
-                        <button onClick={() => setRevenuePage(p => Math.max(1, p - 1))} disabled={revenuePage === 1} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Prev</button>
-                        <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Page {revenuePage} of {Math.ceil(filteredRevenue.length / ITEMS_PER_PAGE)}</span>
-                        <button onClick={() => setRevenuePage(p => Math.min(Math.ceil(filteredRevenue.length / ITEMS_PER_PAGE), p + 1))} disabled={revenuePage === Math.ceil(filteredRevenue.length / ITEMS_PER_PAGE)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-zinc-50 border border-zinc-200 text-zinc-600 rounded-lg disabled:opacity-50 hover:bg-zinc-100 transition">Next</button>
-                      </div>
-                    )}
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Academy Module */}
+                <div className="bg-white border-2 border-zinc-100 p-8 rounded-3xl shadow-sm hover:border-blue-500 transition-all group relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Layers size={48} className="text-blue-600" />
+                  </div>
+                  <h4 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-6">MAPID Academy</h4>
+                  <div className="flex items-end gap-2 mb-2">
+                    <span className="text-4xl font-black tracking-tighter text-zinc-900">Rp {(b2cMetrics.academy.actual / 1000000).toFixed(1)}M</span>
+                    <span className="text-xs font-bold text-zinc-400 mb-2">/ {(b2cMetrics.academy.target / 1000000).toFixed(0)}M</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">{b2cMetrics.academy.percent}% COMPLETE</span>
+                  </div>
+                  <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-600 transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.academy.percent}%` }}></div>
+                  </div>
+                  <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: Supabase DB → revenue_payments</p>
+                </div>
+
+                {/* Platform Module */}
+                <div className="bg-white border-2 border-zinc-100 p-8 rounded-3xl shadow-sm hover:border-emerald-500 transition-all group relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Zap size={48} className="text-emerald-600" />
+                  </div>
+                  <h4 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-6">MAPID Platform</h4>
+                  <div className="flex items-end gap-2 mb-2">
+                    <span className="text-4xl font-black tracking-tighter text-zinc-900">Rp {(b2cMetrics.platform.actual / 1000000).toFixed(1)}M</span>
+                    <span className="text-xs font-bold text-zinc-400 mb-2">/ {(b2cMetrics.platform.target / 1000000).toFixed(0)}M</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{b2cMetrics.platform.percent}% COMPLETE</span>
+                  </div>
+                  <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-600 transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.platform.percent}%` }}></div>
+                  </div>
+                  <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: DevServer API → all_payments</p>
+                </div>
+
+                {/* Combined Total Module */}
+                <div className="bg-zinc-900 p-8 rounded-3xl shadow-xl shadow-zinc-200 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-950 -z-0"></div>
+                  <h4 className="text-sm font-black uppercase tracking-widest text-zinc-500 mb-6 relative z-10">Total B2C Performance</h4>
+                  <div className="flex items-end gap-2 mb-2 relative z-10">
+                    <span className="text-5xl font-black tracking-tighter text-white">Rp {(b2cMetrics.total.actual / 1000000).toFixed(1)}M</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-4 relative z-10">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">GLOBAL ACHIEVEMENT</span>
+                    <span className="text-xs font-black text-white">{b2cMetrics.total.percent}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden relative z-10">
+                    <div className="h-full bg-white transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.total.percent}%` }}></div>
                   </div>
                 </div>
-              );
-            })()}
-
+              </div>
+            </div>
           </div>
         )}
 
@@ -764,6 +947,12 @@ export default function MinimalistDashboard() {
 
           return (
             <div className="space-y-12 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Academy Performance By Program</h3>
+                <button onClick={() => openEditModal('academy')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
+                  <Plus size={12} /> Add Batch
+                </button>
+              </div>
               {academyPrograms.map((program: any) => {
                 const programData = validAcademyData.filter((a: any) => a.program === program);
 
@@ -811,10 +1000,11 @@ export default function MinimalistDashboard() {
                         <table className="w-full text-sm text-left">
                           <thead className="bg-zinc-50/50 text-xs text-zinc-400 font-bold tracking-widest uppercase border-b border-zinc-100">
                             <tr>
-                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/4">Batch Name</th>
-                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/4">Registrants</th>
-                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/4">Converted</th>
-                              <th className="px-6 py-4 text-center">Conversion %</th>
+                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/5">Batch Name</th>
+                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/5">Registrants</th>
+                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/5">Converted</th>
+                              <th className="px-6 py-4 text-center w-1/4">Conversion %</th>
+                              <th className="px-4 py-4 w-16"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-100">
@@ -824,7 +1014,7 @@ export default function MinimalistDashboard() {
                               const rate = registrants > 0 ? ((converted / registrants) * 100).toFixed(2) : '0';
 
                               return (
-                                <tr key={idx} className="hover:bg-zinc-50 transition-colors">
+                                <tr key={idx} className="hover:bg-zinc-50 transition-colors group">
                                   <td className="px-6 py-4 font-bold text-zinc-900 border-r border-dashed border-zinc-200">
                                     {row.batch}
                                   </td>
@@ -845,6 +1035,14 @@ export default function MinimalistDashboard() {
                                       <span className="text-zinc-900 font-bold w-12 text-right font-mono">{rate}%</span>
                                     </div>
                                   </td>
+                                  <td className="px-4 py-4">
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                      {(() => { const origIdx = validAcademyData.indexOf(row); return (<>
+                                        <button onClick={() => openEditModal('academy', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                                        <button onClick={() => handleDeleteItem('academy', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                                      </>); })()}
+                                    </div>
+                                  </td>
                                 </tr>
                               );
                             })}
@@ -860,7 +1058,7 @@ export default function MinimalistDashboard() {
                 <div className="text-center py-20 bg-white border border-zinc-200 border-dashed rounded-3xl">
                   <Users className="mx-auto text-zinc-300 mb-4" size={48} />
                   <h3 className="text-lg font-bold text-zinc-400">No Academy Data yet</h3>
-                  <p className="text-sm text-zinc-400 mt-2">Create some data in the Admin Panel to see the performance.</p>
+                  <p className="text-sm text-zinc-400 mt-2">Click the "+ Add Batch" button above to get started.</p>
                 </div>
               )}
             </div>
@@ -880,7 +1078,10 @@ export default function MinimalistDashboard() {
             <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 font-black">Knowledge Base & Assets</h3>
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
+                  <button onClick={() => openEditModal('docs')} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
+                    <Plus size={12} /> Add
+                  </button>
                   <select value={galleryCategory} onChange={(e) => setGalleryCategory(e.target.value)}
                     className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
                     {uniqueGalleryCategories.map((c: any) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
@@ -890,9 +1091,13 @@ export default function MinimalistDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredDocs.map((doc: any, idx: number) => {
                   const isLinkValid = doc.link && doc.link !== '#';
+                  const origIdx = docsData.indexOf(doc);
                   return (
-                    <a key={idx} href={isLinkValid ? doc.link : undefined} target="_blank" rel="noopener noreferrer"
-                      className={`group bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col justify-between transition-all ${isLinkValid ? 'hover:border-zinc-900 hover:shadow-xl cursor-pointer ring-1 ring-transparent hover:ring-zinc-900' : 'opacity-40 cursor-not-allowed'}`}>
+                    <div key={idx} className="group bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col justify-between transition-all relative hover:border-zinc-400">
+                      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition z-10">
+                        <button onClick={(e) => { e.preventDefault(); openEditModal('docs', origIdx); }} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                        <button onClick={(e) => { e.preventDefault(); handleDeleteItem('docs', origIdx); }} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                      </div>
                       <div>
                         <div className="flex justify-between items-start mb-6">
                           <span className="p-3 bg-zinc-50 rounded-xl group-hover:bg-zinc-100 transition text-zinc-900">
@@ -903,10 +1108,11 @@ export default function MinimalistDashboard() {
                         <h4 className="text-xl font-black tracking-tight mb-2 leading-tight">{doc.title}</h4>
                         <p className="text-xs text-zinc-400 leading-relaxed mb-8 line-clamp-2 italic">{doc.desc}</p>
                       </div>
-                      <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition ${isLinkValid ? 'text-zinc-900' : 'text-zinc-300'}`}>
-                        {isLinkValid ? 'Go to Content' : 'Link not ready'} {isLinkValid && <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />}
-                      </div>
-                    </a>
+                      <a href={isLinkValid ? doc.link : undefined} target="_blank" rel="noopener noreferrer"
+                        className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition ${isLinkValid ? 'text-zinc-900 hover:underline cursor-pointer' : 'text-zinc-300 cursor-not-allowed'}`}>
+                        {isLinkValid ? 'Go to Content' : 'Link not ready'} {isLinkValid && <ArrowRight size={14} />}
+                      </a>
+                    </div>
                   );
                 })}
               </div>
@@ -915,6 +1121,28 @@ export default function MinimalistDashboard() {
         })()}
 
       </div>
+
+      {/* Edit Modal */}
+      {editModal && (
+        <EditModal
+          isOpen={true}
+          onClose={() => setEditModal(null)}
+          onSave={handleSaveEdit}
+          title={`${editModal.index >= 0 ? 'Edit' : 'Add'} ${BI_EDIT_CONFIG[editModal.section]?.title || 'Item'}`}
+          fields={BI_EDIT_CONFIG[editModal.section]?.fields || []}
+          data={editModal.data}
+          onChange={handleEditField}
+        />
+      )}
+
+      {/* Save Status Toast */}
+      {saveStatus !== 'idle' && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4 duration-200">
+          <div className={`px-5 py-3 rounded-2xl shadow-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 ${saveStatus === 'saving' ? 'bg-zinc-900 text-white' : 'bg-emerald-500 text-white'}`}>
+            {saveStatus === 'saving' ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : <><Check size={14} /> Saved!</>}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

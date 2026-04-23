@@ -113,6 +113,13 @@ export interface KanbanProjectItem {
     progress: number;
     priority: string;
     notes?: string;
+    picSales?: string;
+    contactName?: string;
+    contactNumber?: string;
+    forecastedValue?: number;
+    nextStep?: string;
+    closeDate?: string;
+    probability?: number;
 }
 
 export interface KanbanLeadItem {
@@ -136,6 +143,7 @@ export interface KanbanLeadItem {
     lastInteractedOn?: string;
     nextStep?: string;
     proposalLink?: string;
+    partnerId?: string;
 }
 
 export interface StandupTask {
@@ -158,6 +166,10 @@ export interface KanbanPartnerItem {
     progress?: number;
     priority?: string;
     notes?: string;
+    picPartner?: string;
+    contactName?: string;
+    contactNumber?: string;
+    nextStep?: string;
 }
 
 export interface KanbanPSEWorkload {

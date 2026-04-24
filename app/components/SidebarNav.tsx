@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, Target, Settings, Menu, LogOut, PanelLeftClose, PanelRightClose, Briefcase, Calendar } from "lucide-react";
+import { Activity, LayoutDashboard, Target, Settings, Menu, LogOut, PanelLeftClose, PanelRightClose, Briefcase, Calendar, Link2 } from "lucide-react";
 import { getConfig } from "../lib/config";
 import { useEffect, useState } from "react";
 import { useGlobalData } from "./GlobalDataProvider";
@@ -25,10 +25,11 @@ export default function SidebarNav() {
         { href: '/b2b-board', label: 'B2B Delivery & Ops', icon: Briefcase },
         { href: '/daily-standup', label: 'Daily Standup', icon: Calendar },
         { href: '/growth', label: 'Growth Intelligence', icon: Activity },
+        { href: '/links-setup', label: 'Public Links', icon: Link2 },
     ];
 
-    if (pathname === '/login') {
-        return null; // Fullscreen login
+    if (pathname === '/login' || pathname.startsWith('/l/')) {
+        return null; // Fullscreen login or public links page
     }
 
     const handleLogout = () => {

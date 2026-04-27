@@ -1240,7 +1240,7 @@ export default function MinimalistDashboard() {
                       ];
                     });
 
-                    const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+                    const csvContent = [headers.join(","), ...rows.map((row: any[]) => row.join(","))].join("\n");
                     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement("a");

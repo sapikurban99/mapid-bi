@@ -643,3 +643,127 @@ export async function syncSocialsFromN8n(platform: string) {
   }
 }
 
+export async function getWaCrmData(startDate?: string, endDate?: string) {
+  console.log(`Fetching WA CRM Data (SalesMAPID) | Range: ${startDate || 'All'} to ${endDate || 'All'}`);
+  
+  // Format dates for inclusive range
+  const start = startDate ? `${startDate}T00:00:00Z` : null;
+  const end = endDate ? `${endDate}T23:59:59Z` : null;
+
+  const { data: contacts, error: cError } = await supabase
+    .from('mapid_wa_manager_contacts')
+    .select('*')
+    .eq('session_id', 'salesmapid');
+
+  if (cError) {
+    console.error('Error fetching contacts:', cError);
+    return [];
+  }
+
+  let messageQuery = supabase
+    .from('mapid_wa_manager_messages')
+    .select('*')
+    .eq('session_id', 'salesmapid');
+
+  if (start) messageQuery = messageQuery.gte('sent_at', start);
+  if (end) messageQuery = messageQuery.lte('sent_at', end);
+
+  const { data: messages, error: mError } = await messageQuery.order('sent_at', { ascending: true, nullsFirst: false });
+
+  if (mError) {
+    console.warn('sent_at filter failed, attempting with created_at fallback');
+    let fallbackQuery = supabase
+      .from('mapid_wa_manager_messages')
+      .select('*')
+      .eq('session_id', 'salesmapid');
+      
+    if (start) fallbackQuery = fallbackQuery.gte('created_at', start);
+    if (end) fallbackQuery = fallbackQuery.lte('created_at', end);
+
+    const { data: fallbackMessages, error: fError } = await fallbackQuery.order('id', { ascending: true, nullsFirst: false });
+      
+    if (fError) {
+      console.error('Error fetching messages:', fError);
+      return [];
+    }
+    return processCrmData(contacts, fallbackMessages, true);
+  }
+
+  return processCrmData(contacts, messages, !!(startDate || endDate));
+}
+
+function processCrmData(contacts: any[], messages: any[], isFiltered: boolean) {
+  if (!contacts || contacts.length === 0) return [];
+
+  // Group messages by contact and calculate inbound/outbound
+  const contactMap = new Map();
+  const activeContactIds = new Set();
+  
+  (contacts || []).forEach(c => {
+    // Map either id, phone, wa_number, or chat_id as key
+    // We'll store it under multiple keys if necessary to ensure linking
+    const key = c.id || c.wa_number || c.phone || c.chat_id;
+    if (key) {
+      const contactObj = {
+        ...c,
+        inboundCount: 0,
+        outboundCount: 0,
+        lastMessage: '',
+        conversationSummary: []
+      };
+      contactMap.set(key, contactObj);
+      
+      // Also map secondary keys if they exist to the same object reference
+      if (c.wa_number) contactMap.set(c.wa_number, contactObj);
+      if (c.chat_id) contactMap.set(c.chat_id, contactObj);
+      if (c.phone) contactMap.set(c.phone, contactObj);
+    }
+  });
+
+  (messages || []).forEach(m => {
+    // Try to find the contact in our map using all possible linking fields
+    const contactIdentifier = m.chat_id || m.wa_number || m.contact_id || m.contact_uuid || m.phone || m.number;
+    const contact = contactMap.get(contactIdentifier);
+    
+    if (contact) {
+      activeContactIds.add(contact); // Mark contact as having messages in range
+      // Robustly determine direction
+      const isInbound = m.direction === 'inbound' || m.is_outbound === false || m.type === 'inbound' || m.is_inbound === true;
+      
+      if (isInbound) {
+        contact.inboundCount++;
+      } else {
+        contact.outboundCount++;
+      }
+      
+      // Robustly get message text
+      const msgText = m.message || m.text || m.content || m.body || '';
+      contact.lastMessage = msgText;
+      contact.conversationSummary.push(`${isInbound ? 'User' : 'Sales'}: ${msgText}`);
+    }
+  });
+
+  // If filtered, only return contacts that have messages in the range
+  if (isFiltered) {
+    return Array.from(activeContactIds);
+  }
+
+  return Array.from(new Set(contactMap.values()));
+}
+
+export async function deleteWaCrmContact(identifier: string) {
+  // We'll try to delete from contacts table using id, wa_number, or chat_id
+  const { error } = await supabase
+    .from('mapid_wa_manager_contacts')
+    .delete()
+    .or(`id.eq.${identifier},wa_number.eq.${identifier},chat_id.eq.${identifier}`)
+    .eq('session_id', 'salesmapid');
+
+  if (error) {
+    console.error('Error deleting contact:', error);
+    throw new Error(error.message);
+  }
+  
+  return { success: true };
+}
+

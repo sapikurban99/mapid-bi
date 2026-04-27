@@ -210,6 +210,7 @@ export interface SiteConfig {
         Academy: boolean;
         UserGrowth: boolean;
         Gallery: boolean;
+        WACRM: boolean;
     };
 
     // Role details
@@ -276,6 +277,7 @@ export const DEFAULT_CONFIG: SiteConfig = {
         Academy: true,
         UserGrowth: true,
         Gallery: true,
+        WACRM: true,
     },
 
     roles: {

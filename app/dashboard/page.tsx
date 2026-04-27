@@ -6,7 +6,7 @@ import {
   Loader2, ArrowUpRight, ArrowDownRight, Users, Target,
   Activity, FileText, FolderOpen, TableProperties, Lock,
   TrendingUp, BarChart3, Globe, Share2, ArrowRight, Sparkles, Maximize2, Minimize2, BookOpen, MoreVertical,
-  Layers, Zap, Plus, Edit2, Trash2, X, Save, Check
+  Layers, Zap, Plus, Edit2, Trash2, X, Save, Check, Download
 } from 'lucide-react';
 import { getConfig, setConfig as setConfigLS, saveConfigToSupabase } from '../lib/config';
 import LoadingProgress from '../components/LoadingProgress';
@@ -102,11 +102,50 @@ const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: a
             </div>
           ))}
         </div>
-        <div className="flex gap-3 p-6 border-t border-zinc-100">
-          <button onClick={onClose} className="flex-1 px-4 py-3 border border-zinc-200 text-zinc-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-50 transition">Cancel</button>
-          <button onClick={onSave} className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition flex items-center justify-center gap-2">
-            <Check size={14} /> Save
-          </button>
+        <div className="p-6 border-t border-zinc-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 transition">Cancel</button>
+          <button onClick={onSave} className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- WA Chat History Modal ---
+const ChatHistoryModal = ({ isOpen, onClose, contact }: any) => {
+  if (!isOpen || !contact) return null;
+  return (
+    <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between p-6 border-b border-zinc-100 bg-zinc-50/50">
+          <div>
+            <h3 className="text-lg font-black tracking-tight">{contact.name || 'Unknown Contact'}</h3>
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{contact.phone || 'No Phone'}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-xl transition text-zinc-400 hover:text-zinc-900"><X size={20} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-zinc-50/30">
+          {contact.conversationSummary?.length > 0 ? (
+            contact.conversationSummary.map((line: string, idx: number) => {
+              const isUser = line.startsWith('User:');
+              const content = line.split(': ').slice(1).join(': ');
+              return (
+                <div key={idx} className={`flex ${isUser ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${isUser ? 'bg-white text-zinc-900 border border-zinc-100' : 'bg-zinc-900 text-white'}`}>
+                    <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isUser ? 'text-emerald-500' : 'text-blue-400'}`}>
+                      {isUser ? 'Contact' : 'Sales Team'}
+                    </div>
+                    <div className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{content}</div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="h-full flex items-center justify-center text-zinc-300 font-bold uppercase tracking-widest text-xs">No history available</div>
+          )}
+        </div>
+        <div className="p-4 border-t border-zinc-100 bg-white text-center">
+          <p className="text-[10px] text-zinc-300 font-bold uppercase tracking-widest italic">End of Chat History</p>
         </div>
       </div>
     </div>
@@ -115,7 +154,7 @@ const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: a
 
 export default function MinimalistDashboard() {
   const { isLoading: globalIsLoading, syncData } = useGlobalData();
-  const [activeTab, setActiveTab] = useState('Trends');
+  const [activeTab, setActiveTab] = useState<string>('Trends');
   const [trendCategory, setTrendCategory] = useState('All');
   const [galleryCategory, setGalleryCategory] = useState('All');
   const [b2cPeriod, setB2cPeriod] = useState('All');
@@ -133,6 +172,7 @@ export default function MinimalistDashboard() {
   
   // Use config from global provider
   const [config, setConfigState] = useState(() => getConfig());
+  const [selectedContact, setSelectedContact] = useState<any>(null);
 
   // B2C Revenue date range filter (default: current quarter)
   const getQuarterDates = (q: number, y: number) => {
@@ -153,6 +193,41 @@ export default function MinimalistDashboard() {
   // Fetch Academy revenue from Supabase revenue_payments table (dynamic date range)
   const academyPaymentsUrl = `/api/revenue/payments?start_date=${revenueStartDate}&end_date=${revenueEndDate}&category=MAPID Academy`;
   const { data: academyPayData, isLoading: academyLoading } = useSWR(academyPaymentsUrl, apiFetcher, { revalidateOnFocus: false });
+
+  // WA CRM Data Fetch with Date Filter
+  const [waCrmStartDate, setWaCrmStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [waCrmEndDate, setWaCrmEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  const waCrmUrl = `/api/bi/wa-crm?start_date=${waCrmStartDate}&end_date=${waCrmEndDate}`;
+  const { data: waCrmResponse, isLoading: waCrmLoading, mutate: mutateWaCrm } = useSWR(waCrmUrl, apiFetcher);
+  const waCrmData = waCrmResponse?.data || [];
+
+  const handleDeleteContact = async (contact: any) => {
+    const id = contact.id || contact.wa_number || contact.phone || contact.chat_id;
+    if (!id) return;
+
+    if (confirm(`Are you sure you want to remove ${contact.name || 'this contact'} from the leads list?`)) {
+      try {
+        const res = await fetch('/api/bi/wa-crm/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const result = await res.json();
+        if (result.success) {
+          mutateWaCrm();
+        } else {
+          alert('Failed to delete: ' + result.message);
+        }
+      } catch (err: any) {
+        alert('Error: ' + err.message);
+      }
+    }
+  };
 
   // Fetch Live Platform Data from DevServer (dynamic date range)
   const { allPayments, isLoading: platformLoading } = useGrowthData(revenueStartDate, revenueEndDate);
@@ -424,6 +499,7 @@ export default function MinimalistDashboard() {
 
         {config.tabsVisible.Academy && <button onClick={() => setActiveTab('Academy')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Academy' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Academy</button>}
         {config.tabsVisible.Gallery && <button onClick={() => setActiveTab('Gallery')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Gallery' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Gallery</button>}
+        {config.tabsVisible.WACRM && <button onClick={() => setActiveTab('WACRM')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'WACRM' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>WA CRM</button>}
       </div>
 
       <div className="max-w-6xl mx-auto">
@@ -1120,9 +1196,203 @@ export default function MinimalistDashboard() {
           );
         })()}
 
+        {/* === TAB 7: WA CRM === */}
+        {activeTab === 'WACRM' && (
+          <div className="space-y-8 animate-in fade-in">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+              <div>
+                <h3 className="text-xl font-black tracking-tight leading-tight">WA CRM SalesMAPID<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Conversation Performance & Summary</span></h3>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-4 bg-white p-2 rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="flex items-center gap-2 px-3 border-r border-zinc-100">
+                  <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest">From</span>
+                  <input type="date" value={waCrmStartDate} onChange={e => setWaCrmStartDate(e.target.value)} 
+                    className="text-xs font-bold outline-none bg-transparent" />
+                </div>
+                <div className="flex items-center gap-2 px-3">
+                  <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest">To</span>
+                  <input type="date" value={waCrmEndDate} onChange={e => setWaCrmEndDate(e.target.value)} 
+                    className="text-xs font-bold outline-none bg-transparent" />
+                </div>
+                <button 
+                  onClick={() => {
+                    const headers = ['Name', 'Phone', 'Inbound Count', 'Outbound Count', 'Response Rate (%)', 'Conversation Summary'];
+                    
+                    const sanitize = (text: any) => {
+                      if (text === null || text === undefined) return '';
+                      let cleanText = String(text).replace(/[\n\r]+/g, ' ').trim();
+                      cleanText = cleanText.replace(/"/g, '""');
+                      return `"${cleanText}"`;
+                    };
+
+                    const rows = waCrmData.map((c: any) => {
+                      const rate = c.inboundCount > 0 
+                        ? Math.min(Math.round((c.outboundCount / c.inboundCount) * 100), 100) 
+                        : 0;
+                      return [
+                        sanitize(c.name || 'Unknown'),
+                        sanitize(c.phone || '-'),
+                        c.inboundCount,
+                        c.outboundCount,
+                        `${rate}%`,
+                        sanitize((c.conversationSummary || []).join(' | '))
+                      ];
+                    });
+
+                    const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", `wa_crm_full_summary_${new Date().toISOString().split('T')[0]}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg"
+                >
+                  <Download size={14} /> Export CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Total Contacts</h4>
+                <div className="text-3xl font-black tracking-tighter text-zinc-900">{waCrmData.length}</div>
+              </div>
+              <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 text-emerald-500">Inbound Activity</h4>
+                <div className="text-3xl font-black tracking-tighter text-zinc-900">{waCrmData.reduce((acc: number, c: any) => acc + (c.inboundCount || 0), 0)}</div>
+              </div>
+              <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 text-blue-500">Outbound Activity</h4>
+                <div className="text-3xl font-black tracking-tighter text-zinc-900">{waCrmData.reduce((acc: number, c: any) => acc + (c.outboundCount || 0), 0)}</div>
+              </div>
+              <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 text-zinc-900">Overall Response Rate</h4>
+                {(() => {
+                  const totalIn = waCrmData.reduce((acc: number, c: any) => acc + (c.inboundCount || 0), 0);
+                  const totalOut = waCrmData.reduce((acc: number, c: any) => acc + (c.outboundCount || 0), 0);
+                  const rate = totalIn > 0 ? Math.min(Math.round((totalOut / totalIn) * 100), 100) : 0;
+                  return (
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-black tracking-tighter text-zinc-900">{rate}%</div>
+                      <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Efficiency</div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-zinc-50/50 text-[10px] text-zinc-400 border-b border-zinc-100 uppercase font-black tracking-widest">
+                    <tr>
+                      <th className="px-6 py-4">Contact</th>
+                      <th className="px-6 py-4 text-center">Inbound</th>
+                      <th className="px-6 py-4 text-center">Outbound</th>
+                      <th className="px-6 py-4 text-center">Response Rate</th>
+                      <th className="px-6 py-4">History</th>
+                      <th className="px-6 py-4">Action</th>
+                      <th className="px-6 py-4">Latest Summary</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50">
+                    {waCrmLoading ? (
+                      <tr><td colSpan={7} className="px-6 py-10 text-center text-zinc-300 font-bold uppercase tracking-widest text-xs"><Loader2 className="animate-spin inline mr-2" size={14} /> Loading WA CRM Data...</td></tr>
+                    ) : waCrmData.length === 0 ? (
+                      <tr><td colSpan={7} className="px-6 py-10 text-center text-zinc-300 font-bold uppercase tracking-widest text-xs">No CRM data found</td></tr>
+                    ) : (
+                      waCrmData.map((contact: any, idx: number) => {
+                        const responseRate = contact.inboundCount > 0 
+                          ? Math.min(Math.round((contact.outboundCount / contact.inboundCount) * 100), 100) 
+                          : 0;
+                        
+                        return (
+                          <tr key={idx} className="hover:bg-zinc-50/50 transition group">
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-zinc-900">{contact.name || 'Unknown'}</div>
+                              <div className="text-[10px] text-zinc-400 font-mono">{contact.phone || '-'}</div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg font-bold text-xs">
+                                {contact.inboundCount}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg font-bold text-xs">
+                                {contact.outboundCount}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex flex-col items-center gap-1">
+                                <span className={`px-2 py-1 rounded-lg font-black text-[10px] ${
+                                  responseRate >= 80 ? 'bg-emerald-100 text-emerald-600' :
+                                  responseRate >= 50 ? 'bg-amber-100 text-amber-600' :
+                                  'bg-zinc-100 text-zinc-400'
+                                }`}>
+                                  {responseRate}%
+                                </span>
+                                <div className="w-12 h-1 bg-zinc-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full ${responseRate >= 80 ? 'bg-emerald-500' : responseRate >= 50 ? 'bg-amber-500' : 'bg-zinc-300'}`}
+                                    style={{ width: `${responseRate}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <button 
+                                onClick={() => setSelectedContact(contact)}
+                                className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-zinc-900 hover:text-white transition shadow-sm flex items-center gap-2"
+                              >
+                                <BookOpen size={12} /> View History
+                              </button>
+                            </td>
+                            <td className="px-6 py-4">
+                              <button 
+                                onClick={() => handleDeleteContact(contact)}
+                                className="p-2 text-zinc-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                title="Remove Lead"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                            <td className="px-6 py-4 max-w-md">
+                              <div className="space-y-1">
+                                {(contact.conversationSummary || []).slice(-2).map((line: string, lIdx: number) => (
+                                  <div key={lIdx} className="text-[10px] text-zinc-400 truncate">
+                                    <span className={line.startsWith('User:') ? 'text-emerald-500 font-bold' : 'text-blue-500 font-bold'}>
+                                      {line.split(': ')[0]}:
+                                    </span> {line.split(': ')[1]}
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* Edit Modal */}
+        {/* Chat History Modal */}
+        <ChatHistoryModal
+          isOpen={!!selectedContact}
+          onClose={() => setSelectedContact(null)}
+          contact={selectedContact}
+        />
+
+        {/* Edit Modal */}
       {editModal && (
         <EditModal
           isOpen={true}

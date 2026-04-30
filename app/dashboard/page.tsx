@@ -18,16 +18,6 @@ const apiFetcher = (url: string) => fetch(url).then(r => r.json());
 
 // --- BI Section Edit Configs ---
 const BI_EDIT_CONFIG: Record<string, { title: string; fields: { key: string; label: string; type: string; options?: string[]; placeholder?: string }[]; empty: any }> = {
-  budget: {
-    title: 'Budget Item',
-    empty: { category: 'Operational', amount: 0, date: '', description: '' },
-    fields: [
-      { key: 'category', label: 'Category', type: 'select', options: ['Ads Spend', 'Event', 'Operational', 'Software', 'Other'] },
-      { key: 'amount', label: 'Amount (Rp)', type: 'number' },
-      { key: 'date', label: 'Date', type: 'date' },
-      { key: 'description', label: 'Description', type: 'text' },
-    ],
-  },
   campaigns: {
     title: 'Campaign',
     empty: { name: '', period: '', status: 'Active', leads: 0, participants: 0, conversion: 0 },
@@ -111,53 +101,11 @@ const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: a
   );
 };
 
-// --- WA Chat History Modal ---
-const ChatHistoryModal = ({ isOpen, onClose, contact }: any) => {
-  if (!isOpen || !contact) return null;
-  return (
-    <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-100 bg-zinc-50/50">
-          <div>
-            <h3 className="text-lg font-black tracking-tight">{contact.name || 'Unknown Contact'}</h3>
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{contact.phone || 'No Phone'}</p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-xl transition text-zinc-400 hover:text-zinc-900"><X size={20} /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-zinc-50/30">
-          {contact.conversationSummary?.length > 0 ? (
-            contact.conversationSummary.map((line: string, idx: number) => {
-              const isUser = line.startsWith('User:');
-              const content = line.split(': ').slice(1).join(': ');
-              return (
-                <div key={idx} className={`flex ${isUser ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${isUser ? 'bg-white text-zinc-900 border border-zinc-100' : 'bg-zinc-900 text-white'}`}>
-                    <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isUser ? 'text-emerald-500' : 'text-blue-400'}`}>
-                      {isUser ? 'Contact' : 'Sales Team'}
-                    </div>
-                    <div className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{content}</div>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="h-full flex items-center justify-center text-zinc-300 font-bold uppercase tracking-widest text-xs">No history available</div>
-          )}
-        </div>
-        <div className="p-4 border-t border-zinc-100 bg-white text-center">
-          <p className="text-[10px] text-zinc-300 font-bold uppercase tracking-widest italic">End of Chat History</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export default function MinimalistDashboard() {
   const { isLoading: globalIsLoading, syncData } = useGlobalData();
   const [activeTab, setActiveTab] = useState<string>('Trends');
   const [trendCategory, setTrendCategory] = useState('All');
-  const [galleryCategory, setGalleryCategory] = useState('All');
-  const [b2cPeriod, setB2cPeriod] = useState('All');
+
   // Pagination states
   const [projectPage, setProjectPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
@@ -172,7 +120,6 @@ export default function MinimalistDashboard() {
   
   // Use config from global provider
   const [config, setConfigState] = useState(() => getConfig());
-  const [selectedContact, setSelectedContact] = useState<any>(null);
 
   // B2C Revenue date range filter (default: current quarter)
   const getQuarterDates = (q: number, y: number) => {
@@ -190,44 +137,12 @@ export default function MinimalistDashboard() {
   const [revenueStartDate, setRevenueStartDate] = useState(defaultDates.start);
   const [revenueEndDate, setRevenueEndDate] = useState(defaultDates.end);
 
+  // B2B Quarter Filter State
+  const [b2bQuarter, setB2bQuarter] = useState<'All' | 'Q1' | 'Q2' | 'Q3' | 'Q4'>('All');
+
   // Fetch Academy revenue from Supabase revenue_payments table (dynamic date range)
   const academyPaymentsUrl = `/api/revenue/payments?start_date=${revenueStartDate}&end_date=${revenueEndDate}&category=MAPID Academy`;
   const { data: academyPayData, isLoading: academyLoading } = useSWR(academyPaymentsUrl, apiFetcher, { revalidateOnFocus: false });
-
-  // WA CRM Data Fetch with Date Filter
-  const [waCrmStartDate, setWaCrmStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
-  });
-  const [waCrmEndDate, setWaCrmEndDate] = useState(() => new Date().toISOString().split('T')[0]);
-
-  const waCrmUrl = `/api/bi/wa-crm?start_date=${waCrmStartDate}&end_date=${waCrmEndDate}`;
-  const { data: waCrmResponse, isLoading: waCrmLoading, mutate: mutateWaCrm } = useSWR(waCrmUrl, apiFetcher);
-  const waCrmData = waCrmResponse?.data || [];
-
-  const handleDeleteContact = async (contact: any) => {
-    const id = contact.id || contact.wa_number || contact.phone || contact.chat_id;
-    if (!id) return;
-
-    if (confirm(`Are you sure you want to remove ${contact.name || 'this contact'} from the leads list?`)) {
-      try {
-        const res = await fetch('/api/bi/wa-crm/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id })
-        });
-        const result = await res.json();
-        if (result.success) {
-          mutateWaCrm();
-        } else {
-          alert('Failed to delete: ' + result.message);
-        }
-      } catch (err: any) {
-        alert('Error: ' + err.message);
-      }
-    }
-  };
 
   // Fetch Live Platform Data from DevServer (dynamic date range)
   const { allPayments, isLoading: platformLoading } = useGrowthData(revenueStartDate, revenueEndDate);
@@ -340,22 +255,7 @@ export default function MinimalistDashboard() {
     const now = new Date();
     const currentQuarterStr = `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`;
 
-    // Auto-fill B2C period (Campaigns & Revenue)
-    if (data?.revenue && data.revenue.length > 0 && b2cPeriod === 'All') {
-      const b2cPeriods = Array.from(new Set((data.revenue as any[]).map((r: any) => r.quarter).filter(Boolean))).sort().reverse();
-      if (b2cPeriods.includes(currentQuarterStr)) {
-          setB2cPeriod(currentQuarterStr);
-      } else if (b2cPeriods.length > 0) {
-          setB2cPeriod(b2cPeriods[0] as string); // Fallback to latest
-      }
-    } else if (data?.campaigns && data.campaigns.length > 0 && b2cPeriod === 'All') {
-      const campPeriods = Array.from(new Set((data.campaigns as any[]).map((c: any) => c.period).filter(Boolean))).sort().reverse();
-      if (campPeriods.includes(currentQuarterStr)) {
-          setB2cPeriod(currentQuarterStr);
-      } else if (campPeriods.length > 0) {
-          setB2cPeriod(campPeriods[0] as string);
-      }
-    }
+
 
 
   }, [data, activeTab, mounted]);
@@ -387,6 +287,45 @@ export default function MinimalistDashboard() {
       isLoading: academyLoading || platformLoading,
     };
   }, [academyPayData, allPayments, academyLoading, platformLoading]);
+
+  // --- B2B Logic ---
+  const filteredLeads = useMemo(() => {
+    const leads = config?.kanbanLeads || [];
+    if (b2bQuarter === 'All') return leads;
+    return leads.filter((l: any) => {
+      if (!l.expectedCloseDate) return false;
+      const month = new Date(l.expectedCloseDate).getMonth();
+      const quarter = `Q${Math.floor(month / 3) + 1}`;
+      return quarter === b2bQuarter;
+    });
+  }, [config.kanbanLeads, b2bQuarter]);
+
+  const filteredProjects = useMemo(() => {
+    const projects = config?.kanbanProjects || [];
+    if (b2bQuarter === 'All') return projects;
+    return projects.filter((p: any) => {
+      if (!p.closeDate) return false;
+      const month = new Date(p.closeDate).getMonth();
+      const quarter = `Q${Math.floor(month / 3) + 1}`;
+      return quarter === b2bQuarter;
+    });
+  }, [config.kanbanProjects, b2bQuarter]);
+
+  const b2bMetrics = useMemo(() => {
+    const activeProjectsRev = filteredProjects.filter((p: any) => p.stage !== 'Done' && p.stage !== 'Lost' && p.stage !== 'Freeze').reduce((acc: number, curr: any) => acc + (Number(curr.forecastedValue) || 0), 0);
+    const doneProjectsRev = filteredProjects.filter((p: any) => p.stage === 'Done').reduce((acc: number, curr: any) => acc + (Number(curr.forecastedValue) || 0), 0);
+    const potentialRevenue = filteredLeads.filter((l: any) => !['Closed Lost', 'Freeze'].includes(l.stage)).reduce((acc: number, curr: any) => acc + (Number(curr.forecastedValue) || 0), 0);
+    const weightedPipeline = filteredLeads.filter((l: any) => !['Closed Lost', 'Freeze'].includes(l.stage)).reduce((acc: number, curr: any) => acc + (Number(curr.forecastedValue) * (curr.probability || 0)), 0);
+    
+    return {
+        activeProjectsRev,
+        doneProjectsRev,
+        potentialRevenue,
+        weightedPipeline,
+        totalProjection: activeProjectsRev + doneProjectsRev + potentialRevenue,
+        realizationProgress: Math.round((doneProjectsRev / (activeProjectsRev + doneProjectsRev + potentialRevenue || 1)) * 100)
+    };
+  }, [filteredLeads, filteredProjects]);
 
   // Pre-hydration check
   if (!mounted) {
@@ -463,12 +402,7 @@ export default function MinimalistDashboard() {
   // --- CALCULATIONS ---
   const activeRevenueData = data?.revenue || [];
 
-  const b2cPeriods = new Set<string>();
-  (data?.campaigns || []).forEach((c: any) => { if (c.period) b2cPeriods.add(c.period); });
-  activeRevenueData.forEach((r: any) => { if (r.quarter) b2cPeriods.add(r.quarter); });
-  const uniqueB2cPeriods = ['All', ...Array.from(b2cPeriods).sort()];
 
-  const filteredCampaigns = (data?.campaigns || []).filter((c: any) => b2cPeriod === 'All' || c.period === b2cPeriod);
 
 
   // --- LOGIC GRAFIK SVG PROPORSIONAL ---
@@ -496,10 +430,10 @@ export default function MinimalistDashboard() {
       <div className="max-w-6xl mx-auto mb-10 border-b border-zinc-200 flex gap-8 overflow-x-auto hide-scrollbar">
         {config.tabsVisible.Trends && <button onClick={() => setActiveTab('Trends')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Trends' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Trends</button>}
         {config.tabsVisible.B2C && <button onClick={() => setActiveTab('B2C')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'B2C' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>B2C</button>}
+        {config.tabsVisible.B2B && <button onClick={() => setActiveTab('B2B')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'B2B' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>B2B</button>}
 
-        {config.tabsVisible.Academy && <button onClick={() => setActiveTab('Academy')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Academy' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Academy</button>}
-        {config.tabsVisible.Gallery && <button onClick={() => setActiveTab('Gallery')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'Gallery' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>Gallery</button>}
-        {config.tabsVisible.WACRM && <button onClick={() => setActiveTab('WACRM')} className={`pb-3 text-xs font-bold tracking-widest uppercase transition-all ${activeTab === 'WACRM' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>WA CRM</button>}
+
+
       </div>
 
       <div className="max-w-6xl mx-auto">
@@ -657,270 +591,12 @@ export default function MinimalistDashboard() {
               </div>
             </div>
 
-            {/* BUDGET DISBURSEMENT SECTION */}
-            <div className="pt-8 border-t border-zinc-200 mt-12 mb-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-black tracking-tight leading-tight">Budget Disbursement<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</span></h3>
-                <button onClick={() => openEditModal('budget')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
-                  <Plus size={12} /> Add
-                </button>
-              </div>
-              {(() => {
-                const budgetData = data?.budget || [];
-                const totalSpent = budgetData.reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
-                const maxBudget = 100000000;
-                const budgetProgress = (totalSpent / maxBudget) * 100;
-                const spentByCategory = budgetData.reduce((acc: any, item: any) => {
-                  const cat = item.category || 'Other';
-                  acc[cat] = (acc[cat] || 0) + (Number(item.amount) || 0);
-                  return acc;
-                }, {});
-
-                // Sort categories by highest spent
-                const sortedCategories = Object.entries(spentByCategory).sort((a: any, b: any) => b[1] - a[1]);
-
-                return (
-                  <div className="space-y-8">
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-zinc-900 text-white p-6 rounded-2xl shadow-xl">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Total Budget Spent</h4>
-                        <div className="text-2xl font-black tracking-tighter text-emerald-400">{formatIDR(totalSpent)}</div>
-                      </div>
-                      {sortedCategories.slice(0, 3).map(([cat, amount]: any, idx) => (
-                        <div key={cat} className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm transition hover:border-zinc-300">
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">{cat}</h4>
-                          <div className="text-xl font-black tracking-tighter text-zinc-900">{formatIDR(amount)}</div>
-                          <div className="text-[10px] font-bold text-zinc-400 mt-1 text-right">{totalSpent > 0 ? ((amount / totalSpent) * 100).toFixed(1) : 0}% of Total</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Disbursement History Table */}
-                    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                          <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                            <tr><th className="px-6 py-4">Date</th><th className="px-6 py-4">Category</th><th className="px-6 py-4 min-w-[200px]">Description</th><th className="px-6 py-4 text-right">Amount (IDR)</th><th className="px-4 py-4 w-16"></th></tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-100">
-                            {budgetData.length === 0 ? (
-                              <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending recorded</td></tr>
-                            ) : (
-                              budgetData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => {
-                                // Find original index in the unsorted data
-                                const origIdx = (data?.budget || []).indexOf(row);
-                                return (
-                                  <tr key={idx} className="hover:bg-zinc-50 transition group">
-                                    <td className="px-6 py-5 font-bold whitespace-nowrap">{formatDate(row.date)}</td>
-                                    <td className="px-6 py-5"><span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span></td>
-                                    <td className="px-6 py-5 text-zinc-500 font-medium italic">{row.description || '-'}</td>
-                                    <td className="px-6 py-5 text-right font-mono font-bold text-zinc-900">{formatIDR(row.amount)}</td>
-                                    <td className="px-4 py-5">
-                                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                        <button onClick={() => openEditModal('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
-                                        <button onClick={() => handleDeleteItem('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
           </div>
         )}
 
         {/* === TAB 2: B2C === */}
         {activeTab === 'B2C' && (
           <div className="space-y-12 animate-in fade-in">
-            {/* Social & Community */}
-            <div>
-              {(() => {
-                const socialsData = data?.socials || [];
-                const uniqueMonths = ['All', ...Array.from(new Set(socialsData.map((d: any) => normalizeMonth(d.month)).filter(Boolean)))];
-                const uniqueWeeks = ['All', ...Array.from(new Set(socialsData.map((d: any) => d.week).filter(Boolean)))];
-
-
-                // --- DATA TRANSFORMS FOR B2C SOCIALS ---
-                const getComparisonValue = (dataset: any[], month: string, week: string, platform: string, metric: string, type: 'latest' | 'earliest') => {
-                  const filtered = dataset.filter(d =>
-                    d.platform === platform &&
-                    d.metric === metric &&
-                    (month === 'All' || normalizeMonth(d.month) === normalizeMonth(month)) &&
-                    (week === 'All' || d.week === week)
-                  );
-
-                  if (filtered.length === 0) return 0;
-
-                  // If "All" is selected for month or week, we show target data point (latest vs earliest)
-                  // instead of aggregating (summing) as per user request.
-                  if (week === 'All' || month === 'All') {
-                    const sorted = [...filtered].sort((a, b) => {
-                      const dateA = new Date(a.month).getTime();
-                      const dateB = new Date(b.month).getTime();
-                      if (dateA !== dateB) return dateA - dateB;
-                      return b.week.localeCompare(a.week, undefined, { numeric: true });
-                    });
-                    // For growth comparison: primary is latest, secondary is earliest
-                    return type === 'latest' ? (Number(sorted[sorted.length - 1].value) || 0) : (Number(sorted[0].value) || 0);
-                  }
-
-                  // Normal behavior for specific week/month
-                  return filtered.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0);
-                };
-
-                const uniqueMetrics = Array.from(new Set(socialsData.map((d: any) => `${d.platform}|${d.metric}`)));
-                const comparisonRows = uniqueMetrics.map((key: any) => {
-                  const [platform, metric] = key.split('|');
-                  const primary = getComparisonValue(socialsData, socialPrimaryMonth, socialPrimaryWeek, platform, metric, 'latest');
-                  const secondary = getComparisonValue(socialsData, socialSecondaryMonth, socialSecondaryWeek, platform, metric, 'earliest');
-                  return { platform, metric, primary, secondary };
-                }).filter(r => r.primary > 0 || r.secondary > 0);
-
-                return (
-                  <div>
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                      <h3 className="text-xl font-black tracking-tight leading-tight">Social Media & Community<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Growth Comparison</span></h3>
-                      <div className="flex flex-col md:flex-row gap-4 bg-zinc-50 p-2 rounded-2xl border border-zinc-200">
-                        {/* Primary Filters */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest">Now</span>
-                          {uniqueMonths.length > 2 && (
-                            <select value={socialPrimaryMonth} onChange={(e) => setSocialPrimaryMonth(e.target.value)}
-                              className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                              {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
-                            </select>
-                          )}
-                          {uniqueWeeks.length > 2 && (
-                            <select value={socialPrimaryWeek} onChange={(e) => setSocialPrimaryWeek(e.target.value)}
-                              className="bg-white border text-xs text-zinc-900 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                              {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                            </select>
-                          )}
-                        </div>
-                        {(uniqueMonths.length > 2 || uniqueWeeks.length > 2) && <div className="hidden md:block w-px bg-zinc-200"></div>}
-                        {/* Secondary Filters */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 tracking-widest opacity-50">Then</span>
-                          {uniqueMonths.length > 2 && (
-                            <select value={socialSecondaryMonth} onChange={(e) => setSocialSecondaryMonth(e.target.value)}
-                              className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                              {uniqueMonths.map((m: any) => <option key={m} value={m}>{m === 'All' ? 'All Months' : formatMonthDropdown(m)}</option>)}
-                            </select>
-                          )}
-                          {uniqueWeeks.length > 2 && (
-                            <select value={socialSecondaryWeek} onChange={(e) => setSocialSecondaryWeek(e.target.value)}
-                              className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 rounded-lg outline-none cursor-pointer">
-                              {uniqueWeeks.map((w: any) => <option key={w} value={w}>{w === 'All' ? 'All Weeks' : w}</option>)}
-                            </select>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {comparisonRows.length === 0 ? (
-                      <div className="text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest">No data for selected periods</div>
-                    ) : (
-                      <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm text-left">
-                            <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                              <tr>
-                                <th className="px-6 py-4">Platform</th>
-                                <th className="px-6 py-4">Metric</th>
-                                <th className="px-6 py-4 text-right">Primary Vol.</th>
-                                <th className="px-6 py-4 text-right text-zinc-400">Secondary Vol.</th>
-                                <th className="px-6 py-4 text-right">Variance</th>
-                                <th className="px-6 py-4 text-center">Trend</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-100">
-                              {comparisonRows.map((row, idx) => {
-                                const abs_change = row.primary - row.secondary;
-                                const pct_change = row.secondary > 0 ? ((abs_change / row.secondary) * 100).toFixed(1) : ((row.primary > 0) ? '100.0' : '0.0');
-                                const isUp = abs_change > 0;
-                                const isDown = abs_change < 0;
-
-                                return (
-                                  <tr key={idx} className="hover:bg-zinc-50 transition group">
-                                    <td className="px-6 py-4 font-bold whitespace-nowrap">{row.platform}</td>
-                                    <td className="px-6 py-4 text-zinc-500 font-medium whitespace-nowrap text-xs">{row.metric}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-zinc-900 font-bold text-lg">{row.primary.toLocaleString()}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-zinc-400">{row.secondary.toLocaleString()}</td>
-                                    <td className={`px-6 py-4 text-right font-mono font-bold whitespace-nowrap ${isUp ? 'text-emerald-600' : isDown ? 'text-rose-600' : 'text-zinc-400'}`}>
-                                      {abs_change > 0 ? '+' : ''}{abs_change.toLocaleString()} ({abs_change > 0 ? '+' : ''}{pct_change}%)
-                                    </td>
-                                    <td className="px-6 py-4 text-center flex justify-center">
-                                      {isUp ? <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner"><ArrowUpRight size={14} /></div> :
-                                        isDown ? <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner"><ArrowDownRight size={14} /></div> :
-                                          <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-400 flex items-center justify-center shadow-inner"><div className="w-2 h-2 rounded-full bg-zinc-300"></div></div>}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Filter B2C Campaigns & Revenue */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-zinc-200 pb-4 mb-6 gap-4">
-              <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">B2C Performance Overview</h3>
-              {uniqueB2cPeriods.length > 2 && (
-                <select value={b2cPeriod} onChange={(e) => setB2cPeriod(e.target.value)}
-                  className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
-                  {uniqueB2cPeriods.map((p: string) => <option key={p} value={p}>{p === 'All' ? 'All Periods' : p}</option>)}
-                </select>
-              )}
-            </div>
-
-            {/* Campaign Activations */}
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Active Campaigns & Performance</h3>
-                <button onClick={() => openEditModal('campaigns')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
-                  <Plus size={12} /> Add
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {filteredCampaigns.length === 0 ? (
-                  <div className="col-span-full text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest w-full">No campaigns for selected period</div>
-                ) : filteredCampaigns.map((camp: any, idx: number) => {
-                  const origIdx = (data?.campaigns || []).indexOf(camp);
-                  return (
-                    <div key={idx} className="bg-white border border-zinc-200 p-6 rounded-2xl transition hover:border-zinc-400 group relative">
-                      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                        <button onClick={() => openEditModal('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
-                        <button onClick={() => handleDeleteItem('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
-                      </div>
-                      <div className="flex justify-between items-start mb-6">
-                        <h4 className="font-bold text-zinc-900 text-sm leading-tight">{camp.name}</h4>
-                        <div className={`text-[8px] px-2 py-0.5 font-black uppercase rounded border ${camp.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>
-                          {camp.status}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 border-t border-zinc-100 pt-4">
-                        <div><div className="text-[9px] text-zinc-400 uppercase font-bold">Leads</div><div className="text-xl font-black">{camp.leads}</div></div>
-                        <div className="text-right"><div className="text-[9px] text-zinc-400 uppercase font-bold">Conv. Rate</div><div className="text-xl font-black text-zinc-900">{camp.conversion}%</div></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* B2C Revenue Cards (Live — with date range filter) */}
             <div>
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
@@ -955,25 +631,6 @@ export default function MinimalistDashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Academy Module */}
-                <div className="bg-white border-2 border-zinc-100 p-8 rounded-3xl shadow-sm hover:border-blue-500 transition-all group relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Layers size={48} className="text-blue-600" />
-                  </div>
-                  <h4 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-6">MAPID Academy</h4>
-                  <div className="flex items-end gap-2 mb-2">
-                    <span className="text-4xl font-black tracking-tighter text-zinc-900">Rp {(b2cMetrics.academy.actual / 1000000).toFixed(1)}M</span>
-                    <span className="text-xs font-bold text-zinc-400 mb-2">/ {(b2cMetrics.academy.target / 1000000).toFixed(0)}M</span>
-                  </div>
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">{b2cMetrics.academy.percent}% COMPLETE</span>
-                  </div>
-                  <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-600 transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.academy.percent}%` }}></div>
-                  </div>
-                  <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: Supabase DB → revenue_payments</p>
-                </div>
-
                 {/* Platform Module */}
                 <div className="bg-white border-2 border-zinc-100 p-8 rounded-3xl shadow-sm hover:border-emerald-500 transition-all group relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -991,6 +648,25 @@ export default function MinimalistDashboard() {
                     <div className="h-full bg-emerald-600 transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.platform.percent}%` }}></div>
                   </div>
                   <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: DevServer API → all_payments</p>
+                </div>
+
+                {/* Academy Module */}
+                <div className="bg-white border-2 border-zinc-100 p-8 rounded-3xl shadow-sm hover:border-blue-600 transition-all group relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <BookOpen size={48} className="text-blue-600" />
+                  </div>
+                  <h4 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-6">MAPID Academy</h4>
+                  <div className="flex items-end gap-2 mb-2">
+                    <span className="text-4xl font-black tracking-tighter text-zinc-900">Rp {(b2cMetrics.academy.actual / 1000000).toFixed(1)}M</span>
+                    <span className="text-xs font-bold text-zinc-400 mb-2">/ {(b2cMetrics.academy.target / 1000000).toFixed(0)}M</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">{b2cMetrics.academy.percent}% COMPLETE</span>
+                  </div>
+                  <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-600 transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.academy.percent}%` }}></div>
+                  </div>
+                  <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: Supabase → revenue_payments</p>
                 </div>
 
                 {/* Combined Total Module */}
@@ -1013,384 +689,194 @@ export default function MinimalistDashboard() {
           </div>
         )}
 
+        {/* === TAB 3: B2B === */}
+        {activeTab === 'B2B' && (
+          <div className="space-y-12 animate-in fade-in">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                <div>
+                    <h1 className="text-3xl font-black tracking-tighter leading-none mb-2 text-zinc-900">B2B <span className="text-zinc-300">Performance.</span></h1>
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Revenue & Financial Pipeline</p>
+                </div>
+                <select value={b2bQuarter} onChange={(e: any) => setB2bQuarter(e.target.value)} className="bg-white border border-zinc-200 text-xs font-black uppercase px-4 py-3 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all shadow-sm w-full md:w-auto">
+                    <option value="All">All Quarters</option>
+                    <option value="Q1">Q1 Performance</option>
+                    <option value="Q2">Q2 Performance</option>
+                    <option value="Q3">Q3 Performance</option>
+                    <option value="Q4">Q4 Performance</option>
+                </select>
+            </header>
 
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Main Analytics Card */}
+                <div className="lg:col-span-8 bg-zinc-900 rounded-[2.5rem] p-8 md:p-10 text-white relative overflow-hidden shadow-2xl flex flex-col justify-between min-h-[400px]">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 blur-[100px] rounded-full -mr-20 -mt-20"></div>
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 blur-[80px] rounded-full -ml-20 -mb-20"></div>
 
-        {/* === TAB 5: ACADEMY === */}
-        {activeTab === 'Academy' && (() => {
-          // --- DATA TRANSFORMS FOR ACADEMY ---
-          const validAcademyData = config.biData?.academy || [];
-          const academyPrograms = Array.from(new Set(validAcademyData.map((a: any) => a.program))).sort();
-
-          return (
-            <div className="space-y-12 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Academy Performance By Program</h3>
-                <button onClick={() => openEditModal('academy')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
-                  <Plus size={12} /> Add Batch
-                </button>
-              </div>
-              {academyPrograms.map((program: any) => {
-                const programData = validAcademyData.filter((a: any) => a.program === program);
-
-                // Sort natural by batch (Batch 1, Batch 2... Batch 10)
-                const sortedData = [...programData].sort((a, b) => {
-                  return a.batch.localeCompare(b.batch, undefined, { numeric: true, sensitivity: 'base' });
-                });
-
-                const totalRegistrants = sortedData.reduce((acc, curr) => acc + (Number(curr.registrants) || 0), 0);
-                const totalConverted = sortedData.reduce((acc, curr) => acc + (Number(curr.converted) || 0), 0);
-                const totalConversion = totalRegistrants > 0 ? ((totalConverted / totalRegistrants) * 100).toFixed(2) : '0';
-
-                return (
-                  <div key={program} className="space-y-6">
-                    {/* Program Header Summary */}
-                    <div className="bg-white border text-left border-zinc-200 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0">
-                          <BookOpen size={20} />
+                    <div className="relative z-10">
+                        <div className="flex justify-between items-start mb-12">
+                            <div>
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400 mb-2 block">Revenue Projection</span>
+                                <h2 className="text-4xl md:text-5xl font-black tracking-tighter break-words leading-tight">
+                                    {formatIDR(b2bMetrics.totalProjection)}
+                                </h2>
+                                <p className="text-zinc-400 text-xs font-medium mt-2">Total Combined Pipeline for {b2bQuarter === 'All' ? 'Fiscal Year' : b2bQuarter}</p>
+                            </div>
+                            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-md border border-white/10 shrink-0">
+                                <TrendingUp className="text-emerald-400" size={24} />
+                            </div>
                         </div>
-                        <div>
-                          <h3 className="text-xl font-black text-zinc-900 tracking-tight">{program}</h3>
-                          <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Overall Performance</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                            <div className="space-y-1">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Realized Revenue</p>
+                                <p className="text-xl font-black text-emerald-400 whitespace-nowrap">{formatIDR(b2bMetrics.doneProjectsRev)}</p>
+                                <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Completed Projects</p>
+                            </div>
+                            <div className="md:border-x border-white/10 md:px-8 space-y-1">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Active Contract Value</p>
+                                <p className="text-xl font-black text-blue-400 whitespace-nowrap">{formatIDR(b2bMetrics.activeProjectsRev)}</p>
+                                <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Ongoing Delivery</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Unweighted Leads</p>
+                                <p className="text-xl font-black text-zinc-300 whitespace-nowrap">{formatIDR(b2bMetrics.potentialRevenue)}</p>
+                                <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Sales Opportunities</p>
+                            </div>
                         </div>
-                      </div>
-                      <div className="flex gap-8 px-2 md:px-6 md:border-l border-zinc-100 min-w-max">
-                        <div>
-                          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-1">Total Registrants</p>
-                          <p className="text-2xl font-black text-zinc-900">{totalRegistrants}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-1">Total Converted</p>
-                          <p className="text-2xl font-black text-emerald-600">{totalConverted}</p>
-                        </div>
-                        <div className="bg-zinc-50 px-4 py-2 border border-zinc-200 rounded-xl text-center">
-                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Avg Rate</p>
-                          <p className="text-xl font-black text-zinc-900 font-mono">{totalConversion}%</p>
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Batch Breakdowns Table */}
-                    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                          <thead className="bg-zinc-50/50 text-xs text-zinc-400 font-bold tracking-widest uppercase border-b border-zinc-100">
-                            <tr>
-                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/5">Batch Name</th>
-                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/5">Registrants</th>
-                              <th className="px-6 py-4 border-r border-dashed border-zinc-200 w-1/5">Converted</th>
-                              <th className="px-6 py-4 text-center w-1/4">Conversion %</th>
-                              <th className="px-4 py-4 w-16"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-100">
-                            {sortedData.map((row, idx) => {
-                              const registrants = Number(row.registrants) || 0;
-                              const converted = Number(row.converted) || 0;
-                              const rate = registrants > 0 ? ((converted / registrants) * 100).toFixed(2) : '0';
+                    <div className="relative z-10 space-y-3 mt-auto">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                            <span>Realization Progress</span>
+                            <span>{b2bMetrics.realizationProgress}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-400 rounded-full shadow-[0_0_20px_rgba(52,211,153,0.5)] transition-all duration-1000" style={{ width: `${b2bMetrics.realizationProgress}%` }}></div>
+                        </div>
+                    </div>
+                </div>
 
-                              return (
-                                <tr key={idx} className="hover:bg-zinc-50 transition-colors group">
-                                  <td className="px-6 py-4 font-bold text-zinc-900 border-r border-dashed border-zinc-200">
-                                    {row.batch}
-                                  </td>
-                                  <td className="px-6 py-4 text-zinc-600 font-mono border-r border-dashed border-zinc-200">
-                                    {registrants}
-                                  </td>
-                                  <td className="px-6 py-4 text-emerald-600 font-mono border-r border-dashed border-zinc-200">
-                                    +{converted}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center gap-3 w-full max-w-[200px] mx-auto">
-                                      <div className="flex-1 bg-zinc-100 rounded-full h-2 overflow-hidden shadow-inner">
-                                        <div
-                                          className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
-                                          style={{ width: `${Math.min(Number(rate), 100)}%` }}
-                                        ></div>
-                                      </div>
-                                      <span className="text-zinc-900 font-bold w-12 text-right font-mono">{rate}%</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-4">
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                      {(() => { const origIdx = validAcademyData.indexOf(row); return (<>
-                                        <button onClick={() => openEditModal('academy', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
-                                        <button onClick={() => handleDeleteItem('academy', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
-                                      </>); })()}
-                                    </div>
-                                  </td>
+                {/* Insights Side Card */}
+                <div className="lg:col-span-4 bg-white border border-zinc-200 rounded-[2.5rem] p-10 shadow-sm flex flex-col justify-between min-h-[400px]">
+                    <div>
+                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-6 shadow-inner">
+                            <Target size={24} />
+                        </div>
+                        <h3 className="text-xl font-black tracking-tight text-zinc-900 mb-3">Weighted Pipeline</h3>
+                        <p className="text-xs text-zinc-500 leading-relaxed font-medium mb-6">
+                            Probability-adjusted forecast based on current lead stages.
+                        </p>
+                        <div className="space-y-4">
+                            <div className="p-5 bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Expected Closure</p>
+                                <p className="text-xl font-black text-blue-600 whitespace-nowrap">{formatIDR(b2bMetrics.weightedPipeline)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 bg-zinc-900 p-5 rounded-2xl">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-2">
+                            <Sparkles size={12} /> Strategic Insight
+                        </p>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed font-medium">
+                            Focus on high-probability leads to secure cash flow for {b2bQuarter === 'All' ? 'the fiscal year' : b2bQuarter}.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filtered Tables */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-10">
+                <div className="bg-white border border-zinc-200 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col">
+                    <div className="p-8 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/30">
+                        <div>
+                            <h3 className="text-base font-black uppercase tracking-tight text-zinc-900">Opportunity Breakdown</h3>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">Leads with expected close in {b2bQuarter}</p>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left min-w-[600px]">
+                            <thead className="bg-white text-[9px] text-zinc-400 border-b border-zinc-100 font-black uppercase tracking-[0.1em]">
+                                <tr>
+                                    <th className="px-8 py-5 min-w-[200px]">Opportunity</th>
+                                    <th className="px-4 py-5">Stage</th>
+                                    <th className="px-4 py-5 text-right">Value</th>
+                                    <th className="px-8 py-5 text-center">Prob.</th>
                                 </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {academyPrograms.length === 0 && (
-                <div className="text-center py-20 bg-white border border-zinc-200 border-dashed rounded-3xl">
-                  <Users className="mx-auto text-zinc-300 mb-4" size={48} />
-                  <h3 className="text-lg font-bold text-zinc-400">No Academy Data yet</h3>
-                  <p className="text-sm text-zinc-400 mt-2">Click the "+ Add Batch" button above to get started.</p>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* === TAB 6: GALLERY === */}
-        {activeTab === 'Gallery' && (() => {
-          const docsData = data?.docs || [];
-          const uniqueGalleryCategories = ['All', ...Array.from(new Set(docsData.map((d: any) => d.category).filter(Boolean)))];
-
-          const filteredDocs = docsData.filter((d: any) =>
-            galleryCategory === 'All' || d.category === galleryCategory
-          );
-
-          return (
-            <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 font-black">Knowledge Base & Assets</h3>
-                <div className="flex gap-3 items-center">
-                  <button onClick={() => openEditModal('docs')} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
-                    <Plus size={12} /> Add
-                  </button>
-                  <select value={galleryCategory} onChange={(e) => setGalleryCategory(e.target.value)}
-                    className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none">
-                    {uniqueGalleryCategories.map((c: any) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredDocs.map((doc: any, idx: number) => {
-                  const isLinkValid = doc.link && doc.link !== '#';
-                  const origIdx = docsData.indexOf(doc);
-                  return (
-                    <div key={idx} className="group bg-white border border-zinc-200 p-8 rounded-2xl flex flex-col justify-between transition-all relative hover:border-zinc-400">
-                      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition z-10">
-                        <button onClick={(e) => { e.preventDefault(); openEditModal('docs', origIdx); }} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
-                        <button onClick={(e) => { e.preventDefault(); handleDeleteItem('docs', origIdx); }} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
-                      </div>
-                      <div>
-                        <div className="flex justify-between items-start mb-6">
-                          <span className="p-3 bg-zinc-50 rounded-xl group-hover:bg-zinc-100 transition text-zinc-900">
-                            {doc.format === 'Folder' ? <FolderOpen size={24} /> : doc.format === 'Sheet' ? <TableProperties size={24} /> : <FileText size={24} />}
-                          </span>
-                          <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-300">{doc.category}</span>
-                        </div>
-                        <h4 className="text-xl font-black tracking-tight mb-2 leading-tight">{doc.title}</h4>
-                        <p className="text-xs text-zinc-400 leading-relaxed mb-8 line-clamp-2 italic">{doc.desc}</p>
-                      </div>
-                      <a href={isLinkValid ? doc.link : undefined} target="_blank" rel="noopener noreferrer"
-                        className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition ${isLinkValid ? 'text-zinc-900 hover:underline cursor-pointer' : 'text-zinc-300 cursor-not-allowed'}`}>
-                        {isLinkValid ? 'Go to Content' : 'Link not ready'} {isLinkValid && <ArrowRight size={14} />}
-                      </a>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* === TAB 7: WA CRM === */}
-        {activeTab === 'WACRM' && (
-          <div className="space-y-8 animate-in fade-in">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-              <div>
-                <h3 className="text-xl font-black tracking-tight leading-tight">WA CRM SalesMAPID<br /><span className="text-sm text-zinc-400 font-bold uppercase tracking-widest">Conversation Performance & Summary</span></h3>
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-4 bg-white p-2 rounded-2xl border border-zinc-100 shadow-sm">
-                <div className="flex items-center gap-2 px-3 border-r border-zinc-100">
-                  <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest">From</span>
-                  <input type="date" value={waCrmStartDate} onChange={e => setWaCrmStartDate(e.target.value)} 
-                    className="text-xs font-bold outline-none bg-transparent" />
-                </div>
-                <div className="flex items-center gap-2 px-3">
-                  <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest">To</span>
-                  <input type="date" value={waCrmEndDate} onChange={e => setWaCrmEndDate(e.target.value)} 
-                    className="text-xs font-bold outline-none bg-transparent" />
-                </div>
-                <button 
-                  onClick={() => {
-                    const headers = ['Name', 'Phone', 'Inbound Count', 'Outbound Count', 'Response Rate (%)', 'Conversation Summary'];
-                    
-                    const sanitize = (text: any) => {
-                      if (text === null || text === undefined) return '';
-                      let cleanText = String(text).replace(/[\n\r]+/g, ' ').trim();
-                      cleanText = cleanText.replace(/"/g, '""');
-                      return `"${cleanText}"`;
-                    };
-
-                    const rows = waCrmData.map((c: any) => {
-                      const rate = c.inboundCount > 0 
-                        ? Math.min(Math.round((c.outboundCount / c.inboundCount) * 100), 100) 
-                        : 0;
-                      return [
-                        sanitize(c.name || 'Unknown'),
-                        sanitize(c.phone || '-'),
-                        c.inboundCount,
-                        c.outboundCount,
-                        `${rate}%`,
-                        sanitize((c.conversationSummary || []).join(' | '))
-                      ];
-                    });
-
-                    const csvContent = [headers.join(","), ...rows.map((row: any[]) => row.join(","))].join("\n");
-                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement("a");
-                    link.setAttribute("href", url);
-                    link.setAttribute("download", `wa_crm_full_summary_${new Date().toISOString().split('T')[0]}.csv`);
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg"
-                >
-                  <Download size={14} /> Export CSV
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Total Contacts</h4>
-                <div className="text-3xl font-black tracking-tighter text-zinc-900">{waCrmData.length}</div>
-              </div>
-              <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 text-emerald-500">Inbound Activity</h4>
-                <div className="text-3xl font-black tracking-tighter text-zinc-900">{waCrmData.reduce((acc: number, c: any) => acc + (c.inboundCount || 0), 0)}</div>
-              </div>
-              <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 text-blue-500">Outbound Activity</h4>
-                <div className="text-3xl font-black tracking-tighter text-zinc-900">{waCrmData.reduce((acc: number, c: any) => acc + (c.outboundCount || 0), 0)}</div>
-              </div>
-              <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 text-zinc-900">Overall Response Rate</h4>
-                {(() => {
-                  const totalIn = waCrmData.reduce((acc: number, c: any) => acc + (c.inboundCount || 0), 0);
-                  const totalOut = waCrmData.reduce((acc: number, c: any) => acc + (c.outboundCount || 0), 0);
-                  const rate = totalIn > 0 ? Math.min(Math.round((totalOut / totalIn) * 100), 100) : 0;
-                  return (
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-3xl font-black tracking-tighter text-zinc-900">{rate}%</div>
-                      <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Efficiency</div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-zinc-50/50 text-[10px] text-zinc-400 border-b border-zinc-100 uppercase font-black tracking-widest">
-                    <tr>
-                      <th className="px-6 py-4">Contact</th>
-                      <th className="px-6 py-4 text-center">Inbound</th>
-                      <th className="px-6 py-4 text-center">Outbound</th>
-                      <th className="px-6 py-4 text-center">Response Rate</th>
-                      <th className="px-6 py-4">History</th>
-                      <th className="px-6 py-4">Action</th>
-                      <th className="px-6 py-4">Latest Summary</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-50">
-                    {waCrmLoading ? (
-                      <tr><td colSpan={7} className="px-6 py-10 text-center text-zinc-300 font-bold uppercase tracking-widest text-xs"><Loader2 className="animate-spin inline mr-2" size={14} /> Loading WA CRM Data...</td></tr>
-                    ) : waCrmData.length === 0 ? (
-                      <tr><td colSpan={7} className="px-6 py-10 text-center text-zinc-300 font-bold uppercase tracking-widest text-xs">No CRM data found</td></tr>
-                    ) : (
-                      waCrmData.map((contact: any, idx: number) => {
-                        const responseRate = contact.inboundCount > 0 
-                          ? Math.min(Math.round((contact.outboundCount / contact.inboundCount) * 100), 100) 
-                          : 0;
-                        
-                        return (
-                          <tr key={idx} className="hover:bg-zinc-50/50 transition group">
-                            <td className="px-6 py-4">
-                              <div className="font-bold text-zinc-900">{contact.name || 'Unknown'}</div>
-                              <div className="text-[10px] text-zinc-400 font-mono">{contact.phone || '-'}</div>
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg font-bold text-xs">
-                                {contact.inboundCount}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg font-bold text-xs">
-                                {contact.outboundCount}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <div className="flex flex-col items-center gap-1">
-                                <span className={`px-2 py-1 rounded-lg font-black text-[10px] ${
-                                  responseRate >= 80 ? 'bg-emerald-100 text-emerald-600' :
-                                  responseRate >= 50 ? 'bg-amber-100 text-amber-600' :
-                                  'bg-zinc-100 text-zinc-400'
-                                }`}>
-                                  {responseRate}%
-                                </span>
-                                <div className="w-12 h-1 bg-zinc-100 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full ${responseRate >= 80 ? 'bg-emerald-500' : responseRate >= 50 ? 'bg-amber-500' : 'bg-zinc-300'}`}
-                                    style={{ width: `${responseRate}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <button 
-                                onClick={() => setSelectedContact(contact)}
-                                className="px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-zinc-900 hover:text-white transition shadow-sm flex items-center gap-2"
-                              >
-                                <BookOpen size={12} /> View History
-                              </button>
-                            </td>
-                            <td className="px-6 py-4">
-                              <button 
-                                onClick={() => handleDeleteContact(contact)}
-                                className="p-2 text-zinc-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
-                                title="Remove Lead"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                            <td className="px-6 py-4 max-w-md">
-                              <div className="space-y-1">
-                                {(contact.conversationSummary || []).slice(-2).map((line: string, lIdx: number) => (
-                                  <div key={lIdx} className="text-[10px] text-zinc-400 truncate">
-                                    <span className={line.startsWith('User:') ? 'text-emerald-500 font-bold' : 'text-blue-500 font-bold'}>
-                                      {line.split(': ')[0]}:
-                                    </span> {line.split(': ')[1]}
-                                  </div>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-50">
+                                {filteredLeads.filter((l: any) => l.forecastedValue > 0 && !['Closed Lost', 'Freeze'].includes(l.stage)).sort((a: any, b: any) => b.forecastedValue - a.forecastedValue).map((l: any) => (
+                                    <tr key={l.id} className="hover:bg-zinc-50/80 transition group">
+                                        <td className="px-8 py-5">
+                                            <p className="font-bold text-zinc-900 group-hover:text-blue-600 transition-colors line-clamp-1">{l.name}</p>
+                                            <p className="text-[9px] font-black uppercase text-zinc-400 mt-1">{l.picSales || 'No PIC'}</p>
+                                        </td>
+                                        <td className="px-4 py-5">
+                                            <span className="px-2.5 py-1 bg-zinc-100 text-zinc-600 text-[9px] rounded-lg font-black uppercase tracking-widest border border-zinc-200 whitespace-nowrap inline-block">{l.stage}</span>
+                                        </td>
+                                        <td className="px-4 py-5 text-right font-mono font-black text-zinc-900">{formatIDR(l.forecastedValue)}</td>
+                                        <td className="px-8 py-5 text-center">
+                                            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 font-black border border-emerald-100">
+                                                {Math.round((l.probability || 0) * 100)}%
+                                            </div>
+                                        </td>
+                                    </tr>
                                 ))}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                                {filteredLeads.length === 0 && (
+                                    <tr><td colSpan={4} className="px-8 py-12 text-center text-zinc-400 font-medium italic">No opportunities found.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div className="bg-white border border-zinc-200 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col">
+                    <div className="p-8 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/30">
+                        <div>
+                            <h3 className="text-base font-black uppercase tracking-tight text-zinc-900">Contract Lifecycle</h3>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">Active & Closed Projects in {b2bQuarter}</p>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left min-w-[600px]">
+                            <thead className="bg-white text-[9px] text-zinc-400 border-b border-zinc-100 font-black uppercase tracking-[0.1em]">
+                                <tr>
+                                    <th className="px-8 py-5 min-w-[200px]">Client / Project</th>
+                                    <th className="px-4 py-5">Lifecycle</th>
+                                    <th className="px-4 py-5 text-center">Close Date</th>
+                                    <th className="px-8 py-5 text-right">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-50">
+                                {filteredProjects.filter((p: any) => p.forecastedValue > 0 && !['Lost', 'Freeze'].includes(p.stage)).sort((a: any, b: any) => b.forecastedValue - a.forecastedValue).map((p: any) => (
+                                    <tr key={p.id} className="hover:bg-zinc-50/80 transition group">
+                                        <td className="px-8 py-5">
+                                            <p className="font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors line-clamp-1">{p.projectName}</p>
+                                            <p className="text-[9px] font-black uppercase text-zinc-400 mt-1">{p.client}</p>
+                                        </td>
+                                        <td className="px-4 py-5">
+                                            <span className={`px-2.5 py-1 text-[9px] rounded-lg font-black uppercase tracking-widest border whitespace-nowrap inline-block ${p.stage === 'Done' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>{p.stage}</span>
+                                        </td>
+                                        <td className="px-4 py-5 text-center font-bold text-zinc-400">
+                                            {p.closeDate ? new Date(p.closeDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}
+                                        </td>
+                                        <td className="px-8 py-5 text-right font-mono font-black text-zinc-900">{formatIDR(p.forecastedValue)}</td>
+                                    </tr>
+                                ))}
+                                {filteredProjects.length === 0 && (
+                                    <tr><td colSpan={4} className="px-8 py-12 text-center text-zinc-400 font-medium italic">No active contracts found.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
           </div>
         )}
-
       </div>
 
-        {/* Chat History Modal */}
-        <ChatHistoryModal
-          isOpen={!!selectedContact}
-          onClose={() => setSelectedContact(null)}
-          contact={selectedContact}
-        />
+
+
 
         {/* Edit Modal */}
       {editModal && (

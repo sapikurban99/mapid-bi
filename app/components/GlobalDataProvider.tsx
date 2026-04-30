@@ -26,9 +26,22 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
 
     const syncData = async (options?: { silent?: boolean }) => {
         const silent = options?.silent ?? false;
+        
+        // Prevent overlapping syncs if one is already in progress
+        if (isLoading && silent) return;
+
         if (!silent) setIsLoading(true);
         try {
-            const res = await fetch('/api/bi');
+            console.log(`[GlobalSync] ${new Date().toLocaleTimeString()} - Syncing data...`);
+            const res = await fetch('/api/bi', {
+                // Add a reasonable timeout for the fetch request
+                signal: AbortSignal.timeout(15000) 
+            });
+
+            if (!res.ok) {
+                throw new Error(`Server responded with ${res.status}: ${res.statusText}`);
+            }
+
             const json = await res.json();
 
             if (json && !json.isError && !json.error) {
@@ -48,7 +61,7 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
                 mergedData.docs = mergedData.docs?.length ? mergedData.docs : fallbackData.docs || [];
                 mergedData.budget = mergedData.budget?.length ? mergedData.budget : fallbackData.budget || [];
 
-                // Store inside central config (kanbanProjects and pseWorkloads might also be here top-level)
+                // Store inside central config
                 setConfig({ 
                     biData: mergedData, 
                     kanbanProjects: mergedData.kanbanProjects || [], 
@@ -56,9 +69,17 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
                     kanbanPartners: mergedData.kanbanPartners || [],
                     pseWorkloads: mergedData.pseWorkloads || [] 
                 });
+                
+                console.log(`[GlobalSync] ${new Date().toLocaleTimeString()} - Sync successful.`);
+            } else {
+                console.warn('[GlobalSync] Sync returned errors:', json.message || json.error || 'Unknown error');
             }
-        } catch (error) {
-            console.error('Failed to sync global data:', error);
+        } catch (error: any) {
+            if (error.name === 'TimeoutError') {
+                console.error('[GlobalSync] Sync timed out after 15s');
+            } else {
+                console.error('[GlobalSync] Failed to sync global data:', error.message || error);
+            }
         } finally {
             setIsLoading(false);
             setHasFetched(true);

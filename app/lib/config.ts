@@ -203,6 +203,7 @@ export interface SiteConfig {
 
     // BI Dashboard
     biPassword: string;
+    b2cTotalBudget: number;
     tabsVisible: {
         Trends: boolean;
         B2C: boolean;
@@ -270,6 +271,7 @@ export const DEFAULT_CONFIG: SiteConfig = {
     vibeText: 'Aggressive growth with high achievement targets across all operational pillars.',
 
     biPassword: 'MAPID2026',
+    b2cTotalBudget: 100000000,
     tabsVisible: {
         Trends: true,
         B2C: true,

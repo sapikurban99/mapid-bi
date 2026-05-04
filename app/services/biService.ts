@@ -141,28 +141,45 @@ export async function getAllBIData() {
     probability: r.probability || 0,
   }));
 
-  const mappedKanbanLeads = (kanbanLeads || []).map(r => ({
-    id: r.id,
-    name: r.lead_name,
-    pseId: r.pse_id,
-    isClosed: r.is_closed,
-    stage: r.stage || 'Lead Generation',
-    progress: r.progress || 0,
-    priority: r.priority || 'Medium',
-    notes: r.notes || '',
-    picSales: r.pic_sales || '',
-    contactName: r.contact_name || '',
-    contactEmail: r.contact_email || '',
-    contactNumber: r.contact_number || '',
-    forecastedValue: r.forecasted_value || 0,
-    probability: r.probability || 0,
-    demoDate: r.demo_date || '',
-    expectedCloseDate: r.expected_close_date || '',
-    lastInteractedOn: r.last_interacted_on || '',
-    nextStep: r.next_step || '',
-    proposalLink: r.proposal_link || '',
-    partnerId: r.partner_id || '',
-  }));
+  const mappedKanbanLeads = (kanbanLeads || []).map(r => {
+    let stage = r.stage || 'Lead Generation';
+    
+    // Auto-freeze logic
+    if (r.last_interacted_on && stage !== 'Closed Lost' && stage !== 'Closed Won' && stage !== 'Done' && stage !== 'Freeze') {
+      const lastInteract = new Date(r.last_interacted_on);
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      
+      if (lastInteract < oneMonthAgo) {
+        stage = 'Freeze';
+        // Fire-and-forget update to DB to sync state
+        supabase.from('pse_leads').update({ stage: 'Freeze' }).eq('id', r.id).then();
+      }
+    }
+
+    return {
+      id: r.id,
+      name: r.lead_name,
+      pseId: r.pse_id,
+      isClosed: r.is_closed,
+      stage: stage,
+      progress: r.progress || 0,
+      priority: r.priority || 'Medium',
+      notes: r.notes || '',
+      picSales: r.pic_sales || '',
+      contactName: r.contact_name || '',
+      contactEmail: r.contact_email || '',
+      contactNumber: r.contact_number || '',
+      forecastedValue: r.forecasted_value || 0,
+      probability: r.probability || 0,
+      demoDate: r.demo_date || '',
+      expectedCloseDate: r.expected_close_date || '',
+      lastInteractedOn: r.last_interacted_on || '',
+      nextStep: r.next_step || '',
+      proposalLink: r.proposal_link || '',
+      partnerId: r.partner_id || '',
+    };
+  });
 
   const mappedKanbanPartners = (kanbanPartners || []).map(r => ({
     id: r.id,
@@ -709,7 +726,9 @@ function processCrmData(contacts: any[], messages: any[], isFiltered: boolean) {
         inboundCount: 0,
         outboundCount: 0,
         lastMessage: '',
-        conversationSummary: []
+        conversationSummary: [],
+        messages: [],
+        responseRate: 0
       };
       contactMap.set(key, contactObj);
       
@@ -740,15 +759,78 @@ function processCrmData(contacts: any[], messages: any[], isFiltered: boolean) {
       const msgText = m.message || m.text || m.content || m.body || '';
       contact.lastMessage = msgText;
       contact.conversationSummary.push(`${isInbound ? 'User' : 'Sales'}: ${msgText}`);
+      
+      contact.messages.push({
+        isInbound,
+        time: new Date(m.sent_at || m.created_at || m.timestamp).getTime(),
+        text: msgText
+      });
     }
   });
 
-  // If filtered, only return contacts that have messages in the range
-  if (isFiltered) {
-    return Array.from(activeContactIds);
+  // Calculate Response Rate based on 1-hour SOP
+  for (const contact of contactMap.values()) {
+    const msgs = contact.messages || [];
+    let inboundBlocks = 0;
+    let validResponses = 0;
+    let totalResponseTimeMs = 0;
+    let respondedBlocks = 0;
+    
+    let firstInboundInBlock: number | null = null;
+    
+    msgs.forEach((m: any) => {
+      if (m.isInbound) {
+        if (firstInboundInBlock === null) {
+          firstInboundInBlock = m.time;
+          inboundBlocks++;
+        }
+      } else {
+        // Outbound reply!
+        if (firstInboundInBlock !== null) {
+          const diffMs = m.time - firstInboundInBlock;
+          totalResponseTimeMs += diffMs;
+          respondedBlocks++;
+          
+          if (diffMs <= 1 * 60 * 60 * 1000) { // Under 1 hour
+            validResponses++;
+          }
+          firstInboundInBlock = null; // Reset for next inbound block
+        }
+      }
+    });
+    
+    // If there is a pending inbound block at the end without any response yet:
+    if (firstInboundInBlock !== null) {
+      const diffMs = Date.now() - firstInboundInBlock;
+      if (diffMs > 1 * 60 * 60 * 1000) {
+        // counted as failed response because it's past 1 hour
+      } else {
+        // Still pending response within the 1 hour window, exclude it to avoid penalizing unfairly.
+        inboundBlocks = Math.max(0, inboundBlocks - 1);
+      }
+    }
+    
+    contact.responseRate = inboundBlocks > 0 
+      ? Math.min(Math.round((validResponses / inboundBlocks) * 100), 100) 
+      : 0;
+      
+    contact.avgResponseTimeMs = respondedBlocks > 0 
+      ? Math.round(totalResponseTimeMs / respondedBlocks) 
+      : null;
+
+    contact.isPendingReply = firstInboundInBlock !== null;
+    contact.lastActivityTime = msgs.length > 0 ? msgs[msgs.length - 1].time : 0;
   }
 
-  return Array.from(new Set(contactMap.values()));
+  let finalArray = Array.from(new Set(contactMap.values()));
+  if (isFiltered) {
+    finalArray = Array.from(activeContactIds);
+  }
+
+  // Sort by lastActivityTime DESC (newest first)
+  finalArray.sort((a: any, b: any) => (b.lastActivityTime || 0) - (a.lastActivityTime || 0));
+
+  return finalArray;
 }
 
 export async function deleteWaCrmContact(identifier: string) {

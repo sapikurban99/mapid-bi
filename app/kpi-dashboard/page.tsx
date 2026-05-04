@@ -241,12 +241,6 @@ function KpiCard({ kpi, onClick }: { kpi: any, onClick: () => void }) {
                     </div>
 
                 </div>
-                <div className={`flex items-center gap-1 text-[10px] font-bold ${
-                    trendValue >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                } bg-zinc-50 px-2 py-1 rounded-full`}>
-                    {trendValue >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                    {Math.abs(trendValue)}% vs LW
-                </div>
             </div>
 
             <div className="flex items-end justify-between mb-6">

@@ -57,10 +57,55 @@ const FilterChipDropdown = ({ label, options, selected, onChange, color = 'blue'
     );
 };
 
+const QuickNoteInput = ({ onSubmit }: { onSubmit: (text: string) => void }) => {
+    const [val, setVal] = useState('');
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); if (val.trim()) { onSubmit(val); setVal(''); } }} className="mt-2 flex gap-1.5 pt-2 border-t border-zinc-100">
+            <input type="text" value={val} onChange={e => setVal(e.target.value)} onClick={e => e.stopPropagation()} placeholder="Add quick note..." className="flex-1 text-[9px] px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-1 focus:ring-blue-500 font-medium text-zinc-800" />
+            <button type="submit" onClick={e => e.stopPropagation()} className="px-2 text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors">Add</button>
+        </form>
+    );
+};
+
+const NotesViewer = ({ notes, colorClass = 'bg-zinc-50' }: { notes: string, colorClass?: string }) => {
+    const [open, setOpen] = useState(false);
+    if (!notes) return null;
+    const noteLines = notes.split('\n');
+    
+    return (
+        <div className="mb-2">
+            <div className={`text-[9px] text-zinc-500 space-y-1`}>
+                {noteLines.slice(0, 1).map((n, i) => (
+                    <div key={i} className={`${colorClass} px-2 py-1.5 rounded-md leading-tight truncate`}>{n}</div>
+                ))}
+            </div>
+            {(noteLines.length > 1 || notes.length > 50) && (
+                <button onClick={(e) => { e.stopPropagation(); setOpen(true); }} className="text-[9px] font-black text-blue-500 mt-1 uppercase hover:underline text-left">View all notes</button>
+            )}
+            
+            {open && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => { e.stopPropagation(); setOpen(false); }}>
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-4 border-b border-zinc-100">
+                            <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">Note History</h3>
+                            <button onClick={() => setOpen(false)} className="p-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={14} /></button>
+                        </div>
+                        <div className="p-4 overflow-y-auto custom-scrollbar space-y-2">
+                            {noteLines.map((n, i) => (
+                                <div key={i} className={`${colorClass} p-3 rounded-xl text-xs leading-relaxed text-zinc-700`}>{n}</div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const SALES_TEAM = ['Titan', 'Rani'];
 
 // --- Sub-components (Cards) ---
-const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
+const ProjectCard = ({ project: p, onEdit, onDelete, getPseName, onAddNote }: any) => {
     const isDone = p.stage === 'Done';
     const isLost = p.stage === 'Lost';
     const isFrozen = p.stage === 'Freeze';
@@ -108,8 +153,15 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
                     </div>
                 )}
 
+                {p.proposalLink && (
+                    <button onClick={(e) => { e.stopPropagation(); window.open(p.proposalLink, '_blank'); }} className="flex items-center gap-1.5 mb-2 text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg w-fit transition-colors">
+                        <ExternalLink size={10} /> Open Document
+                    </button>
+                )}
+
                 {p.nextStep && <p className="text-[10px] text-zinc-500 bg-zinc-50 px-2 py-1 rounded-lg mb-2 line-clamp-2 italic">&rarr; {p.nextStep}</p>}
                 
+                {p.notes && <NotesViewer notes={p.notes} colorClass="bg-zinc-50" />}
                 <div className="flex flex-col border-t border-zinc-50 pt-3">
                     <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
                         <span className="text-zinc-400">Progress</span>
@@ -119,12 +171,13 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName }: any) => {
                         <div className={`h-full ${isDone ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${p.progress || 0}%` }}></div>
                     </div>
                 </div>
+                <QuickNoteInput onSubmit={(val) => onAddNote('Project', p, val)} />
             </div>
         </div>
     );
 };
 
-const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any) => {
+const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor, onAddNote }: any) => {
     const isLost = l.stage === 'Closed Lost';
     const isFrozen = l.stage === 'Freeze';
     const hasValue = l.forecastedValue && l.forecastedValue > 0;
@@ -161,8 +214,22 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any)
                         {l.contactNumber && <span className="flex items-center gap-0.5"><Phone size={8} /> {l.contactNumber.substring(0, 15)}</span>}
                     </div>
                 )}
+                {l.demoDate && (
+                    <div className="flex items-center gap-1.5 mb-2 text-[9px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded-lg w-fit">
+                        <Calendar size={10} /> Demo: {new Date(l.demoDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                )}
+
                 {/* Next Step */}
                 {l.nextStep && <p className="text-[10px] text-zinc-500 bg-zinc-50 px-2 py-1 rounded-lg mb-2 line-clamp-2 italic">&rarr; {l.nextStep}</p>}
+                
+                {l.proposalLink && (
+                    <button onClick={(e) => { e.stopPropagation(); window.open(l.proposalLink, '_blank'); }} className="flex items-center gap-1.5 mb-2 text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg w-fit transition-colors">
+                        <ExternalLink size={10} /> Open Document
+                    </button>
+                )}
+
+                {l.notes && <NotesViewer notes={l.notes} colorClass="bg-emerald-50/50" />}
                 {/* Progress bar */}
                 <div className="flex flex-col border-t border-emerald-50 pt-3">
                     <div className="flex justify-between text-[9px] font-bold uppercase mb-1.5">
@@ -173,12 +240,13 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor }: any)
                         <div className="h-full bg-emerald-500" style={{ width: `${l.progress || 0}%` }}></div>
                     </div>
                 </div>
+                <QuickNoteInput onSubmit={(val) => onAddNote('Lead', l, val)} />
             </div>
         </div>
     );
 };
 
-const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor }: any) => {
+const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor, onAddNote }: any) => {
     const isFrozen = p.stage === 'Freeze';
     return (
         <div draggable onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)}
@@ -211,6 +279,8 @@ const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor }
 
                 {p.nextStep && <p className="text-[10px] text-zinc-500 bg-zinc-50 px-2 py-1 rounded-lg mb-2 line-clamp-2 italic">&rarr; {p.nextStep}</p>}
                 
+                {p.notes && <NotesViewer notes={p.notes} colorClass="bg-purple-50/50" />}
+                
                 {/* Leads Section Indicator */}
                 {p.leadsCount > 0 && (
                     <div className="mt-3 pt-3 border-t border-zinc-100">
@@ -239,6 +309,7 @@ const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor }
                         <div className="h-full bg-purple-500 rounded-full" style={{ width: `${p.progress || 0}%` }}></div>
                     </div>
                 </div>
+                <QuickNoteInput onSubmit={(val) => onAddNote('Partner', p, val)} />
             </div>
         </div>
     );
@@ -425,6 +496,29 @@ export default function B2BBoardPage() {
         if (type === 'Project') { setNewProject(data); setIsAddingProject(true); }
         else if (type === 'Lead') { setNewLead(data); setIsAddingLead(true); }
         else { setNewPartner(data); setIsAddingPartner(true); }
+    };
+
+    const handleAddNote = async (type: 'Project' | 'Lead' | 'Partner', item: any, noteText: string) => {
+        const timestamp = new Date().toLocaleDateString('id-ID', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const formattedNote = `[${timestamp}] ${noteText}`;
+        const newNotes = item.notes ? `${formattedNote}\n${item.notes}` : formattedNote;
+        
+        const endpoint = `editKanban${type}`;
+        fetch('/api/bi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: endpoint, id: item.id, ...item, notes: newNotes })
+        });
+        
+        setLocalConfig((prev: any) => {
+            if (!prev) return prev;
+            const n = JSON.parse(JSON.stringify(prev));
+            const arrayName = type === 'Project' ? 'kanbanProjects' : type === 'Lead' ? 'kanbanLeads' : 'kanbanPartners';
+            const target = n[arrayName].find((x: any) => x.id === item.id);
+            if (target) target.notes = newNotes;
+            setConfig({ [arrayName]: n[arrayName] });
+            return n;
+        });
     };
 
     const handleDeleteData = async (type: 'Project' | 'Lead' | 'Partner', id: string) => {
@@ -699,15 +793,24 @@ export default function B2BBoardPage() {
                                         e.preventDefault();
                                         const projectId = e.dataTransfer.getData('projectId');
                                         if (projectId) {
+                                            const prob = PROBABILITY_MAP[stage] ?? 0.4;
+                                            const newProgress = Math.round(prob * 100);
+                                            let fullProject: any = null;
                                             setLocalConfig(prev => {
                                                 if (!prev) return prev;
                                                 const n = JSON.parse(JSON.stringify(prev));
                                                 const p = n.kanbanProjects?.find((x: any) => x.id === projectId);
-                                                if (p) p.stage = stage;
+                                                if (p) {
+                                                    p.stage = stage;
+                                                    p.progress = newProgress;
+                                                    fullProject = { ...p };
+                                                }
                                                 setConfig({ kanbanProjects: n.kanbanProjects });
                                                 return n;
                                             });
-                                            fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanban', projectId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                            if (fullProject) {
+                                                fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'editKanbanProject', id: projectId, ...fullProject }) }).catch(() => alert("Fail update"));
+                                            }
                                         }
                                     }}
                                 >
@@ -716,7 +819,7 @@ export default function B2BBoardPage() {
                                         <span className="bg-white border border-zinc-200 text-zinc-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredProjects(stage).length}</span>
                                     </div>
                                     <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                        {getFilteredProjects(stage).map((p: any) => <ProjectCard key={p.id} project={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} />)}
+                                        {getFilteredProjects(stage).map((p: any) => <ProjectCard key={p.id} project={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} onAddNote={handleAddNote} />)}
                                     </div>
                                 </div>
                             );
@@ -735,15 +838,25 @@ export default function B2BBoardPage() {
                                         e.preventDefault();
                                         const leadId = e.dataTransfer.getData('leadId');
                                         if (leadId) {
+                                            const prob = PROBABILITY_MAP[stage] ?? 0;
+                                            const newProgress = Math.round(prob * 100);
+                                            let fullLead: any = null;
                                             setLocalConfig(prev => {
                                                 if (!prev) return prev;
                                                 const n = JSON.parse(JSON.stringify(prev));
                                                 const p = n.kanbanLeads?.find((x: any) => x.id === leadId);
-                                                if (p) p.stage = stage;
+                                                if (p) {
+                                                    p.stage = stage;
+                                                    p.progress = newProgress;
+                                                    p.probability = prob;
+                                                    fullLead = { ...p };
+                                                }
                                                 setConfig({ kanbanLeads: n.kanbanLeads });
                                                 return n;
                                             });
-                                            fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanLead', leadId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                            if (fullLead) {
+                                                fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'editKanbanLead', id: leadId, ...fullLead }) }).catch(() => alert("Fail update"));
+                                            }
                                         }
                                     }}
                                 >
@@ -752,7 +865,7 @@ export default function B2BBoardPage() {
                                         <span className="bg-white border border-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredLeads(stage).length}</span>
                                     </div>
                                     <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                        {getFilteredLeads(stage).map((l: any) => <LeadCard key={l.id} lead={l} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />)}
+                                        {getFilteredLeads(stage).map((l: any) => <LeadCard key={l.id} lead={l} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} onAddNote={handleAddNote} />)}
                                     </div>
                                 </div>
                             );
@@ -771,15 +884,22 @@ export default function B2BBoardPage() {
                                         e.preventDefault();
                                         const partnerId = e.dataTransfer.getData('partnerId');
                                         if (partnerId) {
+                                            let fullPartner: any = null;
                                             setLocalConfig(prev => {
                                                 if (!prev) return prev;
                                                 const n = JSON.parse(JSON.stringify(prev));
                                                 const p = n.kanbanPartners?.find((x: any) => x.id === partnerId);
-                                                if (p) p.stage = stage;
+                                                if (p) {
+                                                    p.stage = stage;
+                                                    // Add progress mapping for partners if needed, else ignore
+                                                    fullPartner = { ...p };
+                                                }
                                                 setConfig({ kanbanPartners: n.kanbanPartners });
                                                 return n;
                                             });
-                                            fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'updateKanbanPartner', partnerId, newStage: stage }) }).catch(() => alert("Fail update"));
+                                            if (fullPartner) {
+                                                fetch('/api/bi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'editKanbanPartner', id: partnerId, ...fullPartner }) }).catch(() => alert("Fail update"));
+                                            }
                                         }
                                     }}
                                 >
@@ -788,7 +908,7 @@ export default function B2BBoardPage() {
                                         <span className="bg-white border border-purple-200 text-purple-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredPartners(stage).length}</span>
                                     </div>
                                     <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                        {getFilteredPartners(stage).map((p: any) => <PartnerCard key={p.id} partner={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} />)}
+                                        {getFilteredPartners(stage).map((p: any) => <PartnerCard key={p.id} partner={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} onAddNote={handleAddNote} />)}
                                     </div>
                                 </div>
                             );
@@ -993,8 +1113,14 @@ export default function B2BBoardPage() {
                                 <input type="text" value={newProject.nextStep || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, nextStep: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
                             </div>
                             <div>
-                                <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">
-                                    <span>Progress</span>
+                                <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase group relative">
+                                    <div className="flex items-center gap-1.5 cursor-help">
+                                        <span>Progress</span>
+                                        <Info size={12} className="text-zinc-400 hover:text-blue-500 transition-colors" />
+                                        <div className="absolute left-0 bottom-full mb-2 w-56 p-2.5 bg-zinc-800 text-white text-[10px] font-medium normal-case rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none shadow-xl">
+                                            Persentase otomatis diperbarui setiap kali Anda memindah Stage. Anda dapat menggeser slider ini jika ingin melakukan penyesuaian manual.
+                                        </div>
+                                    </div>
                                     <span>{newProject.progress || 0}%</span>
                                 </label>
                                 <input type="range" min="0" max="100" value={newProject.progress || 0} onChange={(e) => setNewProject((p: any) => ({ ...p, progress: Number(e.target.value) }))} className="w-full accent-blue-600 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer" />
@@ -1103,8 +1229,14 @@ export default function B2BBoardPage() {
 
                             {/* Progress */}
                             <div>
-                                <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">
-                                    <span>Progress to Won</span>
+                                <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase group relative">
+                                    <div className="flex items-center gap-1.5 cursor-help">
+                                        <span>Progress to Won</span>
+                                        <Info size={12} className="text-zinc-400 hover:text-emerald-500 transition-colors" />
+                                        <div className="absolute left-0 bottom-full mb-2 w-56 p-2.5 bg-zinc-800 text-white text-[10px] font-medium normal-case rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none shadow-xl">
+                                            Persentase otomatis diperbarui setiap kali Anda memindah Stage. Anda dapat menggeser slider ini jika ingin melakukan penyesuaian manual.
+                                        </div>
+                                    </div>
                                     <span>{newLead.progress || 0}%</span>
                                 </label>
                                 <input type="range" min="0" max="100" value={newLead.progress || 0} onChange={(e) => setNewLead((p: any) => ({ ...p, progress: Number(e.target.value) }))} className="w-full accent-emerald-600 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer" />

@@ -73,7 +73,7 @@ export default function AcademyPerformancePage() {
     const [revenueStartDate, setRevenueStartDate] = useState(defaultDates.start);
     const [revenueEndDate, setRevenueEndDate] = useState(defaultDates.end);
 
-    const academyPaymentsUrl = `/api/supabase/revenue?start=${revenueStartDate}&end=${revenueEndDate}&category=Academy`;
+    const academyPaymentsUrl = `/api/revenue/payments?start_date=${revenueStartDate}&end_date=${revenueEndDate}&category=MAPID Academy`;
     const { data: academyPayData, isLoading: academyLoading } = useSWR(academyPaymentsUrl, apiFetcher, { revalidateOnFocus: false });
 
     useEffect(() => {

@@ -16,11 +16,37 @@ export default function StrategyHome() {
   const [activeRole, setActiveRole] = useState<string | null>(null);
   const [config, setConfigState] = useState<SiteConfig>(DEFAULT_CONFIG);
 
+  // B2C Revenue date range filter (default: current quarter)
+  const getQuarterDates = (q: number, y: number) => {
+    const startMonth = (q - 1) * 3;
+    const start = new Date(y, startMonth, 1);
+    const end = new Date(y, startMonth + 3, 0); // last day of quarter
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+    };
+  };
+  const currentQ = Math.ceil((new Date().getMonth() + 1) / 3);
+  const currentY = new Date().getFullYear();
+  const defaultDates = getQuarterDates(currentQ, currentY);
+  const [revenueStartDate, setRevenueStartDate] = useState(defaultDates.start);
+  const [revenueEndDate, setRevenueEndDate] = useState(defaultDates.end);
+
+  const selectedQuarterStr = useMemo(() => {
+    const sd = new Date(revenueStartDate);
+    const q = Math.ceil((sd.getMonth() + 1) / 3);
+    return `Q${q} ${sd.getFullYear()}`;
+  }, [revenueStartDate]);
+
   // Fetch Academy revenue directly from Supabase via /api/bi (not from localStorage)
   const { data: biData, isLoading: biLoading } = useSWR('/api/bi', apiFetcher, { revalidateOnFocus: false });
 
-  // Fetch Live Platform Data from DevServer for Q2 2026
-  const { allPayments, isLoading: platformLoading } = useGrowthData('2026-04-01', '2026-06-30');
+  // Fetch manual payments from Supabase revenue_payments table (dynamic date range)
+  const supabasePaymentsUrl = `/api/revenue/payments?start_date=${revenueStartDate}&end_date=${revenueEndDate}`;
+  const { data: supabasePayData, isLoading: academyLoading } = useSWR(supabasePaymentsUrl, apiFetcher, { revalidateOnFocus: false });
+
+  // Fetch Live Platform Data from DevServer
+  const { allPayments, isLoading: platformLoading } = useGrowthData(revenueStartDate, revenueEndDate);
 
   useEffect(() => {
     setConfigState(getConfig());
@@ -30,23 +56,22 @@ export default function StrategyHome() {
 
   // Calculate B2C targets from live data sources
   const b2cMetrics = useMemo(() => {
-    // Academy: from Supabase revenue table (fetched via /api/bi)
-    const revenueRows = biData?.revenue || [];
-    const q2Revenue = revenueRows.filter((r: any) => {
-        const q = String(r.quarter || '').toUpperCase();
-        return q.includes('Q2') && q.includes('2026');
-    });
+    // Academy: from Supabase revenue_payments where category === 'MAPID Academy'
+    const academyActual = (supabasePayData?.payments || [])
+      .filter((p: any) => p.category === 'MAPID Academy')
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
 
-    const academyRows = q2Revenue.filter((r: any) => r.subProduct?.toLowerCase().includes('academy'));
-    const academyActual = academyRows.reduce((sum: number, r: any) => sum + (Number(r.actual) || 0), 0);
-    const academyTargetFromDB = academyRows.reduce((sum: number, r: any) => sum + (Number(r.target) || 0), 0);
+    // Platform manual invoices: from revenue_payments where invoice_id starts with "bus-exp"
+    const manualPlatformActual = (supabasePayData?.payments || [])
+      .filter((p: any) => p.invoice_id && p.invoice_id.toLowerCase().startsWith('bus-exp'))
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
 
-    // Platform: from devserver (live payment data)
+    // Platform: from devserver (live payment data) + manualPlatformActual
     const platformActual = allPayments
       .filter((p: any) => p.status === 'success' && p.payment_methode?.toLowerCase() === 'midtrans')
-      .reduce((sum: number, p: any) => sum + (p.detail_amount?.total || p.total || 0), 0);
+      .reduce((sum: number, p: any) => sum + (p.detail_amount?.total || p.total || 0), 0) + manualPlatformActual;
 
-    const academyTarget = academyTargetFromDB > 0 ? academyTargetFromDB : 60000000;
+    const academyTarget = 60000000;
     const platformTarget = 40000000;
 
     return {
@@ -65,9 +90,9 @@ export default function StrategyHome() {
           target: academyTarget + platformTarget, 
           percent: Math.min(Math.round(((academyActual + platformActual) / (academyTarget + platformTarget)) * 100), 100) 
       },
-      isLoading: biLoading || platformLoading,
+      isLoading: academyLoading || platformLoading,
     };
-  }, [biData, allPayments, biLoading, platformLoading]);
+  }, [supabasePayData, allPayments, academyLoading, platformLoading]);
 
   return (
     <div className="bg-zinc-50 min-h-screen text-zinc-900 font-sans pb-24 selection:bg-zinc-900 selection:text-white">
@@ -198,14 +223,33 @@ export default function StrategyHome() {
           </div>
         </section>
 
-        {/* B2C Q2 REVENUE TARGETS */}
+        {/* B2C REVENUE TARGETS */}
         <section className="mb-32">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-zinc-200 pb-4 mb-8 gap-4">
-            <div>
-              <h2 className="text-3xl font-black tracking-tight mb-1">B2C Q2 Revenue Targets</h2>
-              <p className="text-zinc-400 text-sm font-medium">Real-time — Academy from database, Platform from live API.</p>
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-6 border-b border-zinc-200 pb-6">
+            <div className="flex flex-col">
+              <h2 className="text-3xl font-black tracking-tight mb-1">B2C Revenue Targets</h2>
+              <p className="text-[10px] font-bold text-zinc-400 mt-1 uppercase tracking-widest leading-none">{selectedQuarterStr} • {new Date(revenueStartDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} — {new Date(revenueEndDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Quick Quarter Buttons */}
+              {[1, 2, 3, 4].map(q => {
+                const dates = getQuarterDates(q, currentY);
+                const isActive = revenueStartDate === dates.start && revenueEndDate === dates.end;
+                return (
+                  <button key={q} onClick={() => { setRevenueStartDate(dates.start); setRevenueEndDate(dates.end); }}
+                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg border transition-all ${isActive ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'}`}>
+                    Q{q}
+                  </button>
+                );
+              })}
+              <div className="hidden md:block w-px h-6 bg-zinc-200 mx-1"></div>
+              {/* Date Range Inputs */}
+              <input type="date" value={revenueStartDate} onChange={e => setRevenueStartDate(e.target.value)}
+                className="bg-white border border-zinc-200 text-xs font-bold text-zinc-600 px-3 py-1.5 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none" />
+              <span className="text-zinc-300 text-xs font-bold">—</span>
+              <input type="date" value={revenueEndDate} onChange={e => setRevenueEndDate(e.target.value)}
+                className="bg-white border border-zinc-200 text-xs font-bold text-zinc-600 px-3 py-1.5 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none" />
+              
               {b2cMetrics.isLoading && (
                 <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
                   <Loader2 size={14} className="animate-spin" /> Fetching live data...
@@ -235,7 +279,7 @@ export default function StrategyHome() {
               <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
                 <div className="h-full bg-blue-600 transition-all duration-1000 ease-out" style={{ width: `${b2cMetrics.academy.percent}%` }}></div>
               </div>
-              <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: Supabase DB → revenue table</p>
+              <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest mt-4">Source: Supabase DB → revenue_payments</p>
             </div>
 
             {/* Platform Module */}

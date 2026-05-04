@@ -140,9 +140,9 @@ export default function MinimalistDashboard() {
   // B2B Quarter Filter State
   const [b2bQuarter, setB2bQuarter] = useState<'All' | 'Q1' | 'Q2' | 'Q3' | 'Q4'>('All');
 
-  // Fetch Academy revenue from Supabase revenue_payments table (dynamic date range)
-  const academyPaymentsUrl = `/api/revenue/payments?start_date=${revenueStartDate}&end_date=${revenueEndDate}&category=MAPID Academy`;
-  const { data: academyPayData, isLoading: academyLoading } = useSWR(academyPaymentsUrl, apiFetcher, { revalidateOnFocus: false });
+  // Fetch Supabase revenue payments (dynamic date range)
+  const supabasePaymentsUrl = `/api/revenue/payments?start_date=${revenueStartDate}&end_date=${revenueEndDate}`;
+  const { data: supabasePayData, isLoading: academyLoading } = useSWR(supabasePaymentsUrl, apiFetcher, { revalidateOnFocus: false });
 
   // Fetch Live Platform Data from DevServer (dynamic date range)
   const { allPayments, isLoading: platformLoading } = useGrowthData(revenueStartDate, revenueEndDate);
@@ -269,13 +269,20 @@ export default function MinimalistDashboard() {
 
   // Calculate B2C Metrics (dynamic date range — both from live sources)
   const b2cMetrics = useMemo(() => {
-    // Academy: from revenue_payments table (filtered by date range + category)
-    const academyActual = academyPayData?.totalAmount || 0;
+    // Academy: from revenue_payments table where category === 'MAPID Academy'
+    const academyActual = (supabasePayData?.payments || [])
+      .filter((p: any) => p.category === 'MAPID Academy')
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
 
-    // Platform: from DevServer (already filtered by date range via useGrowthData)
+    // Platform manual invoices: from revenue_payments where invoice_id starts with "bus-exp"
+    const manualPlatformActual = (supabasePayData?.payments || [])
+      .filter((p: any) => p.invoice_id && p.invoice_id.toLowerCase().startsWith('bus-exp'))
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+
+    // Platform: from DevServer (already filtered by date range via useGrowthData) + manualPlatformActual
     const platformActual = allPayments
       .filter((p: any) => p.status === 'success' && p.payment_methode?.toLowerCase() === 'midtrans')
-      .reduce((sum: number, p: any) => sum + (p.detail_amount?.total || p.total || 0), 0);
+      .reduce((sum: number, p: any) => sum + (p.detail_amount?.total || p.total || 0), 0) + manualPlatformActual;
 
     const academyTarget = 60000000;
     const platformTarget = 40000000;
@@ -286,7 +293,7 @@ export default function MinimalistDashboard() {
       total: { actual: academyActual + platformActual, target: academyTarget + platformTarget, percent: Math.min(Math.round(((academyActual + platformActual) / (academyTarget + platformTarget)) * 100), 100) },
       isLoading: academyLoading || platformLoading,
     };
-  }, [academyPayData, allPayments, academyLoading, platformLoading]);
+  }, [supabasePayData, allPayments, academyLoading, platformLoading]);
 
   // --- B2B Logic ---
   const filteredLeads = useMemo(() => {

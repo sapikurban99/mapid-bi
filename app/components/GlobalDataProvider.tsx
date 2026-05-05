@@ -34,8 +34,8 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
         try {
             console.log(`[GlobalSync] ${new Date().toLocaleTimeString()} - Syncing data...`);
             const res = await fetch('/api/bi', {
-                // Add a reasonable timeout for the fetch request
-                signal: AbortSignal.timeout(15000) 
+                // Increased sync timeout to 60 seconds to prevent timeout on slower networks/loads
+                signal: AbortSignal.timeout(60000) 
             });
 
             if (!res.ok) {
@@ -76,7 +76,7 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
             }
         } catch (error: any) {
             if (error.name === 'TimeoutError') {
-                console.error('[GlobalSync] Sync timed out after 15s');
+                console.error('[GlobalSync] Sync timed out after 60s');
             } else {
                 console.error('[GlobalSync] Failed to sync global data:', error.message || error);
             }

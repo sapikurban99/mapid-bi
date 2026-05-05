@@ -849,3 +849,36 @@ export async function deleteWaCrmContact(identifier: string) {
   return { success: true };
 }
 
+// --- WA Blast Functions ---
+export async function getWaBlastContacts(groupName?: string) {
+  let query = supabase.from('wa_blast_contacts').select('*').order('created_at', { ascending: false });
+  
+  if (groupName) {
+    query = query.eq('group_name', groupName);
+  }
+  
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
+export async function saveWaBlastContacts(contacts: any[]) {
+  const { data, error } = await supabase
+    .from('wa_blast_contacts')
+    .insert(contacts)
+    .select();
+    
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteWaBlastGroup(groupName: string) {
+  const { error } = await supabase
+    .from('wa_blast_contacts')
+    .delete()
+    .eq('group_name', groupName);
+    
+  if (error) throw error;
+  return { success: true };
+}
+

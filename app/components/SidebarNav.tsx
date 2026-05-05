@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, Target, Settings, Menu, LogOut, PanelLeftClose, PanelRightClose, Briefcase, Calendar, Link2, TrendingUp, ChevronRight, MessageSquare, MessageCircle, Image as ImageIcon } from "lucide-react";
+import { Activity, LayoutDashboard, Target, Settings, Menu, LogOut, PanelLeftClose, PanelRightClose, Briefcase, Calendar, Link2, TrendingUp, ChevronRight, MessageSquare, MessageCircle, Image as ImageIcon, SendHorizontal } from "lucide-react";
 import { getConfig } from "../lib/config";
 import { useEffect, useState } from "react";
 import { useGlobalData } from "./GlobalDataProvider";
@@ -50,6 +50,7 @@ export default function SidebarNav() {
                 { href: '/daily-standup', label: 'Daily Standup', icon: Calendar },
                 { href: '/b2c-campaigns', label: 'B2C Campaigns', icon: Target },
                 { href: '/crm-wa', label: 'WA CRM', icon: MessageCircle },
+                { href: '/crm-blast', label: 'CRM Blast', icon: SendHorizontal },
             ]
         },
         {
@@ -58,6 +59,7 @@ export default function SidebarNav() {
                 { href: '/kpi-config', label: 'KPI Config', icon: Settings },
                 { href: '/links-setup', label: 'Public Links', icon: Link2 },
                 { href: '/gallery-config', label: 'Gallery & Assets', icon: ImageIcon },
+                { href: '/pricing-list', label: 'Pricing List', icon: Briefcase },
             ]
         }
     ];

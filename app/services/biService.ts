@@ -75,6 +75,8 @@ export async function getAllBIData() {
     leads: r.leads,
     participants: r.participants,
     conversion: r.conversion_pct,
+    startDate: r.start_date || '',
+    endDate: r.end_date || '',
   }));
 
   const mappedSocials = (socials || []).map(r => ({
@@ -558,7 +560,16 @@ async function syncBiDataToTables(biData: any) {
     await replaceTable('pipeline', biData.pipeline.map((r: any) => ({ client: r.client, industry: r.industry, stage: r.stage, value_idr: r.value, action: r.action, eta: r.eta })));
   }
   if (biData.campaigns) {
-    await replaceTable('campaigns', biData.campaigns.map((r: any) => ({ campaign_name: r.name, period: r.period || '', status: r.status, leads: r.leads, participants: r.participants, conversion_pct: r.conversion })));
+    await replaceTable('campaigns', biData.campaigns.map((r: any) => ({ 
+      campaign_name: r.name, 
+      period: r.period || '', 
+      status: r.status, 
+      leads: r.leads, 
+      participants: r.participants, 
+      conversion_pct: r.conversion,
+      start_date: r.startDate || null,
+      end_date: r.endDate || null
+    })));
   }
   if (biData.socials) {
     await replaceTable('socials', biData.socials.map((r: any) => ({ month: r.month, week: r.week, platform: r.platform, metric: r.metric, value: r.value })));

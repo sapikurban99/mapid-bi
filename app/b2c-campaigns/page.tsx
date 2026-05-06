@@ -2,16 +2,18 @@
 import { useState, useEffect } from 'react';
 import { useGlobalData } from '../components/GlobalDataProvider';
 import { getConfig, setConfig as setConfigLS, saveConfigToSupabase } from '../lib/config';
-import { Plus, Edit2, Trash2, X, Target, Loader2, Check, ArrowLeft, Wallet, TrendingDown } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Target, Loader2, Check, ArrowLeft, Wallet, TrendingDown, Calendar as CalendarIcon, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 
 const BI_EDIT_CONFIG: Record<string, any> = {
   campaigns: {
     title: 'Campaign',
-    empty: { name: '', period: '', leads: 0, conversion: 0, status: 'Active' },
+    empty: { name: '', period: '', startDate: '', endDate: '', leads: 0, conversion: 0, status: 'Active' },
     fields: [
       { key: 'name', label: 'Campaign Name', type: 'text' },
       { key: 'period', label: 'Period', type: 'text', placeholder: 'Q2 2026' },
+      { key: 'startDate', label: 'Start Date', type: 'date' },
+      { key: 'endDate', label: 'End Date', type: 'date' },
       { key: 'leads', label: 'Leads Count', type: 'number' },
       { key: 'conversion', label: 'Conversion (%)', type: 'number' },
       { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Completed', 'Planned'] },
@@ -69,6 +71,8 @@ export default function B2CCampaignsPage() {
   const { isLoading: globalIsLoading, syncData } = useGlobalData();
   const [config, setConfigState] = useState(() => getConfig());
   const [b2cPeriod, setB2cPeriod] = useState('All');
+  const [activeTab, setActiveTab] = useState<'Overview' | 'Calendar'>('Overview');
+  const [calendarDate, setCalendarDate] = useState(new Date());
   
   const [editModal, setEditModal] = useState<{ section: string; index: number; data: any } | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -78,11 +82,11 @@ export default function B2CCampaignsPage() {
     setConfigState(getConfig());
   }, [globalIsLoading]);
 
-  const openEditModal = (section: string, index: number = -1) => {
+  const openEditModal = (section: string, index: number = -1, defaultData: any = null) => {
     const sectionConfig = BI_EDIT_CONFIG[section];
     if (!sectionConfig) return;
     const existingData = index >= 0 ? (config.biData as any)?.[section]?.[index] : null;
-    setEditModal({ section, index, data: existingData ? { ...existingData } : { ...sectionConfig.empty } });
+    setEditModal({ section, index, data: existingData ? { ...existingData } : { ...sectionConfig.empty, ...defaultData } });
   };
 
   const handleEditField = (key: string, value: any) => {
@@ -146,6 +150,15 @@ export default function B2CCampaignsPage() {
   }, {} as Record<string, number>);
   const sortedCategories = Object.entries(spentByCategory).sort((a: any, b: any) => b[1] - a[1]);
 
+  // Calendar logic
+  const daysInMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0).getDate();
+  const firstDayOfMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1).getDay();
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const nextMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
+  const prevMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
+
   return (
     <main className="min-h-screen bg-zinc-50 font-sans pb-24 text-zinc-900">
       <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 sticky top-0 z-40 transition-all">
@@ -171,10 +184,21 @@ export default function B2CCampaignsPage() {
       </header>
 
       <div className="max-w-6xl mx-auto py-8 sm:py-12 px-4 sm:px-6 space-y-12">
+        {/* Tabs */}
+        <div className="flex gap-6 border-b border-zinc-200">
+            <button onClick={() => setActiveTab('Overview')} className={`pb-3 text-xs font-black tracking-widest uppercase transition-all ${activeTab === 'Overview' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600 border-b-2 border-transparent'}`}>
+                <LayoutGrid size={14} className="inline mr-2 mb-0.5" /> Overview
+            </button>
+            <button onClick={() => setActiveTab('Calendar')} className={`pb-3 text-xs font-black tracking-widest uppercase transition-all ${activeTab === 'Calendar' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600 border-b-2 border-transparent'}`}>
+                <CalendarIcon size={14} className="inline mr-2 mb-0.5" /> Calendar View
+            </button>
+        </div>
 
-        {/* === CAMPAIGNS SECTION === */}
-        <section>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-200 pb-4 mb-6 gap-3">
+        {activeTab === 'Overview' && (
+          <div className="space-y-12 animate-in fade-in">
+            {/* === CAMPAIGNS SECTION === */}
+            <section>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-200 pb-4 mb-6 gap-3">
             <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-zinc-900">Campaign Overview</h3>
             {uniqueB2cPeriods.length > 2 && (
               <select value={b2cPeriod} onChange={(e) => setB2cPeriod(e.target.value)}
@@ -336,6 +360,133 @@ export default function B2CCampaignsPage() {
             </div>
           </div>
         </section>
+        </div>
+        )}
+
+        {activeTab === 'Calendar' && (
+          <div className="animate-in fade-in">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Calendar Grid */}
+              <div className="lg:col-span-9 bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">Campaign Calendar</h3>
+                    <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Click a day to schedule a new campaign</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button onClick={prevMonth} className="p-2 hover:bg-zinc-100 rounded-xl transition"><ChevronLeft size={20} /></button>
+                    <span className="font-bold text-lg min-w-[150px] text-center">{monthNames[calendarDate.getMonth()]} {calendarDate.getFullYear()}</span>
+                    <button onClick={nextMonth} className="p-2 hover:bg-zinc-100 rounded-xl transition"><ChevronRight size={20} /></button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-7 gap-px bg-zinc-200 border border-zinc-200 rounded-xl overflow-hidden">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="bg-zinc-50 py-3 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                      {day}
+                    </div>
+                  ))}
+                  
+                  {blanks.map(blank => (
+                    <div key={`blank-${blank}`} className="bg-white min-h-[120px] p-2 opacity-50"></div>
+                  ))}
+                  
+                  {days.map(day => {
+                    const currentDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day);
+                    // Find campaigns active on this day
+                    const dayCampaigns = campaigns.filter((c: any) => {
+                      if (!c.startDate || !c.endDate) return false;
+                      const start = new Date(c.startDate);
+                      start.setHours(0,0,0,0);
+                      const end = new Date(c.endDate);
+                      end.setHours(23,59,59,999);
+                      return currentDate >= start && currentDate <= end;
+                    });
+                    
+                    const isToday = new Date().toDateString() === currentDate.toDateString();
+                    
+                    // Format pre-filled date
+                    const yyyy = currentDate.getFullYear();
+                    const mm = String(currentDate.getMonth() + 1).padStart(2, '0');
+                    const dd = String(currentDate.getDate()).padStart(2, '0');
+                    const formattedDateStr = `${yyyy}-${mm}-${dd}`;
+
+                    return (
+                      <div 
+                        key={day} 
+                        onClick={() => openEditModal('campaigns', -1, { startDate: formattedDateStr, endDate: formattedDateStr })}
+                        className={`bg-white min-h-[120px] p-2 border-t border-zinc-100 transition hover:bg-zinc-50/80 cursor-pointer group/day`}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <div className={`text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-zinc-900 text-white' : 'text-zinc-600 group-hover/day:bg-zinc-100'}`}>
+                            {day}
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-zinc-300 opacity-0 group-hover/day:opacity-100 transition">+ ADD</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {dayCampaigns.map((camp: any, idx: number) => {
+                            const origIdx = campaigns.indexOf(camp);
+                            return (
+                              <div 
+                                key={idx} 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal('campaigns', origIdx);
+                                }}
+                                className={`text-[9px] font-bold px-2 py-1 rounded truncate border hover:scale-105 transition-all ${camp.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : camp.status === 'Planned' ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200'}`} 
+                                title={`${camp.name} (Click to Edit)`}
+                              >
+                                {camp.name}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Sidebar: All / Undated Campaigns */}
+              <div className="lg:col-span-3 space-y-6">
+                <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm">
+                  <h4 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-4">All Campaigns</h4>
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                    {campaigns.length === 0 ? (
+                      <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest text-center py-4">No campaigns found</p>
+                    ) : (
+                      campaigns.map((camp: any, idx: number) => {
+                        const hasDates = camp.startDate && camp.endDate;
+                        return (
+                          <div 
+                            key={idx} 
+                            onClick={() => openEditModal('campaigns', idx)}
+                            className={`p-4 rounded-2xl border transition cursor-pointer hover:border-zinc-400 ${hasDates ? 'bg-zinc-50 border-zinc-100' : 'bg-rose-50/50 border-rose-100'}`}
+                          >
+                            <div className="flex justify-between items-start gap-2 mb-2">
+                              <h5 className="font-bold text-xs text-zinc-900 leading-snug line-clamp-2">{camp.name}</h5>
+                              <span className={`text-[8px] px-1.5 py-0.5 font-black uppercase rounded border shrink-0 ${camp.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : camp.status === 'Planned' ? 'border-blue-200 bg-blue-50 text-blue-600' : 'bg-zinc-100 text-zinc-400 border-zinc-200'}`}>
+                                {camp.status}
+                              </span>
+                            </div>
+                            
+                            {hasDates ? (
+                              <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">{formatDate(camp.startDate)} - {formatDate(camp.endDate)}</p>
+                            ) : (
+                              <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-1">
+                                ⚠️ No Dates Assigned
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <EditModal isOpen={!!editModal} onClose={() => setEditModal(null)} onSave={handleSaveEdit} title={`${editModal?.index! >= 0 ? 'Edit' : 'Add'} ${BI_EDIT_CONFIG[editModal?.section!]?.title}`} fields={BI_EDIT_CONFIG[editModal?.section!]?.fields || []} data={editModal?.data} onChange={handleEditField} />

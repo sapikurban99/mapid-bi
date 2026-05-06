@@ -49,8 +49,7 @@ export default function SidebarNav() {
                 { href: '/b2b-board', label: 'B2B Delivery & Ops', icon: Briefcase },
                 { href: '/daily-standup', label: 'Daily Standup', icon: Calendar },
                 { href: '/b2c-campaigns', label: 'B2C Campaigns', icon: Target },
-                { href: '/crm-wa', label: 'WA CRM', icon: MessageCircle },
-                { href: '/crm-blast', label: 'CRM Blast', icon: SendHorizontal },
+                { href: '/crm-wa', label: 'WA CRM & Blast', icon: MessageCircle },
             ]
         },
         {

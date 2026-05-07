@@ -124,10 +124,101 @@ export async function GET() {
   }
 }
 
+async function syncToCalDav(event: {
+  id: string;
+  title: string;
+  description?: string;
+  startDate: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  attachmentLink?: string;
+}, isDelete = false) {
+  const url = `https://dav.privateemail.com/caldav/Y2FsOi8vMC84NQ/${event.id}.ics`;
+  const auth = Buffer.from('cal@mapid.io:Indonesi@a1945').toString('base64');
+
+  if (isDelete) {
+    try {
+      await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Basic ${auth}`
+        }
+      });
+    } catch (err) {
+      console.error('Failed to delete from CalDAV:', err);
+    }
+    return;
+  }
+
+  // Format dates for ICS
+  const cleanStartDate = event.startDate.replace(/-/g, '');
+  const cleanEndDate = (event.endDate || event.startDate).replace(/-/g, '');
+
+  let dtstart = '';
+  let dtend = '';
+
+  if (event.startTime) {
+    const cleanTime = event.startTime.replace(/:/g, '') + '00';
+    dtstart = `DTSTART:${cleanStartDate}T${cleanTime}`;
+    if (event.endTime) {
+      const cleanEndTime = event.endTime.replace(/:/g, '') + '00';
+      dtend = `DTEND:${cleanEndDate}T${cleanEndTime}`;
+    } else {
+      dtend = `DTEND:${cleanEndDate}T${cleanTime}`;
+    }
+  } else {
+    dtstart = `DTSTART;VALUE=DATE:${cleanStartDate}`;
+    dtend = `DTEND;VALUE=DATE:${cleanEndDate}`;
+  }
+
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  let descriptionLines = event.description || '';
+  if (event.attachmentLink) {
+    descriptionLines += `\nAttachment Link: ${event.attachmentLink}`;
+  }
+
+  // Escape special chars for ICS format
+  const escapedTitle = (event.title || '').replace(/[,;]/g, '\\$&');
+  const escapedDesc = descriptionLines.replace(/[,;]/g, '\\$&').replace(/\n/g, '\\n');
+
+  const icsBody = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//MAPID BI Dashboard//NONSGML v1.0//EN',
+    'BEGIN:VEVENT',
+    `UID:${event.id}`,
+    `DTSTAMP:${dtstamp}`,
+    dtstart,
+    dtend,
+    `SUMMARY:${escapedTitle}`,
+    `DESCRIPTION:${escapedDesc}`,
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+
+  try {
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Authorization': `Basic ${auth}`
+      },
+      body: icsBody
+    });
+    if (!res.ok) {
+      console.error('CalDAV PUT returned non-OK status:', res.status, res.statusText);
+    }
+  } catch (err) {
+    console.error('Error PUTing event to CalDAV:', err);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, description, startDate, endDate, startTime, endTime, attachmentLink } = body;
+    const { title, description, startDate, endDate, startTime, endTime, attachmentLink, syncToPrivateEmail } = body;
 
     if (!title || !startDate) {
       return NextResponse.json({ success: false, message: 'Title and start date are required' }, { status: 400 });
@@ -143,11 +234,26 @@ export async function POST(request: Request) {
         start_time: startTime || null,
         end_time: endTime || null,
         attachment_link: attachmentLink || null,
+        sync_to_private_email: syncToPrivateEmail || false,
       })
       .select()
       .single();
 
     if (error) throw error;
+
+    // Sync to PrivateEmail CalDAV asynchronously only if requested
+    if (syncToPrivateEmail) {
+      await syncToCalDav({
+        id: data.id,
+        title: data.title,
+        description: data.description || '',
+        startDate: data.start_date,
+        endDate: data.end_date || data.start_date,
+        startTime: data.start_time,
+        endTime: data.end_time,
+        attachmentLink: data.attachment_link,
+      });
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
@@ -158,7 +264,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, title, description, startDate, endDate, startTime, endTime, attachmentLink } = body;
+    const { id, title, description, startDate, endDate, startTime, endTime, attachmentLink, syncToPrivateEmail } = body;
 
     if (!id || !title || !startDate) {
       return NextResponse.json({ success: false, message: 'ID, Title, and start date are required' }, { status: 400 });
@@ -174,6 +280,7 @@ export async function PUT(request: Request) {
         start_time: startTime || null,
         end_time: endTime || null,
         attachment_link: attachmentLink || null,
+        sync_to_private_email: syncToPrivateEmail || false,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -181,6 +288,22 @@ export async function PUT(request: Request) {
       .single();
 
     if (error) throw error;
+
+    // Sync updated data to PrivateEmail CalDAV or delete if unchecked
+    if (syncToPrivateEmail) {
+      await syncToCalDav({
+        id: data.id,
+        title: data.title,
+        description: data.description || '',
+        startDate: data.start_date,
+        endDate: data.end_date || data.start_date,
+        startTime: data.start_time,
+        endTime: data.end_time,
+        attachmentLink: data.attachment_link,
+      });
+    } else {
+      await syncToCalDav({ id: data.id } as any, true);
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
@@ -200,6 +323,9 @@ export async function DELETE(request: Request) {
     const { error } = await supabase.from('b2b_agendas').delete().eq('id', id);
 
     if (error) throw error;
+
+    // Delete from PrivateEmail CalDAV asynchronously
+    await syncToCalDav({ id } as any, true);
 
     return NextResponse.json({ success: true, message: 'Agenda deleted successfully' });
   } catch (error: any) {

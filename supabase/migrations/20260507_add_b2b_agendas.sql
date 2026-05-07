@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.b2b_agendas (
   start_time TIME,
   end_time TIME,
   attachment_link TEXT,
+  sync_to_private_email BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

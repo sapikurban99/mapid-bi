@@ -335,9 +335,10 @@ export default function B2BBoardPage() {
     const [currentCalDate, setCurrentCalDate] = useState(() => new Date());
     const [isAddingAgenda, setIsAddingAgenda] = useState(false);
     const [editingAgendaId, setEditingAgendaId] = useState<string | null>(null);
-    const [newAgenda, setNewAgenda] = useState({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '' });
+    const [newAgenda, setNewAgenda] = useState({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '', syncToPrivateEmail: false });
     const [submittingCalendar, setSubmittingCalendar] = useState(false);
     const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<any>(null);
+    const [calendarFilter, setCalendarFilter] = useState<string>('all');
 
     const fetchCalendar = async () => {
         setLoadingCalendar(true);
@@ -378,7 +379,7 @@ export default function B2BBoardPage() {
             if (result.success) {
                 setIsAddingAgenda(false);
                 setEditingAgendaId(null);
-                setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '' });
+                setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '', syncToPrivateEmail: false });
                 fetchCalendar();
             } else {
                 alert('Failed to save: ' + result.message);
@@ -422,6 +423,7 @@ export default function B2BBoardPage() {
                 startTime: a.start_time,
                 endTime: a.end_time,
                 attachmentLink: a.attachment_link,
+                syncToPrivateEmail: a.sync_to_private_email,
                 type: 'agenda',
                 color: 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 font-extrabold shadow-sm',
                 badgeColor: 'bg-indigo-300',
@@ -493,8 +495,15 @@ export default function B2BBoardPage() {
             }
         });
 
-        return list;
-    }, [calendarData, config?.kanbanLeads]);
+        const filteredList = list.filter(item => {
+            if (calendarFilter === 'all') return true;
+            if (calendarFilter === 'agenda') return item.type === 'agenda';
+            if (calendarFilter === 'external') return item.type === 'external';
+            if (calendarFilter === 'leads') return item.type.startsWith('lead-');
+            return true;
+        });
+        return filteredList;
+    }, [calendarData, config?.kanbanLeads, calendarFilter]);
 
     const calendarGrid = useMemo(() => {
         const year = currentCalDate.getFullYear();
@@ -920,7 +929,7 @@ export default function B2BBoardPage() {
                         {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
                         {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
                         {activeTab === 'stats' && <button onClick={() => setEditingMember({ pseId: '', name: '', maxCapacity: 30, isActive: true, isExisting: false })} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-zinc-900 text-white hover:bg-zinc-800"><Plus size={14} /> Add PSE Member</button>}
-                        {activeTab === 'calendar' && <button onClick={() => { setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '' }); setIsAddingAgenda(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-indigo-600 text-white hover:bg-indigo-700"><Plus size={14} /> Add Agenda</button>}
+                        {activeTab === 'calendar' && <button onClick={() => { setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '', syncToPrivateEmail: false }); setIsAddingAgenda(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-indigo-600 text-white hover:bg-indigo-700"><Plus size={14} /> Add Agenda</button>}
                     </div>
 
                     <button
@@ -1263,10 +1272,36 @@ export default function B2BBoardPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                             {/* Calendar Main Grid */}
                             <div className="lg:col-span-3 bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-sm">
-                                <div className="flex justify-between items-center mb-6">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-6 border-b border-zinc-100">
                                     <div>
                                         <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">Operations Calendar</h3>
                                         <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Click a day to schedule a new agenda</p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 bg-zinc-100 p-1.5 rounded-xl border border-zinc-200 overflow-x-auto hide-scrollbar max-w-full">
+                                        <button 
+                                            onClick={() => setCalendarFilter('all')} 
+                                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${calendarFilter === 'all' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}
+                                        >
+                                            All
+                                        </button>
+                                        <button 
+                                            onClick={() => setCalendarFilter('agenda')} 
+                                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${calendarFilter === 'agenda' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}
+                                        >
+                                            Agendas
+                                        </button>
+                                        <button 
+                                            onClick={() => setCalendarFilter('external')} 
+                                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${calendarFilter === 'external' ? 'bg-amber-500 text-amber-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}
+                                        >
+                                            PrivateEmail
+                                        </button>
+                                        <button 
+                                            onClick={() => setCalendarFilter('leads')} 
+                                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${calendarFilter === 'leads' ? 'bg-rose-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}
+                                        >
+                                            Leads
+                                        </button>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <button onClick={() => {
@@ -1304,7 +1339,7 @@ export default function B2BBoardPage() {
                                                     key={idx} 
                                                     onClick={() => {
                                                         if (cell.isCurrentMonth) {
-                                                            setNewAgenda({ title: '', description: '', startDate: cell.dateStr, endDate: cell.dateStr, startTime: '', endTime: '', attachmentLink: '' });
+                                                            setNewAgenda({ title: '', description: '', startDate: cell.dateStr, endDate: cell.dateStr, startTime: '', endTime: '', attachmentLink: '', syncToPrivateEmail: false });
                                                             setEditingAgendaId(null);
                                                             setIsAddingAgenda(true);
                                                         }
@@ -1856,6 +1891,18 @@ export default function B2BBoardPage() {
                                     <input type="time" value={newAgenda.endTime} onChange={(e) => setNewAgenda(prev => ({ ...prev, endTime: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" />
                                 </div>
                             </div>
+                            <div className="flex items-center gap-3 p-4 bg-amber-50/40 border border-amber-100 rounded-2xl">
+                                <input 
+                                    type="checkbox" 
+                                    id="syncToPrivateEmail" 
+                                    checked={newAgenda.syncToPrivateEmail} 
+                                    onChange={(e) => setNewAgenda(prev => ({ ...prev, syncToPrivateEmail: e.target.checked }))} 
+                                    className="w-4 h-4 text-amber-600 border-zinc-300 rounded focus:ring-amber-500 cursor-pointer"
+                                />
+                                <label htmlFor="syncToPrivateEmail" className="text-xs font-black text-amber-900 cursor-pointer select-none">
+                                    Sync to PrivateEmail Calendar 📧
+                                </label>
+                            </div>
                         </div>
                         <div className="p-6 border-t border-zinc-100 flex justify-end gap-3 shrink-0 bg-zinc-50/50">
                             <button onClick={() => {
@@ -1936,6 +1983,7 @@ export default function B2BBoardPage() {
                                             startTime: selectedCalendarEvent.startTime || '',
                                             endTime: selectedCalendarEvent.endTime || '',
                                             attachmentLink: selectedCalendarEvent.attachmentLink || '',
+                                            syncToPrivateEmail: selectedCalendarEvent.syncToPrivateEmail || false,
                                         });
                                         setEditingAgendaId(selectedCalendarEvent.rawId);
                                         setSelectedCalendarEvent(null);

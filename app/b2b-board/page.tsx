@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useGlobalData } from '../components/GlobalDataProvider';
 import { getConfig, SiteConfig, setConfig } from '../lib/config';
-import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck, CheckCircle, Activity, Zap, Info } from 'lucide-react';
+import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck, CheckCircle, Activity, Zap, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 // --- Filter Chip Dropdown Component ---
@@ -319,7 +319,7 @@ export default function B2BBoardPage() {
     const { syncData, isLoading: globalIsLoading } = useGlobalData();
     const [config, setLocalConfig] = useState<SiteConfig | null>(null);
     const [loadingBiData, setLoadingBiData] = useState(false);
-    const [activeTab, setActiveTab] = useState<'projects' | 'leads' | 'partners' | 'stats' | 'sales'>('projects');
+    const [activeTab, setActiveTab] = useState<'projects' | 'leads' | 'partners' | 'stats' | 'sales' | 'calendar'>('projects');
     const [showArchived, setShowArchived] = useState(false);
     const [showPointsInfo, setShowPointsInfo] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -328,6 +328,212 @@ export default function B2BBoardPage() {
 
     // Dynamic filter state: Record<columnName, selectedValues[]>
     const [filters, setFilters] = useState<Record<string, string[]>>({});
+
+    // === Calendar States & Logic ===
+    const [calendarData, setCalendarData] = useState<{ agendas: any[], externalEvents: any[] }>({ agendas: [], externalEvents: [] });
+    const [loadingCalendar, setLoadingCalendar] = useState(false);
+    const [currentCalDate, setCurrentCalDate] = useState(() => new Date());
+    const [isAddingAgenda, setIsAddingAgenda] = useState(false);
+    const [editingAgendaId, setEditingAgendaId] = useState<string | null>(null);
+    const [newAgenda, setNewAgenda] = useState({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '' });
+    const [submittingCalendar, setSubmittingCalendar] = useState(false);
+    const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<any>(null);
+
+    const fetchCalendar = async () => {
+        setLoadingCalendar(true);
+        try {
+            const res = await fetch('/api/bi/calendar');
+            const data = await res.json();
+            if (data.success) {
+                setCalendarData({ agendas: data.agendas || [], externalEvents: data.externalEvents || [] });
+            }
+        } catch (error) {
+            console.error('Failed to fetch calendar:', error);
+        } finally {
+            setLoadingCalendar(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'calendar') {
+            fetchCalendar();
+        }
+    }, [activeTab]);
+
+    const handleSaveAgenda = async () => {
+        if (!newAgenda.title || !newAgenda.startDate) {
+            alert('Title and Start Date are required!');
+            return;
+        }
+        setSubmittingCalendar(true);
+        try {
+            const method = editingAgendaId ? 'PUT' : 'POST';
+            const payload = editingAgendaId ? { id: editingAgendaId, ...newAgenda } : newAgenda;
+            const res = await fetch('/api/bi/calendar', {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (result.success) {
+                setIsAddingAgenda(false);
+                setEditingAgendaId(null);
+                setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '' });
+                fetchCalendar();
+            } else {
+                alert('Failed to save: ' + result.message);
+            }
+        } catch (error: any) {
+            alert('Error saving agenda: ' + error.message);
+        } finally {
+            setSubmittingCalendar(false);
+        }
+    };
+
+    const handleDeleteAgenda = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this agenda?')) return;
+        try {
+            const res = await fetch(`/api/bi/calendar?id=${id}`, { method: 'DELETE' });
+            const result = await res.json();
+            if (result.success) {
+                fetchCalendar();
+            } else {
+                alert('Failed to delete: ' + result.message);
+            }
+        } catch (error: any) {
+            alert('Error deleting agenda: ' + error.message);
+        }
+    };
+
+    const combinedEvents = useMemo(() => {
+        const list: any[] = [];
+        
+        // 1. Supabase agendas
+        calendarData.agendas.forEach(a => {
+            const timeStr = a.start_time ? a.start_time.substring(0, 5) : '';
+            const displayTitle = timeStr ? `[${timeStr}] ${a.title}` : a.title;
+            list.push({
+                id: `agenda-${a.id}`,
+                rawId: a.id,
+                title: displayTitle,
+                description: a.description,
+                startDate: a.start_date,
+                endDate: a.end_date || a.start_date,
+                startTime: a.start_time,
+                endTime: a.end_time,
+                attachmentLink: a.attachment_link,
+                type: 'agenda',
+                color: 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 font-extrabold shadow-sm',
+                badgeColor: 'bg-indigo-300',
+            });
+        });
+
+        // 2. PrivateEmail external events
+        calendarData.externalEvents.forEach((e, idx) => {
+            const startDay = e.startDate ? e.startDate.split('T')[0] : '';
+            const endDay = e.endDate ? e.endDate.split('T')[0] : startDay;
+            let timeStr = '';
+            if (e.startDate && e.startDate.includes('T')) {
+                const parts = e.startDate.split('T');
+                if (parts[1]) {
+                    timeStr = parts[1].substring(0, 5);
+                }
+            }
+            const displayTitle = timeStr ? `[${timeStr}] ${e.title}` : e.title;
+            list.push({
+                id: `ext-${idx}`,
+                title: displayTitle,
+                description: e.description,
+                startDate: startDay,
+                endDate: endDay,
+                type: 'external',
+                color: 'bg-amber-500 text-amber-950 border-amber-600 hover:bg-amber-600 font-extrabold shadow-sm',
+                badgeColor: 'bg-amber-300',
+            });
+        });
+
+        // 3. Leads dates from config?.kanbanLeads
+        const leads = config?.kanbanLeads || [];
+        leads.forEach(l => {
+            if (l.demoDate) {
+                list.push({
+                    id: `lead-demo-${l.id}`,
+                    title: `📞 Demo: ${l.name}`,
+                    description: `PIC Sales: ${l.picSales || '-'}\nExpected Close: ${l.expectedCloseDate || '-'}`,
+                    startDate: l.demoDate,
+                    endDate: l.demoDate,
+                    type: 'lead-demo',
+                    color: 'bg-rose-600 text-white border-rose-700 hover:bg-rose-700 font-extrabold shadow-sm',
+                    badgeColor: 'bg-rose-300',
+                });
+            }
+            if (l.lastInteractedOn) {
+                list.push({
+                    id: `lead-interacted-${l.id}`,
+                    title: `💬 Interacted: ${l.name}`,
+                    description: `Next Step: ${l.nextStep || '-'}`,
+                    startDate: l.lastInteractedOn,
+                    endDate: l.lastInteractedOn,
+                    type: 'lead-interacted',
+                    color: 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 font-extrabold shadow-sm',
+                    badgeColor: 'bg-emerald-300',
+                });
+            }
+            if (l.expectedCloseDate) {
+                list.push({
+                    id: `lead-close-${l.id}`,
+                    title: `💰 Close Deal: ${l.name}`,
+                    description: `Forecasted Value: IDR ${(Number(l.forecastedValue || 0) / 1000000).toFixed(0)}M\nProbability: ${(Number(l.probability || 0) * 100).toFixed(0)}%`,
+                    startDate: l.expectedCloseDate,
+                    endDate: l.expectedCloseDate,
+                    type: 'lead-close',
+                    color: 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 font-extrabold shadow-sm',
+                    badgeColor: 'bg-blue-300',
+                });
+            }
+        });
+
+        return list;
+    }, [calendarData, config?.kanbanLeads]);
+
+    const calendarGrid = useMemo(() => {
+        const year = currentCalDate.getFullYear();
+        const month = currentCalDate.getMonth();
+        const firstDayOfMonth = new Date(year, month, 1);
+        const lastDayOfMonth = new Date(year, month + 1, 0);
+        const startDayIndex = firstDayOfMonth.getDay(); // 0 is Sunday, 1 is Monday, etc.
+        const daysInMonth = lastDayOfMonth.getDate();
+
+        const grid = [];
+        // Pad previous month days
+        const prevMonthLastDay = new Date(year, month, 0).getDate();
+        for (let i = startDayIndex - 1; i >= 0; i--) {
+            grid.push({
+                day: prevMonthLastDay - i,
+                isCurrentMonth: false,
+                dateStr: new Date(year, month - 1, prevMonthLastDay - i).toISOString().split('T')[0]
+            });
+        }
+        // Current month days
+        for (let i = 1; i <= daysInMonth; i++) {
+            grid.push({
+                day: i,
+                isCurrentMonth: true,
+                dateStr: `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`
+            });
+        }
+        // Pad next month days to make multiple of 7
+        const totalCells = Math.ceil(grid.length / 7) * 7;
+        const remaining = totalCells - grid.length;
+        for (let i = 1; i <= remaining; i++) {
+            grid.push({
+                day: i,
+                isCurrentMonth: false,
+                dateStr: new Date(year, month + 1, i).toISOString().split('T')[0]
+            });
+        }
+        return grid;
+    }, [currentCalDate]);
 
     // Modals State
     const [isAddingProject, setIsAddingProject] = useState(false);
@@ -697,6 +903,7 @@ export default function B2BBoardPage() {
                         <button onClick={() => setActiveTab('projects')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'projects' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><Briefcase size={14} /> Projects</button>
                         <button onClick={() => setActiveTab('leads')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'leads' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><Target size={14} /> Leads</button>
                         <button onClick={() => setActiveTab('partners')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'partners' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><Users size={14} /> Partners</button>
+                        <button onClick={() => setActiveTab('calendar')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'calendar' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><Calendar size={14} /> Calendar</button>
                         <div className="w-px h-6 bg-zinc-200 mx-1"></div>
                         <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><BarChart3 size={14} /> PSE</button>
                         <button onClick={() => setActiveTab('sales')} className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeTab === 'sales' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}><UserCheck size={14} /> Sales</button>
@@ -713,6 +920,7 @@ export default function B2BBoardPage() {
                         {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
                         {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
                         {activeTab === 'stats' && <button onClick={() => setEditingMember({ pseId: '', name: '', maxCapacity: 30, isActive: true, isExisting: false })} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-zinc-900 text-white hover:bg-zinc-800"><Plus size={14} /> Add PSE Member</button>}
+                        {activeTab === 'calendar' && <button onClick={() => { setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '' }); setIsAddingAgenda(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-indigo-600 text-white hover:bg-indigo-700"><Plus size={14} /> Add Agenda</button>}
                     </div>
 
                     <button
@@ -1049,6 +1257,143 @@ export default function B2BBoardPage() {
                     </div>
                 )}
 
+                {/* TAB 6: CALENDAR VIEW */}
+                {activeTab === 'calendar' && (
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                            {/* Calendar Main Grid */}
+                            <div className="lg:col-span-3 bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+                                <div className="flex justify-between items-center mb-6">
+                                    <div>
+                                        <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">Operations Calendar</h3>
+                                        <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Click a day to schedule a new agenda</p>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button onClick={() => {
+                                            const prev = new Date(currentCalDate);
+                                            prev.setMonth(prev.getMonth() - 1);
+                                            setCurrentCalDate(prev);
+                                        }} className="p-2 hover:bg-zinc-100 rounded-xl transition"><ChevronLeft size={20} className="text-zinc-800" /></button>
+                                        <span className="font-black text-lg min-w-[150px] text-center text-zinc-800">
+                                            {currentCalDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                                        </span>
+                                        <button onClick={() => {
+                                            const next = new Date(currentCalDate);
+                                            next.setMonth(next.getMonth() + 1);
+                                            setCurrentCalDate(next);
+                                        }} className="p-2 hover:bg-zinc-100 rounded-xl transition"><ChevronRight size={20} className="text-zinc-800" /></button>
+                                    </div>
+                                </div>
+
+                                {loadingCalendar ? (
+                                    <div className="flex flex-col justify-center items-center py-24 space-y-3">
+                                        <Loader2 className="animate-spin text-zinc-400" size={32} />
+                                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest animate-pulse">Loading Agenda & Events...</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-7 gap-px bg-zinc-200 border border-zinc-200 rounded-xl overflow-hidden">
+                                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                                            <div key={d} className="bg-zinc-50 py-3 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">{d}</div>
+                                        ))}
+
+                                        {calendarGrid.map((cell, idx) => {
+                                            const cellEvents = combinedEvents.filter(e => e.startDate === cell.dateStr);
+                                            const isToday = new Date().toDateString() === new Date(cell.dateStr).toDateString();
+                                            return (
+                                                <div 
+                                                    key={idx} 
+                                                    onClick={() => {
+                                                        if (cell.isCurrentMonth) {
+                                                            setNewAgenda({ title: '', description: '', startDate: cell.dateStr, endDate: cell.dateStr, startTime: '', endTime: '', attachmentLink: '' });
+                                                            setEditingAgendaId(null);
+                                                            setIsAddingAgenda(true);
+                                                        }
+                                                    }}
+                                                    className={`bg-white min-h-[120px] p-2 border-t border-zinc-100 transition hover:bg-zinc-50/80 cursor-pointer group/day ${cell.isCurrentMonth ? '' : 'opacity-40'}`}
+                                                >
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <div className={`text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-zinc-900 text-white' : 'text-zinc-600 group-hover/day:bg-zinc-100'}`}>
+                                                            {cell.day}
+                                                        </div>
+                                                        {cell.isCurrentMonth && (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-300 opacity-0 group-hover/day:opacity-100 transition">+ ADD</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-1.5 max-h-[80px] overflow-y-auto hide-scrollbar">
+                                                        {cellEvents.map((evt) => (
+                                                            <div 
+                                                                key={evt.id} 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedCalendarEvent(evt);
+                                                                }}
+                                                                className={`text-[9px] font-bold px-2 py-1 rounded truncate border hover:scale-105 transition-all ${evt.color}`} 
+                                                                title={`${evt.title} (Click to View)`}
+                                                            >
+                                                                {evt.title}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Sidebar: All Agendas list */}
+                            <div className="space-y-6">
+                                <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm space-y-4">
+                                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Database Agendas</h4>
+                                    {calendarData.agendas.length === 0 ? (
+                                        <div className="text-center py-6 text-zinc-300 italic text-xs">No agendas created yet.</div>
+                                    ) : (
+                                        <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                            {calendarData.agendas.map((a) => (
+                                                <div key={a.id} className="p-3 bg-zinc-50 hover:bg-zinc-100/80 rounded-2xl border border-zinc-100 transition-all flex justify-between items-start gap-2 group">
+                                                    <div className="space-y-1">
+                                                        <p className="text-xs font-black text-zinc-800 leading-tight">{a.title}</p>
+                                                        {a.description && <p className="text-[10px] text-zinc-500 leading-relaxed font-medium line-clamp-2">{a.description}</p>}
+                                                        <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-1">
+                                                            📅 {new Date(a.start_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                                                            {a.start_time && ` • ${a.start_time.substring(0, 5)}`}
+                                                        </p>
+                                                    </div>
+                                                    <button onClick={() => handleDeleteAgenda(a.id)} className="p-1 hover:bg-rose-50 text-zinc-400 hover:text-rose-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm space-y-4">
+                                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">PrivateEmail Calendar</h4>
+                                    {calendarData.externalEvents.length === 0 ? (
+                                        <div className="text-center py-6 text-zinc-300 italic text-xs">No external events loaded.</div>
+                                    ) : (
+                                        <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                            {calendarData.externalEvents.slice(0, 15).map((e, idx) => (
+                                                <div key={idx} className="p-3 bg-amber-50/50 rounded-2xl border border-amber-100/50">
+                                                    <p className="text-xs font-black text-amber-900 leading-tight">{e.title}</p>
+                                                    {e.startDate && (
+                                                        <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-1">
+                                                            📅 {new Date(e.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {calendarData.externalEvents.length > 15 && (
+                                                <p className="text-center text-[9px] font-bold text-amber-400 uppercase tracking-widest italic">+ {calendarData.externalEvents.length - 15} more events...</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
 
             </div>
@@ -1462,6 +1807,153 @@ export default function B2BBoardPage() {
                             </div>
                             
                             <button onClick={() => setShowPointsInfo(false)} className="w-full mt-8 py-4 bg-zinc-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-zinc-800 transition-all shadow-xl">Dimengerti</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== ADD AGENDA MODAL ========== */}
+            {isAddingAgenda && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between p-6 border-b border-zinc-100">
+                            <h3 className="text-lg font-black text-zinc-900">{editingAgendaId ? 'Edit Calendar Agenda' : 'Add New Calendar Agenda'}</h3>
+                            <button onClick={() => {
+                                setIsAddingAgenda(false);
+                                setEditingAgendaId(null);
+                            }} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
+                        </div>
+                        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
+                            <div>
+                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Agenda Title</label>
+                                <input type="text" value={newAgenda.title} onChange={(e) => setNewAgenda(prev => ({ ...prev, title: e.target.value }))} placeholder="e.g. Technical Kickoff" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Description</label>
+                                <textarea rows={3} value={newAgenda.description} onChange={(e) => setNewAgenda(prev => ({ ...prev, description: e.target.value }))} placeholder="Agenda details, requirements..." className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Attachment Link (Optional)</label>
+                                <input type="text" value={newAgenda.attachmentLink} onChange={(e) => setNewAgenda(prev => ({ ...prev, attachmentLink: e.target.value }))} placeholder="e.g. https://meet.google.com/abc-def" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Start Date</label>
+                                    <input type="date" value={newAgenda.startDate} onChange={(e) => setNewAgenda(prev => ({ ...prev, startDate: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">End Date (Optional)</label>
+                                    <input type="date" value={newAgenda.endDate} onChange={(e) => setNewAgenda(prev => ({ ...prev, endDate: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Start Time (Optional)</label>
+                                    <input type="time" value={newAgenda.startTime} onChange={(e) => setNewAgenda(prev => ({ ...prev, startTime: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">End Time (Optional)</label>
+                                    <input type="time" value={newAgenda.endTime} onChange={(e) => setNewAgenda(prev => ({ ...prev, endTime: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-zinc-100 flex justify-end gap-3 shrink-0 bg-zinc-50/50">
+                            <button onClick={() => {
+                                setIsAddingAgenda(false);
+                                setEditingAgendaId(null);
+                            }} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-zinc-100 text-zinc-500 transition-colors">Cancel</button>
+                            <button onClick={handleSaveAgenda} disabled={submittingCalendar} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+                                {submittingCalendar ? 'Saving...' : 'Save Agenda'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== EVENT DETAILS MODAL ========== */}
+            {selectedCalendarEvent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between p-6 border-b border-zinc-100">
+                            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-800">
+                                {selectedCalendarEvent.type === 'agenda' ? 'Database Agenda' : selectedCalendarEvent.type === 'external' ? 'PrivateEmail Event' : 'CRM Lead Support'}
+                            </span>
+                            <button onClick={() => setSelectedCalendarEvent(null)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">Title</h4>
+                                <p className="text-base font-black text-zinc-900 leading-tight">{selectedCalendarEvent.title}</p>
+                            </div>
+                            
+                            {selectedCalendarEvent.description && (
+                                <div>
+                                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">Details / Description</h4>
+                                    <p className="text-xs font-bold text-zinc-600 leading-relaxed whitespace-pre-line bg-zinc-50 p-3 rounded-2xl border border-zinc-100 max-h-[150px] overflow-y-auto custom-scrollbar">{selectedCalendarEvent.description}</p>
+                                </div>
+                            )}
+
+                            {selectedCalendarEvent.attachmentLink && (
+                                <div className="pt-2 border-t border-zinc-100">
+                                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">Attachment / Link</h4>
+                                    <a 
+                                        href={selectedCalendarEvent.attachmentLink.startsWith('http') ? selectedCalendarEvent.attachmentLink : `https://${selectedCalendarEvent.attachmentLink}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="inline-flex items-center gap-1.5 text-xs font-black text-blue-600 hover:text-blue-800 underline transition"
+                                    >
+                                        <ExternalLink size={14} /> Open Attachment
+                                    </a>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-100">
+                                <div>
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Date</h4>
+                                    <p className="text-xs font-black text-zinc-800">
+                                        📅 {new Date(selectedCalendarEvent.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </p>
+                                </div>
+                                {(selectedCalendarEvent.startTime || selectedCalendarEvent.endTime) && (
+                                    <div>
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Time</h4>
+                                        <p className="text-xs font-black text-indigo-600">
+                                            ⏰ {selectedCalendarEvent.startTime ? selectedCalendarEvent.startTime.substring(0, 5) : '00:00'} - {selectedCalendarEvent.endTime ? selectedCalendarEvent.endTime.substring(0, 5) : '23:59'}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-zinc-100 flex justify-end gap-3 bg-zinc-50/50">
+                            {selectedCalendarEvent.type === 'agenda' && (
+                                <>
+                                    <button onClick={() => {
+                                        setNewAgenda({
+                                            title: selectedCalendarEvent.title.replace(/^\[\d{2}:\d{2}\]\s+/, ''),
+                                            description: selectedCalendarEvent.description || '',
+                                            startDate: selectedCalendarEvent.startDate,
+                                            endDate: selectedCalendarEvent.endDate || selectedCalendarEvent.startDate,
+                                            startTime: selectedCalendarEvent.startTime || '',
+                                            endTime: selectedCalendarEvent.endTime || '',
+                                            attachmentLink: selectedCalendarEvent.attachmentLink || '',
+                                        });
+                                        setEditingAgendaId(selectedCalendarEvent.rawId);
+                                        setSelectedCalendarEvent(null);
+                                        setIsAddingAgenda(true);
+                                    }} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors">
+                                        Edit Agenda
+                                    </button>
+                                    <button onClick={() => {
+                                        handleDeleteAgenda(selectedCalendarEvent.rawId);
+                                        setSelectedCalendarEvent(null);
+                                    }} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors">
+                                        Delete
+                                    </button>
+                                </>
+                            )}
+                            <button onClick={() => setSelectedCalendarEvent(null)} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white transition-colors">
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>

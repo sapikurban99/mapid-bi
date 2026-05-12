@@ -94,6 +94,7 @@ export interface AcademyItem {
 export interface ContentItem {
     title: string;
     platform: string;
+    account?: string;
     contentType: string;
     date: string;
     status: string;

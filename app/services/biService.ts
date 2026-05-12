@@ -129,6 +129,7 @@ export async function getAllBIData() {
   const mappedContents = (contentsData || []).map(r => ({
     title: r.title,
     platform: r.platform,
+    account: r.account,
     contentType: r.content_type,
     date: r.date,
     status: r.status,
@@ -608,7 +609,7 @@ async function syncBiDataToTables(biData: any) {
     await replaceTable('revenue', biData.revenue.map((r: any) => ({ sub_product: r.subProduct, quarter: r.quarter || '', target: r.target, actual: r.actual, achievement_pct: r.achievement })));
   }
   if (biData.contents) {
-    await replaceTable('contents', biData.contents.map((r: any) => ({ title: r.title, platform: r.platform, content_type: r.contentType, date: r.date || null, status: r.status, pic: r.pic || null })));
+    await replaceTable('contents', biData.contents.map((r: any) => ({ title: r.title, platform: r.platform, account: r.account || null, content_type: r.contentType, date: r.date || null, status: r.status, pic: r.pic || null })));
   }
 }
 

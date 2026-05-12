@@ -31,10 +31,11 @@ const BI_EDIT_CONFIG: Record<string, any> = {
   },
   contents: {
     title: 'Konten',
-    empty: { title: '', platform: 'Instagram', contentType: 'Reels', date: '', status: 'Drafting', pic: '' },
+    empty: { title: '', platform: 'Instagram', account: 'mapidseeit', contentType: 'Reels', date: '', status: 'Drafting', pic: '' },
     fields: [
       { key: 'title', label: 'Title / Topic', type: 'text' },
       { key: 'platform', label: 'Platform', type: 'select', options: ['Instagram', 'TikTok', 'LinkedIn', 'Facebook', 'YouTube', 'Other'] },
+      { key: 'account', label: 'Akun Media', type: 'select', options: ['mapidseeit', 'mapidacademy', 'Other'] },
       { key: 'contentType', label: 'Content Type', type: 'select', options: ['Feed', 'Story', 'Reels', 'Video', 'Article', 'Other'] },
       { key: 'date', label: 'Publish Date', type: 'date' },
       { key: 'status', label: 'Status', type: 'select', options: ['Idea', 'Drafting', 'Editing', 'Finalized', 'Scheduled', 'Published'] },
@@ -60,10 +61,27 @@ const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: a
             <div key={f.key}>
               <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1.5">{f.label}</label>
               {f.type === 'select' ? (
-                <select value={data?.[f.key] || ''} onChange={e => onChange(f.key, e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 outline-none">
-                  <option value="" disabled>Select {f.label}</option>
-                  {f.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
+                <div className="space-y-2">
+                  <select 
+                    value={f.options.includes(data?.[f.key]) ? data?.[f.key] : (data?.[f.key] ? 'Other' : '')} 
+                    onChange={e => onChange(f.key, e.target.value)} 
+                    className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 outline-none"
+                  >
+                    <option value="" disabled>Select {f.label}</option>
+                    {f.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                  {/* Show custom text field if 'Other' is explicitly selected or if current data has a non-matching string */}
+                  {(data?.[f.key] === 'Other' || (data?.[f.key] && !f.options.includes(data?.[f.key]))) && (
+                    <input 
+                      type="text" 
+                      placeholder={`Enter custom ${f.label}`} 
+                      value={data?.[f.key] === 'Other' ? '' : data?.[f.key]} 
+                      onChange={e => onChange(f.key, e.target.value)} 
+                      className="w-full p-3 bg-white border border-zinc-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 outline-none animate-in slide-in-from-top-1 duration-150"
+                      autoFocus
+                    />
+                  )}
+                </div>
               ) : (
                 <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} placeholder={f.placeholder || ''} value={data?.[f.key] ?? (f.type === 'number' ? 0 : '')} onChange={e => onChange(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 outline-none" />
               )}
@@ -235,7 +253,7 @@ export default function B2CCampaignsPage() {
       list.push({
         id: `cont-${idx}`,
         origIdx: idx,
-        title: `📱 ${c.platform}: ${c.title}`,
+        title: `📱 [${c.account || c.platform}] ${c.title}`,
         type: 'content',
         startDate: c.date,
         endDate: c.date,

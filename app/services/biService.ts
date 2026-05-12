@@ -25,6 +25,7 @@ export async function getAllBIData() {
     { data: kanbanLeads },
     { data: kanbanPartners },
     { data: adminConfigRows },
+    { data: contentsData },
   ] = await Promise.all([
     supabase.from('revenue').select('*'),
     supabase.from('projects').select('*'),
@@ -41,6 +42,7 @@ export async function getAllBIData() {
     supabase.from('pse_leads').select('*'),
     supabase.from('pse_partners').select('*'),
     supabase.from('admin_config').select('*').eq('key', 'main'),
+    supabase.from('contents').select('*'),
   ]);
 
   // --- Map to same shape expected by frontend ---
@@ -122,6 +124,15 @@ export async function getAllBIData() {
     category: r.category,
     amount: r.amount,
     description: r.description,
+  }));
+
+  const mappedContents = (contentsData || []).map(r => ({
+    title: r.title,
+    platform: r.platform,
+    contentType: r.content_type,
+    date: r.date,
+    status: r.status,
+    pic: r.pic
   }));
 
   // --- Kanban Data ---
@@ -263,6 +274,7 @@ export async function getAllBIData() {
     kanbanPartners: mappedKanbanPartners,
     pseWorkloads,
     adminConfig,
+    contents: mappedContents,
   };
 }
 
@@ -594,6 +606,9 @@ async function syncBiDataToTables(biData: any) {
   }
   if (biData.revenue) {
     await replaceTable('revenue', biData.revenue.map((r: any) => ({ sub_product: r.subProduct, quarter: r.quarter || '', target: r.target, actual: r.actual, achievement_pct: r.achievement })));
+  }
+  if (biData.contents) {
+    await replaceTable('contents', biData.contents.map((r: any) => ({ title: r.title, platform: r.platform, content_type: r.contentType, date: r.date || null, status: r.status, pic: r.pic || null })));
   }
 }
 

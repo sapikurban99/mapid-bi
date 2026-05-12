@@ -91,6 +91,15 @@ export interface AcademyItem {
     converted: number;
 }
 
+export interface ContentItem {
+    title: string;
+    platform: string;
+    contentType: string;
+    date: string;
+    status: string;
+    pic?: string;
+}
+
 export interface BIData {
     socials: SocialItem[];
     campaigns: CampaignItem[];
@@ -102,6 +111,7 @@ export interface BIData {
     trends: TrendPoint[];
     academy: AcademyItem[];
     budget: BudgetItem[];
+    contents?: ContentItem[];
 }
 
 export interface KanbanProjectItem {
@@ -437,7 +447,8 @@ export async function loadConfigFromSupabase(): Promise<SiteConfig> {
                 userGrowth: json.userGrowth || [],
                 trends: json.trends || [],
                 academy: json.academy || [],
-                budget: json.budget || []
+                budget: json.budget || [],
+                contents: json.contents || json.adminConfig?.biData?.contents || []
             };
 
             // 3. Map Kanban data

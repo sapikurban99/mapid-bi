@@ -22,6 +22,8 @@ import {
   editStandupTask,
   deleteStandupTask,
   updateStandupStatus,
+  getStandupGeneral,
+  saveStandupGeneral,
 } from '../../services/biService';
 
 export async function GET(request: Request) {
@@ -35,7 +37,8 @@ export async function GET(request: Request) {
     
     if (standupDate) {
       const data = await getStandupByDate(standupDate);
-      return NextResponse.json({ success: true, data });
+      const general = await getStandupGeneral(standupDate);
+      return NextResponse.json({ success: true, data, general });
     }
     
     if (standupStart && standupEnd) {
@@ -116,6 +119,9 @@ export async function POST(request: Request) {
       
       case 'updateStandupStatus':
         return NextResponse.json(await updateStandupStatus(body.id, body.status));
+      
+      case 'saveStandupGeneral':
+        return NextResponse.json(await saveStandupGeneral(body.date, body));
 
       default:
         return NextResponse.json({ success: false, message: 'Unknown action' });

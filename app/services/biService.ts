@@ -501,6 +501,7 @@ export async function getStandupByDate(date: string) {
     status: r.status || 'In Progress',
     notes: r.notes || '',
     hambatan: r.hambatan || '',
+    link: r.link || '',
   }));
 }
 
@@ -521,6 +522,7 @@ export async function getStandupByRange(startDate: string, endDate: string) {
     status: r.status || 'In Progress',
     notes: r.notes || '',
     hambatan: r.hambatan || '',
+    link: r.link || '',
   }));
 }
 
@@ -532,6 +534,7 @@ export async function addStandupTask(payload: any) {
     status: payload.status || 'In Progress',
     notes: payload.notes || '',
     hambatan: payload.hambatan || '',
+    link: payload.link || '',
   }).select('id').single();
   if (error) throw new Error(error.message);
   return { success: true, newId: data.id };
@@ -544,6 +547,7 @@ export async function editStandupTask(id: string, payload: any) {
     notes: payload.notes || '',
     hambatan: payload.hambatan || '',
     member_name: payload.memberName,
+    link: payload.link || '',
   }).eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };
@@ -557,6 +561,30 @@ export async function deleteStandupTask(id: string) {
 
 export async function updateStandupStatus(id: string, status: string) {
   const { error } = await supabase.from('daily_standup').update({ status }).eq('id', id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function getStandupGeneral(date: string) {
+  const { data, error } = await supabase
+    .from('daily_standup_general')
+    .select('*')
+    .eq('date', date)
+    .maybeSingle();
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+  return data || { date, general_links: [], general_notes: '', member_links: {} };
+}
+
+export async function saveStandupGeneral(date: string, payload: any) {
+  const { error } = await supabase
+    .from('daily_standup_general')
+    .upsert({
+      date,
+      general_links: payload.generalLinks || [],
+      general_notes: payload.generalNotes || '',
+      member_links: payload.memberLinks || {},
+      updated_at: new Date().toISOString()
+    });
   if (error) throw new Error(error.message);
   return { success: true };
 }

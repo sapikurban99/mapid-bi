@@ -6,7 +6,7 @@ import {
   Loader2, ArrowUpRight, ArrowDownRight, Users, Target,
   Activity, FileText, FolderOpen, TableProperties, Lock,
   TrendingUp, BarChart3, Globe, Share2, ArrowRight, Sparkles, Maximize2, Minimize2, BookOpen, MoreVertical,
-  Layers, Zap, Plus, Edit2, Trash2, X, Save, Check, Download
+  Layers, Zap, Plus, Edit2, Trash2, X, Save, Check, Download, Calendar, Clock, Briefcase
 } from 'lucide-react';
 import { getConfig, setConfig as setConfigLS, saveConfigToSupabase } from '../lib/config';
 import LoadingProgress from '../components/LoadingProgress';
@@ -698,192 +698,290 @@ export default function MinimalistDashboard() {
 
         {/* === TAB 3: B2B === */}
         {activeTab === 'B2B' && (
-          <div className="space-y-12 animate-in fade-in">
+          <div className="space-y-12 animate-in fade-in duration-300">
+            {/* Header Section */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tighter leading-none mb-2 text-zinc-900">B2B <span className="text-zinc-300">Performance.</span></h1>
-                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Revenue & Financial Pipeline</p>
-                </div>
-                <select value={b2bQuarter} onChange={(e: any) => setB2bQuarter(e.target.value)} className="bg-white border border-zinc-200 text-xs font-black uppercase px-4 py-3 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all shadow-sm w-full md:w-auto">
-                    <option value="All">All Quarters</option>
-                    <option value="Q1">Q1 Performance</option>
-                    <option value="Q2">Q2 Performance</option>
-                    <option value="Q3">Q3 Performance</option>
-                    <option value="Q4">Q4 Performance</option>
-                </select>
+              <div>
+                <h1 className="text-3xl font-black tracking-tighter leading-none mb-2 text-zinc-900">
+                  B2B <span className="text-zinc-300">Performance.</span>
+                </h1>
+                <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                  Revenue & Financial Pipeline
+                </p>
+              </div>
+              <select
+                value={b2bQuarter}
+                onChange={(e: any) => setB2bQuarter(e.target.value)}
+                className="bg-white border border-zinc-200 text-xs font-black uppercase px-4 py-3 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all shadow-sm w-full md:w-auto"
+              >
+                <option value="All">All Quarters</option>
+                <option value="Q1">Q1 Performance</option>
+                <option value="Q2">Q2 Performance</option>
+                <option value="Q3">Q3 Performance</option>
+                <option value="Q4">Q4 Performance</option>
+              </select>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Main Analytics Card */}
-                <div className="lg:col-span-8 bg-zinc-900 rounded-[2.5rem] p-8 md:p-10 text-white relative overflow-hidden shadow-2xl flex flex-col justify-between min-h-[400px]">
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 blur-[100px] rounded-full -mr-20 -mt-20"></div>
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 blur-[80px] rounded-full -ml-20 -mb-20"></div>
-
-                    <div className="relative z-10">
-                        <div className="flex justify-between items-start mb-12">
-                            <div>
-                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400 mb-2 block">Revenue Projection</span>
-                                <h2 className="text-4xl md:text-5xl font-black tracking-tighter break-words leading-tight">
-                                    {formatIDR(b2bMetrics.totalProjection)}
-                                </h2>
-                                <p className="text-zinc-400 text-xs font-medium mt-2">Total Combined Pipeline for {b2bQuarter === 'All' ? 'Fiscal Year' : b2bQuarter}</p>
-                            </div>
-                            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-md border border-white/10 shrink-0">
-                                <TrendingUp className="text-emerald-400" size={24} />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                            <div className="space-y-1">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Realized Revenue</p>
-                                <p className="text-xl font-black text-emerald-400 whitespace-nowrap">{formatIDR(b2bMetrics.doneProjectsRev)}</p>
-                                <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Completed Projects</p>
-                            </div>
-                            <div className="md:border-x border-white/10 md:px-8 space-y-1">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Active Contract Value</p>
-                                <p className="text-xl font-black text-blue-400 whitespace-nowrap">{formatIDR(b2bMetrics.activeProjectsRev)}</p>
-                                <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Ongoing Delivery</p>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Unweighted Leads</p>
-                                <p className="text-xl font-black text-zinc-300 whitespace-nowrap">{formatIDR(b2bMetrics.potentialRevenue)}</p>
-                                <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Sales Opportunities</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="relative z-10 space-y-3 mt-auto">
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-400">
-                            <span>Realization Progress</span>
-                            <span>{b2bMetrics.realizationProgress}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-400 rounded-full shadow-[0_0_20px_rgba(52,211,153,0.5)] transition-all duration-1000" style={{ width: `${b2bMetrics.realizationProgress}%` }}></div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Insights Side Card */}
-                <div className="lg:col-span-4 bg-white border border-zinc-200 rounded-[2.5rem] p-10 shadow-sm flex flex-col justify-between min-h-[400px]">
+            {/* Financial Overview (KPI Metrics) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Metric Card 1: Deals Won (Secured Revenue) */}
+              <div className="relative overflow-hidden bg-zinc-900 text-white rounded-3xl p-8 shadow-xl flex flex-col justify-between min-h-[180px] group transition-all duration-300 hover:shadow-2xl">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full -mr-8 -mt-8 group-hover:bg-emerald-500/20 transition-all duration-300"></div>
+                
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-4">
                     <div>
-                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-6 shadow-inner">
-                            <Target size={24} />
-                        </div>
-                        <h3 className="text-xl font-black tracking-tight text-zinc-900 mb-3">Weighted Pipeline</h3>
-                        <p className="text-xs text-zinc-500 leading-relaxed font-medium mb-6">
-                            Probability-adjusted forecast based on current lead stages.
-                        </p>
-                        <div className="space-y-4">
-                            <div className="p-5 bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Expected Closure</p>
-                                <p className="text-xl font-black text-blue-600 whitespace-nowrap">{formatIDR(b2bMetrics.weightedPipeline)}</p>
-                            </div>
-                        </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">
+                        Deals Secured (Won Revenue)
+                      </span>
+                      <h3 className="text-3xl font-black tracking-tight mt-1">
+                        {formatIDR(b2bMetrics.doneProjectsRev + b2bMetrics.activeProjectsRev)}
+                      </h3>
                     </div>
-
-                    <div className="mt-8 bg-zinc-900 p-5 rounded-2xl">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-2">
-                            <Sparkles size={12} /> Strategic Insight
-                        </p>
-                        <p className="text-[11px] text-zinc-400 leading-relaxed font-medium">
-                            Focus on high-probability leads to secure cash flow for {b2bQuarter === 'All' ? 'the fiscal year' : b2bQuarter}.
-                        </p>
+                    <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/5 text-emerald-400">
+                      <Zap size={20} />
                     </div>
+                  </div>
                 </div>
+
+                <div className="relative z-10 grid grid-cols-2 gap-4 pt-4 border-t border-white/10 text-xs mt-4">
+                  <div>
+                    <p className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Realized / Done</p>
+                    <p className="font-bold text-emerald-400">{formatIDR(b2bMetrics.doneProjectsRev)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Active Delivery</p>
+                    <p className="font-bold text-blue-400">{formatIDR(b2bMetrics.activeProjectsRev)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Metric Card 2: Potential Pipeline */}
+              <div className="relative overflow-hidden bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm flex flex-col justify-between min-h-[180px] group transition-all duration-300 hover:shadow-lg hover:border-zinc-300">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-[50px] rounded-full -mr-8 -mt-8 group-hover:bg-indigo-500/10 transition-all duration-300"></div>
+                
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                        Potential Revenue (Leads)
+                      </span>
+                      <h3 className="text-3xl font-black tracking-tight text-zinc-900 mt-1">
+                        {formatIDR(b2bMetrics.potentialRevenue)}
+                      </h3>
+                    </div>
+                    <div className="p-3 bg-zinc-50 rounded-2xl border border-zinc-100 text-indigo-600">
+                      <Target size={20} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative z-10 pt-4 border-t border-zinc-100 text-xs mt-4">
+                  <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Probability-Weighted</p>
+                  <p className="font-bold text-indigo-600">{formatIDR(b2bMetrics.weightedPipeline)}</p>
+                </div>
+              </div>
+
+              {/* Metric Card 3: Total Projection & Realization Progress */}
+              <div className="relative overflow-hidden bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm flex flex-col justify-between min-h-[180px] group transition-all duration-300 hover:shadow-lg hover:border-zinc-300">
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                        Total Combined Pipeline
+                      </span>
+                      <h3 className="text-3xl font-black tracking-tight text-zinc-900 mt-1">
+                        {formatIDR(b2bMetrics.totalProjection)}
+                      </h3>
+                    </div>
+                    <div className="p-3 bg-zinc-50 rounded-2xl border border-zinc-100 text-emerald-600">
+                      <TrendingUp size={20} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative z-10 pt-4 border-t border-zinc-100 mt-4">
+                  <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1.5">
+                    <span>Realization Progress</span>
+                    <span className="text-zinc-900">{b2bMetrics.realizationProgress}%</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-zinc-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.2)] transition-all duration-1000"
+                      style={{ width: `${b2bMetrics.realizationProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Filtered Tables */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-10">
-                <div className="bg-white border border-zinc-200 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-8 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/30">
-                        <div>
-                            <h3 className="text-base font-black uppercase tracking-tight text-zinc-900">Opportunity Breakdown</h3>
-                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">Leads with expected close in {b2bQuarter}</p>
-                        </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs text-left min-w-[600px]">
-                            <thead className="bg-white text-[9px] text-zinc-400 border-b border-zinc-100 font-black uppercase tracking-[0.1em]">
-                                <tr>
-                                    <th className="px-8 py-5 min-w-[200px]">Opportunity</th>
-                                    <th className="px-4 py-5">Stage</th>
-                                    <th className="px-4 py-5 text-right">Value</th>
-                                    <th className="px-8 py-5 text-center">Prob.</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-50">
-                                {filteredLeads.filter((l: any) => l.forecastedValue > 0 && !['Closed Lost', 'Freeze'].includes(l.stage)).sort((a: any, b: any) => b.forecastedValue - a.forecastedValue).map((l: any) => (
-                                    <tr key={l.id} className="hover:bg-zinc-50/80 transition group">
-                                        <td className="px-8 py-5">
-                                            <p className="font-bold text-zinc-900 group-hover:text-blue-600 transition-colors line-clamp-1">{l.name}</p>
-                                            <p className="text-[9px] font-black uppercase text-zinc-400 mt-1">{l.picSales || 'No PIC'}</p>
-                                        </td>
-                                        <td className="px-4 py-5">
-                                            <span className="px-2.5 py-1 bg-zinc-100 text-zinc-600 text-[9px] rounded-lg font-black uppercase tracking-widest border border-zinc-200 whitespace-nowrap inline-block">{l.stage}</span>
-                                        </td>
-                                        <td className="px-4 py-5 text-right font-mono font-black text-zinc-900">{formatIDR(l.forecastedValue)}</td>
-                                        <td className="px-8 py-5 text-center">
-                                            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 font-black border border-emerald-100">
-                                                {Math.round((l.probability || 0) * 100)}%
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {filteredLeads.length === 0 && (
-                                    <tr><td colSpan={4} className="px-8 py-12 text-center text-zinc-400 font-medium italic">No opportunities found.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+            {/* Won Revenue & Potential Lists (revamped card grid) */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              {/* Section 1: Won Revenue Deals (Cards) */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b border-zinc-200 pb-3">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                    <Zap size={14} className="text-emerald-500" /> Won Deals (Revenue)
+                  </h3>
+                  <span className="bg-zinc-100 text-zinc-600 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg">
+                    {filteredProjects.filter((p: any) => p.forecastedValue > 0 && !['Lost', 'Freeze'].includes(p.stage)).length} Projects
+                  </span>
                 </div>
 
-                <div className="bg-white border border-zinc-200 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-8 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/30">
-                        <div>
-                            <h3 className="text-base font-black uppercase tracking-tight text-zinc-900">Contract Lifecycle</h3>
-                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">Active & Closed Projects in {b2bQuarter}</p>
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredProjects
+                    .filter((p: any) => p.forecastedValue > 0 && !['Lost', 'Freeze'].includes(p.stage))
+                    .sort((a: any, b: any) => b.forecastedValue - a.forecastedValue)
+                    .map((p: any) => (
+                      <div
+                        key={p.id}
+                        className="relative group overflow-hidden bg-white border border-zinc-200 hover:border-emerald-500 hover:shadow-md rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between"
+                      >
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-2xl rounded-full -mr-4 -mt-4 group-hover:bg-emerald-500/10 transition-all duration-300"></div>
+
+                        <div className="relative z-10 flex justify-between items-start gap-4 mb-4">
+                          <div>
+                            <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
+                              {p.client || 'No Client'}
+                            </span>
+                            <h4 className="text-sm font-bold text-zinc-900 mt-0.5 group-hover:text-emerald-600 transition-colors line-clamp-1">
+                              {p.projectName || 'Unnamed Project'}
+                            </h4>
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 text-[8px] rounded-md font-black uppercase tracking-wider border whitespace-nowrap ${
+                              p.stage === 'Done'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-blue-50 text-blue-600 border-blue-200'
+                            }`}
+                          >
+                            {p.stage}
+                          </span>
                         </div>
+
+                        <div className="relative z-10 flex items-end justify-between mb-4">
+                          <div>
+                            <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider">Value</span>
+                            <p className="text-sm font-mono font-black text-zinc-900 leading-none mt-0.5">
+                              {formatIDR(p.forecastedValue)}
+                            </p>
+                          </div>
+                          {p.closeDate && (
+                            <div className="text-right">
+                              <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider block">Close Date</span>
+                              <span className="text-[10px] font-bold text-zinc-500 flex items-center gap-1 mt-0.5 justify-end">
+                                <Calendar size={10} /> {formatDate(p.closeDate)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="relative z-10 space-y-1.5 pt-3.5 border-t border-zinc-100 mt-2">
+                          <div className="flex justify-between text-[9px] font-bold text-zinc-500">
+                            <span>Implementation Progress</span>
+                            <span>{p.progress || 0}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                p.stage === 'Done' ? 'bg-emerald-500' : 'bg-blue-500'
+                              }`}
+                              style={{ width: `${p.progress || 0}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                  {filteredProjects.filter((p: any) => p.forecastedValue > 0 && !['Lost', 'Freeze'].includes(p.stage)).length === 0 && (
+                    <div className="bg-white border border-zinc-200 rounded-2xl p-10 text-center text-zinc-400 font-medium italic text-xs">
+                      No active B2B deals or projects found for this quarter.
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs text-left min-w-[600px]">
-                            <thead className="bg-white text-[9px] text-zinc-400 border-b border-zinc-100 font-black uppercase tracking-[0.1em]">
-                                <tr>
-                                    <th className="px-8 py-5 min-w-[200px]">Client / Project</th>
-                                    <th className="px-4 py-5">Lifecycle</th>
-                                    <th className="px-4 py-5 text-center">Close Date</th>
-                                    <th className="px-8 py-5 text-right">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-50">
-                                {filteredProjects.filter((p: any) => p.forecastedValue > 0 && !['Lost', 'Freeze'].includes(p.stage)).sort((a: any, b: any) => b.forecastedValue - a.forecastedValue).map((p: any) => (
-                                    <tr key={p.id} className="hover:bg-zinc-50/80 transition group">
-                                        <td className="px-8 py-5">
-                                            <p className="font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors line-clamp-1">{p.projectName}</p>
-                                            <p className="text-[9px] font-black uppercase text-zinc-400 mt-1">{p.client}</p>
-                                        </td>
-                                        <td className="px-4 py-5">
-                                            <span className={`px-2.5 py-1 text-[9px] rounded-lg font-black uppercase tracking-widest border whitespace-nowrap inline-block ${p.stage === 'Done' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>{p.stage}</span>
-                                        </td>
-                                        <td className="px-4 py-5 text-center font-bold text-zinc-400">
-                                            {p.closeDate ? new Date(p.closeDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}
-                                        </td>
-                                        <td className="px-8 py-5 text-right font-mono font-black text-zinc-900">{formatIDR(p.forecastedValue)}</td>
-                                    </tr>
-                                ))}
-                                {filteredProjects.length === 0 && (
-                                    <tr><td colSpan={4} className="px-8 py-12 text-center text-zinc-400 font-medium italic">No active contracts found.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                  )}
                 </div>
+              </div>
+
+              {/* Section 2: Potential opportunities (Cards) */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b border-zinc-200 pb-3">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                    <Target size={14} className="text-indigo-500" /> Potential Opportunities
+                  </h3>
+                  <span className="bg-zinc-100 text-zinc-600 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg">
+                    {filteredLeads.filter((l: any) => l.forecastedValue > 0 && !['Closed Lost', 'Freeze'].includes(l.stage)).length} Opportunities
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredLeads
+                    .filter((l: any) => l.forecastedValue > 0 && !['Closed Lost', 'Freeze'].includes(l.stage))
+                    .sort((a: any, b: any) => b.forecastedValue - a.forecastedValue)
+                    .map((l: any) => (
+                      <div
+                        key={l.id}
+                        className="relative group overflow-hidden bg-white border border-zinc-200 hover:border-indigo-500 hover:shadow-md rounded-2xl p-5 transition-all duration-300 flex flex-col justify-between"
+                      >
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-2xl rounded-full -mr-4 -mt-4 group-hover:bg-indigo-500/10 transition-all duration-300"></div>
+
+                        <div className="relative z-10 flex justify-between items-start gap-4 mb-4">
+                          <div>
+                            <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
+                              Sales PIC: {l.picSales || 'No PIC'}
+                            </span>
+                            <h4 className="text-sm font-bold text-zinc-900 mt-0.5 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                              {l.name || 'Unnamed Lead'}
+                            </h4>
+                          </div>
+                          <span className="px-2 py-0.5 bg-zinc-50 text-zinc-600 text-[8px] rounded-md font-black uppercase tracking-wider border border-zinc-200 whitespace-nowrap">
+                            {l.stage}
+                          </span>
+                        </div>
+
+                        <div className="relative z-10 flex items-end justify-between mb-4">
+                          <div>
+                            <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider">Value</span>
+                            <p className="text-sm font-mono font-black text-zinc-900 leading-none mt-0.5">
+                              {formatIDR(l.forecastedValue)}
+                            </p>
+                          </div>
+                          {l.expectedCloseDate && (
+                            <div className="text-right">
+                              <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider block">Expected Close</span>
+                              <span className="text-[10px] font-bold text-zinc-500 flex items-center gap-1 mt-0.5 justify-end">
+                                <Clock size={10} /> {formatDate(l.expectedCloseDate)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="relative z-10 flex items-center justify-between pt-3.5 border-t border-zinc-100 mt-2">
+                          <div className="flex flex-col">
+                            <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider">Win Probability</span>
+                            <span className="text-xs font-black text-indigo-600 mt-0.5">
+                              {Math.round((l.probability || 0) * 100)}%
+                            </span>
+                          </div>
+                          <div className="w-20 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-indigo-500 rounded-full"
+                              style={{ width: `${Math.round((l.probability || 0) * 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                  {filteredLeads.filter((l: any) => l.forecastedValue > 0 && !['Closed Lost', 'Freeze'].includes(l.stage)).length === 0 && (
+                    <div className="bg-white border border-zinc-200 rounded-2xl p-10 text-center text-zinc-400 font-medium italic text-xs">
+                      No active B2B opportunities or leads found for this quarter.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
-
-
-
 
         {/* Edit Modal */}
       {editModal && (

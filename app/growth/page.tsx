@@ -74,6 +74,7 @@ export default function GrowthIntelligencePage() {
     const [blasting, setBlasting] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 10;
+    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
     // --- DATA FETCHING ---
     const { newRegisters, paidConversions, allPayments, isLoading, isError } = useGrowthData(startDate, endDate);
@@ -268,7 +269,9 @@ export default function GrowthIntelligencePage() {
         const leads = filtered.filter(u => (u.status === 'Checkout' || u.status === 'Expired') && isCommercial(u));
         const newRegs = filtered.filter(u => u.status === 'Registered' && u.successCount === 0);
         const active = filtered.filter(u => u.status === 'Active');
-        const retention = filtered.filter(u => u.successCount > 1);
+        const retention = filtered
+            .filter(u => u.successCount > 1)
+            .sort((a, b) => new Date(b.updatedAt || b.date).getTime() - new Date(a.updatedAt || a.date).getTime());
 
         const searchFilter = (list: LeadItem[]) => {
             if (!searchQuery) return list;
@@ -304,7 +307,28 @@ export default function GrowthIntelligencePage() {
         };
     }, [newRegisters, paidConversions, allPayments, selectedIndustry, selectedLicense, searchQuery]);
 
-    const displayList = processedData[activeTab];
+    const licenseOptions = useMemo(() => {
+        const set = new Set<string>();
+        paidConversions.forEach((u: any) => {
+            (u.licenses || []).forEach((l: any) => {
+                if (l.license_type) set.add(l.license_type);
+            });
+        });
+        allPayments.forEach((p: any) => {
+            if (p.license_type) set.add(p.license_type);
+        });
+        return ['All Licenses', ...Array.from(set).sort()];
+    }, [paidConversions, allPayments]);
+
+    const displayList = useMemo(() => {
+        const list = [...processedData[activeTab]];
+        list.sort((a, b) => {
+            const dateA = new Date(a.date || a.createdAt).getTime() || 0;
+            const dateB = new Date(b.date || b.createdAt).getTime() || 0;
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+        return list;
+    }, [processedData, activeTab, sortOrder]);
 
     const exportCsv = () => {
         if (!displayList.length) return;
@@ -557,6 +581,20 @@ export default function GrowthIntelligencePage() {
                                 <option value="Retail & Fashion">Retail & Fashion</option>
                                 <option value="Not Specified">Not Specified</option>
                             </select>
+
+                            <select value={selectedLicense} onChange={(e) => setSelectedLicense(e.target.value)} className="bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-4 text-xs font-bold outline-none">
+                                {licenseOptions.map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </select>
+
+                            <button
+                                onClick={() => setSortOrder(o => o === 'newest' ? 'oldest' : 'newest')}
+                                className="bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-black uppercase tracking-widest px-4 py-4 rounded-2xl flex items-center gap-2 transition-all"
+                            >
+                                <svg className={`w-4 h-4 transition-transform ${sortOrder === 'oldest' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+                                {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
+                            </button>
 
                             <div className="flex items-center gap-3">
                                 <button

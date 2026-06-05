@@ -104,16 +104,34 @@ const NotesViewer = ({ notes, colorClass = 'bg-zinc-50' }: { notes: string, colo
 
 const SALES_TEAM = ['Titan', 'Rani'];
 
+// --- Project Type helpers (data=1x, dev=3x, survey=3x) ---
+const PROJECT_TYPES = ['data', 'dev', 'survey'] as const;
+type ProjectType = typeof PROJECT_TYPES[number];
+
+const getTypeMultiplier = (type?: string) => {
+    const t = (type || 'data').toLowerCase();
+    if (t === 'dev' || t === 'survey') return 3.0;
+    return 1.0;
+};
+
+const getTypeStyle = (type?: string) => {
+    const t = (type || 'data').toLowerCase();
+    if (t === 'dev') return { bar: 'bg-rose-500', text: 'text-rose-500', chip: 'bg-rose-100 text-rose-700', label: 'DEV', mult: '3x' };
+    if (t === 'survey') return { bar: 'bg-rose-500', text: 'text-rose-500', chip: 'bg-amber-100 text-amber-700', label: 'SURVEY', mult: '3x' };
+    return { bar: 'bg-blue-400', text: 'text-blue-500', chip: 'bg-blue-100 text-blue-700', label: 'DATA', mult: '1x' };
+};
+
 // --- Sub-components (Cards) ---
 const ProjectCard = ({ project: p, onEdit, onDelete, getPseName, onAddNote }: any) => {
     const isDone = p.stage === 'Done';
     const isLost = p.stage === 'Lost';
     const isFrozen = p.stage === 'Freeze';
     const hasValue = p.forecastedValue && p.forecastedValue > 0;
+    const tStyle = getTypeStyle(p.projectType);
     return (
         <div draggable onDragStart={(e) => e.dataTransfer.setData('projectId', p.id)}
             className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isDone ? 'bg-emerald-50 border-emerald-200' : isLost ? 'bg-rose-50 border-rose-200' : isFrozen ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-zinc-200'}`}>
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : isFrozen ? 'bg-slate-400' : (p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${isDone ? 'bg-emerald-500' : isLost ? 'bg-rose-500' : isFrozen ? 'bg-slate-400' : tStyle.bar}`}></div>
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDone ? 'bg-emerald-100 text-emerald-600' : isLost ? 'bg-rose-100 text-rose-600' : 'bg-blue-50 text-blue-600'}`}><Briefcase size={14} /></div>
@@ -121,7 +139,7 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName, onAddNote }: an
                 </div>
                 <div className="flex flex-col gap-1 items-end text-right">
                     <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md whitespace-nowrap inline-block ${isDone ? 'bg-emerald-200 text-emerald-800' : isLost ? 'bg-rose-200 text-rose-800' : isFrozen ? 'bg-slate-200 text-slate-800' : 'bg-blue-100 text-blue-800'}`}>{p.stage}</span>
-                    <span className={`text-[8px] font-black uppercase tracking-widest ${p.priority === 'High' ? 'text-rose-500' : p.priority === 'Medium' ? 'text-amber-500' : 'text-blue-500'}`}>{p.priority}</span>
+                    <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${tStyle.chip}`}>{tStyle.label} · {tStyle.mult}</span>
                 </div>
             </div>
             <div onClick={() => onEdit('Project', p)}>
@@ -187,16 +205,20 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor, onAddN
     const isLost = l.stage === 'Closed Lost';
     const isFrozen = l.stage === 'Freeze';
     const hasValue = l.forecastedValue && l.forecastedValue > 0;
+    const tStyle = getTypeStyle(l.projectType);
     return (
         <div draggable onDragStart={(e) => e.dataTransfer.setData('leadId', l.id)}
             className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isLost ? 'bg-rose-50 border-rose-200' : isFrozen ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-zinc-200'}`}>
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${isLost ? 'bg-rose-500' : isFrozen ? 'bg-slate-400' : (l.priority || 'Medium') === 'High' ? 'bg-rose-500' : (l.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${isLost ? 'bg-rose-500' : isFrozen ? 'bg-slate-400' : tStyle.bar}`}></div>
             <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isLost ? 'bg-rose-100 text-rose-600' : isFrozen ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-600'}`}><Target size={14} /></div>
                     <button onClick={(e) => { e.stopPropagation(); onDelete('Lead', l.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
                 </div>
-                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border whitespace-nowrap inline-block ${isLost ? 'bg-rose-200 text-rose-800' : isFrozen ? 'bg-slate-200 text-slate-800 border-slate-300' : getStageColor(l.stage)}`}>{l.stage}</span>
+                <div className="flex flex-col gap-1 items-end text-right">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border whitespace-nowrap inline-block ${isLost ? 'bg-rose-200 text-rose-800' : isFrozen ? 'bg-slate-200 text-slate-800 border-slate-300' : getStageColor(l.stage)}`}>{l.stage}</span>
+                    <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${tStyle.chip}`}>{tStyle.label} · {tStyle.mult}</span>
+                </div>
             </div>
             <div onClick={() => onEdit('Lead', l)}>
                 <h3 className="font-bold text-zinc-900 text-base mb-1">{l.name}</h3>
@@ -260,17 +282,19 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor, onAddN
 
 const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor, onAddNote }: any) => {
     const isFrozen = p.stage === 'Freeze';
+    const tStyle = getTypeStyle(p.projectType);
     return (
         <div draggable onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)}
             className={`border shadow-sm hover:shadow-md p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden ${isFrozen ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-zinc-200'}`}>
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${isFrozen ? 'bg-slate-400' : (p.priority || 'Medium') === 'High' ? 'bg-rose-500' : (p.priority || 'Medium') === 'Medium' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${isFrozen ? 'bg-slate-400' : tStyle.bar}`}></div>
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isFrozen ? 'bg-slate-100 text-slate-600' : 'bg-purple-50 text-purple-600'}`}><Users size={14} /></div>
                     <button onClick={(e) => { e.stopPropagation(); onDelete('Partner', p.id); }} className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
                 </div>
-                <div className="text-right">
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md block mb-1 border whitespace-nowrap ${isFrozen ? 'bg-slate-200 text-slate-800 border-slate-300' : getStageColor(p.stage || 'Sourcing')}`}>{p.stage || 'Sourcing'}</span>
+                <div className="text-right flex flex-col gap-1 items-end">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border whitespace-nowrap ${isFrozen ? 'bg-slate-200 text-slate-800 border-slate-300' : getStageColor(p.stage || 'Sourcing')}`}>{p.stage || 'Sourcing'}</span>
+                    <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${tStyle.chip}`}>{tStyle.label} · {tStyle.mult}</span>
                     <span className={`text-[8px] font-black uppercase tracking-widest ${isFrozen ? 'text-slate-400' : 'text-purple-400'}`}>{p.type}</span>
                 </div>
             </div>
@@ -563,9 +587,9 @@ export default function B2BBoardPage() {
     const [submitting, setSubmitting] = useState(false);
     
     // Forms State
-    const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', probability: 0.4, closeYear: '', closeQuarter: '' });
-    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '', closeYear: '', closeQuarter: '' });
-    const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' });
+    const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', probability: 0.4, closeYear: '', closeQuarter: '' });
+    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '', closeYear: '', closeQuarter: '' });
+    const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' });
 
     const [editingItemType, setEditingItemType] = useState<'Project' | 'Lead' | 'Partner' | null>(null);
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -642,7 +666,7 @@ export default function B2BBoardPage() {
         const projects = config?.kanbanProjects || [];
         return {
             stages: [...new Set(projects.map((p: any) => p.stage))].sort(),
-            priorities: ['High', 'Medium', 'Low'],
+            projectTypes: ['data', 'dev', 'survey'],
             pse: [...new Set(projects.map((p: any) => getPseName(p.pseId)).filter(Boolean))].sort(),
             clients: [...new Set(projects.map((p: any) => p.client).filter(Boolean))].sort(),
         };
@@ -652,7 +676,7 @@ export default function B2BBoardPage() {
         const leads = config?.kanbanLeads || [];
         return {
             stages: [...new Set(leads.map((l: any) => l.stage))].sort(),
-            priorities: ['High', 'Medium', 'Low'],
+            projectTypes: ['data', 'dev', 'survey'],
             pse: [...new Set(leads.map((l: any) => getPseName(l.pseId)).filter(Boolean))].sort(),
             picSales: [...new Set(leads.map((l: any) => l.picSales).filter(Boolean))].sort(),
             companies: [...new Set(leads.map((l: any) => l.name).filter(Boolean))].sort(),
@@ -663,7 +687,7 @@ export default function B2BBoardPage() {
         const partners = config?.kanbanPartners || [];
         return {
             stages: [...new Set(partners.map((p: any) => p.stage || 'Sourcing'))].sort(),
-            priorities: ['High', 'Medium', 'Low'],
+            projectTypes: ['data', 'dev', 'survey'],
             pse: [...new Set(partners.map((p: any) => getPseName(p.pseId)).filter(Boolean))].sort(),
             types: [...new Set(partners.map((p: any) => p.type).filter(Boolean))].sort(),
         };
@@ -682,7 +706,7 @@ export default function B2BBoardPage() {
     const getFilteredProjects = (stage: string) => {
         return config?.kanbanProjects?.filter((p: any) => {
             if (p.stage !== stage) return false;
-            if (filters.priority && !filters.priority.includes(p.priority || 'Medium')) return false;
+            if (filters.projectType && !filters.projectType.includes(p.projectType || 'data')) return false;
             if (filters.pse && !filters.pse.includes(getPseName(p.pseId))) return false;
             if (filters.client && !filters.client.includes(p.client)) return false;
             if (!matchesSearch(p)) return false;
@@ -693,7 +717,7 @@ export default function B2BBoardPage() {
     const getFilteredLeads = (stage: string) => {
         return config?.kanbanLeads?.filter((l: any) => {
             if (l.stage !== stage) return false;
-            if (filters.priority && !filters.priority.includes(l.priority || 'Medium')) return false;
+            if (filters.projectType && !filters.projectType.includes(l.projectType || 'data')) return false;
             if (filters.pse && !filters.pse.includes(getPseName(l.pseId))) return false;
             if (filters.picSales && !filters.picSales.includes(l.picSales)) return false;
             if (filters.company && !filters.company.includes(l.name)) return false;
@@ -705,7 +729,7 @@ export default function B2BBoardPage() {
     const getFilteredPartners = (stage: string) => {
         return config?.kanbanPartners?.filter((p: any) => {
             if ((p.stage || 'Sourcing') !== stage) return false;
-            if (filters.priority && !filters.priority.includes(p.priority || 'Medium')) return false;
+            if (filters.projectType && !filters.projectType.includes(p.projectType || 'data')) return false;
             if (filters.pse && !filters.pse.includes(getPseName(p.pseId))) return false;
             if (filters.type && !filters.type.includes(p.type)) return false;
             if (!matchesSearch(p)) return false;
@@ -783,7 +807,7 @@ export default function B2BBoardPage() {
                 pseId: lead.pseId,
                 stage: 'Technical Handover',
                 progress: 0,
-                priority: lead.priority || 'Medium',
+                projectType: lead.projectType || 'data',
                 notes: lead.notes || '',
                 closeYear: lead.closeYear || '',
                 closeQuarter: lead.closeQuarter || '',
@@ -910,7 +934,7 @@ export default function B2BBoardPage() {
     };
 
     return (
-        <main className="min-h-screen bg-zinc-50 font-sans pb-24">
+        <main className="min-h-screen bg-zinc-50 font-sans">
             <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 sticky top-0 z-40 transition-all">
                 <div className="max-w-screen-2xl mx-auto px-6 lg:px-8 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-3">
@@ -939,9 +963,9 @@ export default function B2BBoardPage() {
                 {/* GLOBAL ACTION BAR */}
                 <div className="flex justify-between items-center mb-6 animate-in fade-in duration-300">
                     <div>
-                        {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', closeYear: '', closeQuarter: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
-                        {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', closeYear: '', closeQuarter: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
-                        {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
+                        {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', closeYear: '', closeQuarter: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
+                        {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', closeYear: '', closeQuarter: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
+                        {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
                         {activeTab === 'stats' && <button onClick={() => setEditingMember({ pseId: '', name: '', maxCapacity: 30, isActive: true, isExisting: false })} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-zinc-900 text-white hover:bg-zinc-800"><Plus size={14} /> Add PSE Member</button>}
                         {activeTab === 'calendar' && <button onClick={() => { setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '', syncToPrivateEmail: false }); setIsAddingAgenda(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-indigo-600 text-white hover:bg-indigo-700"><Plus size={14} /> Add Agenda</button>}
                     </div>
@@ -986,7 +1010,7 @@ export default function B2BBoardPage() {
                             {activeTab === 'projects' && (
                                 <>
                                     <FilterChipDropdown label="Stage" options={getUniqueProjectValues.stages} selected={filters.stage || []} onChange={(v) => updateFilter('stage', v)} color="blue" />
-                                    <FilterChipDropdown label="Priority" options={getUniqueProjectValues.priorities} selected={filters.priority || []} onChange={(v) => updateFilter('priority', v)} color="amber" />
+                                    <FilterChipDropdown label="Type" options={getUniqueProjectValues.projectTypes} selected={filters.projectType || []} onChange={(v) => updateFilter('projectType', v)} color="rose" />
                                     <FilterChipDropdown label="PSE" options={getUniqueProjectValues.pse} selected={filters.pse || []} onChange={(v) => updateFilter('pse', v)} color="zinc" />
                                     <FilterChipDropdown label="Client" options={getUniqueProjectValues.clients} selected={filters.client || []} onChange={(v) => updateFilter('client', v)} color="purple" />
                                 </>
@@ -994,18 +1018,18 @@ export default function B2BBoardPage() {
                             {activeTab === 'leads' && (
                                 <>
                                     <FilterChipDropdown label="Stage" options={getUniqueLeadValues.stages} selected={filters.stage || []} onChange={(v) => updateFilter('stage', v)} color="emerald" />
-                                    <FilterChipDropdown label="Priority" options={getUniqueLeadValues.priorities} selected={filters.priority || []} onChange={(v) => updateFilter('priority', v)} color="amber" />
+                                    <FilterChipDropdown label="Type" options={getUniqueLeadValues.projectTypes} selected={filters.projectType || []} onChange={(v) => updateFilter('projectType', v)} color="rose" />
                                     <FilterChipDropdown label="PSE" options={getUniqueLeadValues.pse} selected={filters.pse || []} onChange={(v) => updateFilter('pse', v)} color="zinc" />
-                                    <FilterChipDropdown label="PIC Sales" options={getUniqueLeadValues.picSales} selected={filters.picSales || []} onChange={(v) => updateFilter('picSales', v)} color="rose" />
+                                    <FilterChipDropdown label="PIC Sales" options={getUniqueLeadValues.picSales} selected={filters.picSales || []} onChange={(v) => updateFilter('picSales', v)} color="amber" />
                                     <FilterChipDropdown label="Company" options={getUniqueLeadValues.companies} selected={filters.company || []} onChange={(v) => updateFilter('company', v)} color="blue" />
                                 </>
                             )}
                             {activeTab === 'partners' && (
                                 <>
                                     <FilterChipDropdown label="Stage" options={getUniquePartnerValues.stages} selected={filters.stage || []} onChange={(v) => updateFilter('stage', v)} color="purple" />
-                                    <FilterChipDropdown label="Priority" options={getUniquePartnerValues.priorities} selected={filters.priority || []} onChange={(v) => updateFilter('priority', v)} color="amber" />
+                                    <FilterChipDropdown label="Type" options={getUniquePartnerValues.projectTypes} selected={filters.projectType || []} onChange={(v) => updateFilter('projectType', v)} color="rose" />
                                     <FilterChipDropdown label="PSE" options={getUniquePartnerValues.pse} selected={filters.pse || []} onChange={(v) => updateFilter('pse', v)} color="zinc" />
-                                    <FilterChipDropdown label="Type" options={getUniquePartnerValues.types} selected={filters.type || []} onChange={(v) => updateFilter('type', v)} color="rose" />
+                                    <FilterChipDropdown label="Partner Type" options={getUniquePartnerValues.types} selected={filters.type || []} onChange={(v) => updateFilter('type', v)} color="amber" />
                                 </>
                             )}
                         </div>
@@ -1467,7 +1491,7 @@ export default function B2BBoardPage() {
                                 <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Phone size={10} className="inline mr-1 -mt-0.5" />Contact Number</label><input type="text" value={newProject.contactNumber || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, contactNumber: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium text-zinc-900" /></div>
                             </div>
                             
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC Sales</label>
                                     <select value={newProject.picSales || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, picSales: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
@@ -1478,6 +1502,16 @@ export default function B2BBoardPage() {
                                     <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PSE Assignee</label>
                                     <select value={newProject.pseId} onChange={(e) => setNewProject((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
                                         <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Project Type <span className="text-zinc-400 normal-case font-medium">(workload weight)</span></label>
+                                    <select value={newProject.projectType || 'data'} onChange={(e) => setNewProject((p: any) => ({ ...p, projectType: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="data">Data (1x)</option>
+                                        <option value="dev">Dev (3x)</option>
+                                        <option value="survey">Survey (3x)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -1553,7 +1587,7 @@ export default function B2BBoardPage() {
                                     <Trash2 size={14} /> Delete
                                 </button>
                             ) : <div></div>}
-                            <button disabled={submitting} onClick={() => handleSaveData('Project', newProject, setNewProject, setIsAddingProject, () => setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', closeDate: '', probability: 0.4, closeYear: '', closeQuarter: '' }))} className="px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700">{submitting ? 'Saving...' : editingItemId ? 'Update Project' : 'Save Project'}</button>
+                            <button disabled={submitting} onClick={() => handleSaveData('Project', newProject, setNewProject, setIsAddingProject, () => setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', closeDate: '', probability: 0.4, closeYear: '', closeQuarter: '' }))} className="px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700">{submitting ? 'Saving...' : editingItemId ? 'Update Project' : 'Save Project'}</button>
                         </div>
                     </div>
                 </div>
@@ -1593,11 +1627,11 @@ export default function B2BBoardPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Priority</label>
-                                    <select value={newLead.priority || 'Medium'} onChange={(e) => setNewLead((p: any) => ({ ...p, priority: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                        <option value="High">High</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="Low">Low</option>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Type <span className="text-zinc-400 normal-case font-medium">(weight)</span></label>
+                                    <select value={newLead.projectType || 'data'} onChange={(e) => setNewLead((p: any) => ({ ...p, projectType: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="data">Data (1x)</option>
+                                        <option value="dev">Dev (3x)</option>
+                                        <option value="survey">Survey (3x)</option>
                                     </select>
                                 </div>
                             </div>
@@ -1697,7 +1731,7 @@ export default function B2BBoardPage() {
                                         <Trash2 size={14} /> Delete
                                     </button>
                                 ) : <div></div>}
-                                <button disabled={submitting} onClick={() => handleSaveData('Lead', newLead, setNewLead, setIsAddingLead, () => setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '', closeYear: '', closeQuarter: '' }))} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase rounded-xl hover:bg-emerald-700">{submitting ? 'Saving...' : editingItemId ? 'Update Lead' : 'Save Lead'}</button>
+                                <button disabled={submitting} onClick={() => handleSaveData('Lead', newLead, setNewLead, setIsAddingLead, () => setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '', closeYear: '', closeQuarter: '' }))} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase rounded-xl hover:bg-emerald-700">{submitting ? 'Saving...' : editingItemId ? 'Update Lead' : 'Save Lead'}</button>
                             </div>
                             {editingItemId && editingItemType === 'Lead' && (
                                 <button onClick={() => handleConvertToProject(newLead)} className="w-full py-3 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-800 transition-all shadow-lg flex items-center justify-center gap-2">
@@ -1797,11 +1831,11 @@ export default function B2BBoardPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Priority</label>
-                                    <select value={newPartner.priority || 'Medium'} onChange={(e) => setNewPartner((p: any) => ({ ...p, priority: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                        <option value="High">High</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="Low">Low</option>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Project Type <span className="text-zinc-400 normal-case font-medium">(weight)</span></label>
+                                    <select value={newPartner.projectType || 'data'} onChange={(e) => setNewPartner((p: any) => ({ ...p, projectType: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="data">Data (1x)</option>
+                                        <option value="dev">Dev (3x)</option>
+                                        <option value="survey">Survey (3x)</option>
                                     </select>
                                 </div>
                             </div>
@@ -1829,7 +1863,7 @@ export default function B2BBoardPage() {
                                     <Trash2 size={14} /> Delete
                                 </button>
                             ) : <div></div>}
-                            <button disabled={submitting} onClick={() => handleSaveData('Partner', newPartner, setNewPartner, setIsAddingPartner, () => setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }))} className="px-6 py-2.5 bg-purple-600 text-white text-xs font-black uppercase rounded-xl hover:bg-purple-700">{submitting ? 'Saving...' : editingItemId ? 'Update Partner' : 'Save Partner'}</button>
+                            <button disabled={submitting} onClick={() => handleSaveData('Partner', newPartner, setNewPartner, setIsAddingPartner, () => setNewPartner({ name: '', pseId: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '' }))} className="px-6 py-2.5 bg-purple-600 text-white text-xs font-black uppercase rounded-xl hover:bg-purple-700">{submitting ? 'Saving...' : editingItemId ? 'Update Partner' : 'Save Partner'}</button>
                         </div>
                     </div>
                 </div>
@@ -1857,7 +1891,7 @@ export default function B2BBoardPage() {
 
                             <div className="space-y-6">
                                 <p className="text-sm text-zinc-600 leading-relaxed">
-                                    Beban kerja setiap anggota tim dihitung berdasarkan poin. Setiap tipe tugas memiliki **Bobot Dasar**, yang kemudian dikalikan dengan **Prioritas** tugas tersebut.
+                                    Beban kerja setiap anggota tim dihitung berdasarkan poin. Setiap tugas memiliki <b>Bobot Dasar</b>, lalu dikalikan dengan <b>Jenis Proyek</b>: <span className="font-black text-blue-600">Data</span> = 1x, <span className="font-black text-rose-600">Dev / Survey</span> = 3x.
                                 </p>
 
                                 <div className="bg-zinc-50 rounded-2xl overflow-hidden border border-zinc-100">
@@ -1865,29 +1899,29 @@ export default function B2BBoardPage() {
                                         <thead>
                                             <tr className="bg-zinc-100/50 border-b border-zinc-200">
                                                 <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Tipe Tugas</th>
-                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Low (0.5x)</th>
-                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Med (1.0x)</th>
-                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">High (1.5x)</th>
+                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Data (1x)</th>
+                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Dev (3x)</th>
+                                                <th className="px-4 py-3 font-black uppercase tracking-tighter text-zinc-500">Survey (3x)</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-zinc-200/50 font-bold text-zinc-700">
                                             <tr>
                                                 <td className="px-4 py-3 bg-blue-50/30 text-blue-700">Project (3 pts)</td>
-                                                <td className="px-4 py-3 text-center">1.5</td>
                                                 <td className="px-4 py-3 text-center bg-blue-50/50">3.0</td>
-                                                <td className="px-4 py-3 text-center text-rose-600">4.5</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">9.0</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">9.0</td>
                                             </tr>
                                             <tr>
                                                 <td className="px-4 py-3 bg-emerald-50/30 text-emerald-700">Lead (1 pt)</td>
-                                                <td className="px-4 py-3 text-center">0.5</td>
                                                 <td className="px-4 py-3 text-center bg-emerald-50/50">1.0</td>
-                                                <td className="px-4 py-3 text-center text-rose-600">1.5</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">3.0</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">3.0</td>
                                             </tr>
                                             <tr>
                                                 <td className="px-4 py-3 bg-purple-50/30 text-purple-700">Partner (1 pt)</td>
-                                                <td className="px-4 py-3 text-center">0.5</td>
                                                 <td className="px-4 py-3 text-center bg-purple-50/50">1.0</td>
-                                                <td className="px-4 py-3 text-center text-rose-600">1.5</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">3.0</td>
+                                                <td className="px-4 py-3 text-center text-rose-600">3.0</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -1897,7 +1931,7 @@ export default function B2BBoardPage() {
                                     <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center shrink-0 shadow-sm"><Target size={14} /></div>
                                     <div>
                                         <p className="text-xs font-black text-blue-900 uppercase tracking-tight mb-0.5">Kapasitas Maksimal (Limit)</p>
-                                        <p className="text-[11px] text-blue-700 leading-tight">Secara default, setiap PSE memiliki limit 30 poin. Status **Freeze**, **Done**, dan **Lost** tidak akan menambah beban poin.</p>
+                                        <p className="text-[11px] text-blue-700 leading-tight">Secara default, setiap PSE memiliki limit 30 poin. Status <b>Freeze</b>, <b>Done</b>, dan <b>Lost</b> tidak akan menambah beban poin.</p>
                                     </div>
                                 </div>
                             </div>

@@ -10,12 +10,13 @@ export default function WorkloadStats({ config }: { config: SiteConfig }) {
         );
     }
 
-    // Prepare chart data format
+    // Prepare chart data format. activeProjects/Leads/Partners are already
+    // weighted points (base × type multiplier), so don't multiply again.
     const chartData = config.pseWorkloads.map(p => ({
         name: p.name,
-        Projects: p.activeProjects * 3, // Weight 3
-        Leads: p.activeLeads * 1, // Weight 1
-        Partners: p.activePartners * 1, // Weight 1
+        Projects: p.activeProjects,
+        Leads: p.activeLeads,
+        Partners: p.activePartners,
         Total: p.totalPoints,
         Max: p.maxCapacity,
     }));
@@ -55,9 +56,9 @@ export default function WorkloadStats({ config }: { config: SiteConfig }) {
                                 <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12, fontWeight: 600, fill: '#3f3f46' }} />
                                 <Tooltip cursor={{ fill: '#f4f4f5' }} contentStyle={{ borderRadius: '12px', border: '1px solid #e4e4e7', fontWeight: 'bold', fontSize: '12px' }} />
                                 <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
-                                <Bar dataKey="Projects" stackId="a" fill="#10b981" name="Projects (x3)" />
-                                <Bar dataKey="Leads" stackId="a" fill="#f59e0b" name="Leads (x1)" />
-                                <Bar dataKey="Partners" stackId="a" fill="#8b5cf6" name="Partners (x1)" radius={[0, 4, 4, 0]} />
+                                <Bar dataKey="Projects" stackId="a" fill="#10b981" name="Projects (3pt × type)" />
+                                <Bar dataKey="Leads" stackId="a" fill="#f59e0b" name="Leads (1pt × type)" />
+                                <Bar dataKey="Partners" stackId="a" fill="#8b5cf6" name="Partners (1pt × type)" radius={[0, 4, 4, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

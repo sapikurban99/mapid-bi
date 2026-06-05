@@ -150,7 +150,8 @@ create table if not exists kanban_projects (
     close_date date,
     probability numeric default 0,
     close_year text,
-    close_quarter text
+    close_quarter text,
+    project_type text default 'data' check (project_type in ('data', 'dev', 'survey'))
 );
 
 -- 13. PSE Leads
@@ -178,7 +179,8 @@ create table if not exists pse_leads (
     proposal_link text,
     partner_id uuid references pse_partners(id) on delete set null,
     close_year text,
-    close_quarter text
+    close_quarter text,
+    project_type text default 'data' check (project_type in ('data', 'dev', 'survey'))
 );
 
 -- 14. PSE Partners
@@ -193,7 +195,8 @@ create table if not exists pse_partners (
     priority text default 'Medium',
     notes text,
     created_at timestamp with time zone default now(),
-    updated_at timestamp with time zone default now()
+    updated_at timestamp with time zone default now(),
+    project_type text default 'data' check (project_type in ('data', 'dev', 'survey'))
 );
 
 -- 15. Admin Config

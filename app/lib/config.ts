@@ -123,6 +123,7 @@ export interface KanbanProjectItem {
     stage: string;
     progress: number;
     priority: string;
+    projectType?: 'data' | 'dev' | 'survey';
     notes?: string;
     picSales?: string;
     contactName?: string;
@@ -143,6 +144,7 @@ export interface KanbanLeadItem {
     isClosed: boolean;
     progress?: number;
     priority?: string;
+    projectType?: 'data' | 'dev' | 'survey';
     notes?: string;
     // CRM Fields
     picSales?: string;
@@ -176,6 +178,7 @@ export interface KanbanPartnerItem {
     name: string;
     pseId: string;
     type: string;
+    projectType?: 'data' | 'dev' | 'survey';
     isActive: boolean;
     stage: string;
     progress?: number;

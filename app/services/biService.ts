@@ -156,6 +156,7 @@ export async function getAllBIData() {
       stage: r.stage,
       progress: r.progress_pct,
       priority: r.priority,
+      projectType: r.project_type || 'data',
       notes: r.notes || '',
       picSales: r.pic_sales || '',
       contactName: r.contact_name || '',
@@ -196,6 +197,7 @@ export async function getAllBIData() {
       stage: stage,
       progress: r.progress || 0,
       priority: r.priority || 'Medium',
+      projectType: r.project_type || 'data',
       notes: r.notes || '',
       picSales: r.pic_sales || '',
       contactName: r.contact_name || '',
@@ -227,6 +229,7 @@ export async function getAllBIData() {
     pseId: r.pse_id,
     isActive: r.is_active,
     type: r.type || 'Technology',
+    projectType: r.project_type || 'data',
     stage: r.stage || 'Sourcing',
     progress: r.progress || 0,
     priority: r.priority || 'Medium',
@@ -241,27 +244,26 @@ export async function getAllBIData() {
   const pseWorkloads = (pseMembers || []).map(pse => {
     const maxCap = pse.max_capacity || 30;
 
-    // Weight Multipliers
-    const getWeight = (prio: string) => {
-      const p = (prio || 'Medium').toLowerCase();
-      if (p === 'high') return 1.5;
-      if (p === 'low') return 0.5;
-      return 1.0;
+    // Weight Multipliers — by project type (data=1x, dev/survey=3x)
+    const getWeight = (projectType: string) => {
+      const t = (projectType || 'data').toLowerCase();
+      if (t === 'dev' || t === 'survey') return 3.0;
+      return 1.0; // data (default)
     };
 
-    const projItems = (kanbanProjects || []).filter(p => 
+    const projItems = (kanbanProjects || []).filter(p =>
       p.pse_id === pse.id && !['Done', 'Lost', 'Freeze'].includes(p.stage)
     );
-    const leadItems = (kanbanLeads || []).filter(l => 
+    const leadItems = (kanbanLeads || []).filter(l =>
       l.pse_id === pse.id && l.is_closed === false && l.stage !== 'Freeze'
     );
-    const partnerItems = (kanbanPartners || []).filter(p => 
+    const partnerItems = (kanbanPartners || []).filter(p =>
       p.pse_id === pse.id && p.is_active === true && p.stage !== 'Freeze'
     );
 
-    const projectPoints = projItems.reduce((sum, p) => sum + (3 * getWeight(p.priority)), 0);
-    const leadPoints = leadItems.reduce((sum, l) => sum + (1 * getWeight(l.priority)), 0);
-    const partnerPoints = partnerItems.reduce((sum, p) => sum + (1 * getWeight(p.priority)), 0);
+    const projectPoints = projItems.reduce((sum, p) => sum + (3 * getWeight(p.project_type)), 0);
+    const leadPoints = leadItems.reduce((sum, l) => sum + (1 * getWeight(l.project_type)), 0);
+    const partnerPoints = partnerItems.reduce((sum, p) => sum + (1 * getWeight(p.project_type)), 0);
 
     const totalPoints = projectPoints + leadPoints + partnerPoints;
     const loadPercentage = maxCap > 0 ? Math.round((totalPoints / maxCap) * 100) : 0;
@@ -334,6 +336,7 @@ export async function addKanbanProject(payload: any) {
     stage: payload.stage,
     progress_pct: payload.progress || 0,
     priority: payload.priority || 'Medium',
+    project_type: payload.projectType || 'data',
     notes: payload.notes || '',
     pic_sales: payload.picSales || null,
     contact_name: payload.contactName || null,
@@ -357,6 +360,7 @@ export async function editKanbanProject(id: string, payload: any) {
     stage: payload.stage,
     progress_pct: payload.progress || 0,
     priority: payload.priority || 'Medium',
+    project_type: payload.projectType || 'data',
     notes: payload.notes || '',
     pic_sales: payload.picSales || null,
     contact_name: payload.contactName || null,
@@ -380,6 +384,7 @@ export async function addKanbanLead(payload: any) {
     stage: payload.stage,
     progress: payload.progress || 0,
     priority: payload.priority || 'Medium',
+    project_type: payload.projectType || 'data',
     notes: payload.notes || '',
     pic_sales: payload.picSales || null,
     contact_name: payload.contactName || null,
@@ -408,6 +413,7 @@ export async function editKanbanLead(id: string, payload: any) {
     stage: payload.stage,
     progress: payload.progress || 0,
     priority: payload.priority || 'Medium',
+    project_type: payload.projectType || 'data',
     notes: payload.notes || '',
     pic_sales: payload.picSales || null,
     contact_name: payload.contactName || null,
@@ -440,6 +446,7 @@ export async function addKanbanPartner(payload: any) {
     pse_id: payload.pseId || null,
     is_active: true,
     type: payload.type,
+    project_type: payload.projectType || 'data',
     stage: payload.stage,
     progress: payload.progress || 0,
     priority: payload.priority || 'Medium',
@@ -459,6 +466,7 @@ export async function editKanbanPartner(id: string, payload: any) {
     pse_id: payload.pseId || null,
     is_active: payload.isActive !== undefined ? payload.isActive : true,
     type: payload.type,
+    project_type: payload.projectType || 'data',
     stage: payload.stage,
     progress: payload.progress || 0,
     priority: payload.priority || 'Medium',

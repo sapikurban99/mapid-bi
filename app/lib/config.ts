@@ -131,6 +131,8 @@ export interface KanbanProjectItem {
     nextStep?: string;
     closeDate?: string;
     probability?: number;
+    closeYear?: string;
+    closeQuarter?: string;
 }
 
 export interface KanbanLeadItem {
@@ -155,6 +157,8 @@ export interface KanbanLeadItem {
     nextStep?: string;
     proposalLink?: string;
     partnerId?: string;
+    closeYear?: string;
+    closeQuarter?: string;
 }
 
 export interface StandupTask {

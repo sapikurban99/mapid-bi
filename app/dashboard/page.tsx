@@ -137,8 +137,11 @@ export default function MinimalistDashboard() {
   const [revenueStartDate, setRevenueStartDate] = useState(defaultDates.start);
   const [revenueEndDate, setRevenueEndDate] = useState(defaultDates.end);
 
-  // B2B Quarter Filter State
+  // B2B Quarter & Year Filter State
   const [b2bQuarter, setB2bQuarter] = useState<'All' | 'Q1' | 'Q2' | 'Q3' | 'Q4'>('All');
+  const [b2bYear, setB2bYear] = useState<string>(currentY.toString());
+
+  const [consolidatedQuarter, setConsolidatedQuarter] = useState<'All' | 'Q1' | 'Q2' | 'Q3' | 'Q4'>('All');
 
   // Fetch Supabase revenue payments (dynamic date range)
   const supabasePaymentsUrl = `/api/revenue/payments?start_date=${revenueStartDate}&end_date=${revenueEndDate}`;
@@ -146,6 +149,13 @@ export default function MinimalistDashboard() {
 
   // Fetch Live Platform Data from DevServer (dynamic date range)
   const { allPayments, isLoading: platformLoading } = useGrowthData(revenueStartDate, revenueEndDate);
+
+  // Full year B2C fetches for consolidated Trends summary card
+  const yearStart = `${currentY}-01-01`;
+  const yearEnd = `${currentY}-12-31`;
+  const supabasePaymentsYearUrl = `/api/revenue/payments?start_date=${yearStart}&end_date=${yearEnd}`;
+  const { data: supabasePayYearData } = useSWR(supabasePaymentsYearUrl, apiFetcher, { revalidateOnFocus: false });
+  const { allPayments: allPaymentsYear } = useGrowthData(yearStart, yearEnd);
 
   useEffect(() => {
     setMounted(true);
@@ -298,25 +308,58 @@ export default function MinimalistDashboard() {
   // --- B2B Logic ---
   const filteredLeads = useMemo(() => {
     const leads = config?.kanbanLeads || [];
-    if (b2bQuarter === 'All') return leads;
     return leads.filter((l: any) => {
-      if (!l.expectedCloseDate) return false;
-      const month = new Date(l.expectedCloseDate).getMonth();
-      const quarter = `Q${Math.floor(month / 3) + 1}`;
-      return quarter === b2bQuarter;
+      let year = l.closeYear;
+      let quarter = l.closeQuarter;
+      
+      if (!year && !quarter) {
+        if (!l.expectedCloseDate) return false;
+        const date = new Date(l.expectedCloseDate);
+        if (isNaN(date.getTime())) return false;
+        year = date.getFullYear().toString();
+        quarter = `Q${Math.floor(date.getMonth() / 3) + 1}`;
+      } else if (!year && l.expectedCloseDate) {
+        const date = new Date(l.expectedCloseDate);
+        if (!isNaN(date.getTime())) year = date.getFullYear().toString();
+      } else if (!quarter && l.expectedCloseDate) {
+        const date = new Date(l.expectedCloseDate);
+        if (!isNaN(date.getTime())) quarter = `Q${Math.floor(date.getMonth() / 3) + 1}`;
+      }
+      
+      if (!year) return false;
+      const matchYear = year === b2bYear;
+      const matchQuarter = b2bQuarter === 'All' || !quarter || quarter === b2bQuarter;
+      return matchYear && matchQuarter;
     });
-  }, [config.kanbanLeads, b2bQuarter]);
+  }, [config.kanbanLeads, b2bQuarter, b2bYear]);
 
   const filteredProjects = useMemo(() => {
     const projects = config?.kanbanProjects || [];
-    if (b2bQuarter === 'All') return projects;
     return projects.filter((p: any) => {
-      if (!p.closeDate) return false;
-      const month = new Date(p.closeDate).getMonth();
-      const quarter = `Q${Math.floor(month / 3) + 1}`;
-      return quarter === b2bQuarter;
+      let year = p.closeYear;
+      let quarter = p.closeQuarter;
+      
+      // Fallback to closeDate parsing only if both year and quarter are missing
+      if (!year && !quarter) {
+        if (!p.closeDate) return false;
+        const date = new Date(p.closeDate);
+        if (isNaN(date.getTime())) return false;
+        year = date.getFullYear().toString();
+        quarter = `Q${Math.floor(date.getMonth() / 3) + 1}`;
+      } else if (!year && p.closeDate) {
+        const date = new Date(p.closeDate);
+        if (!isNaN(date.getTime())) year = date.getFullYear().toString();
+      } else if (!quarter && p.closeDate) {
+        const date = new Date(p.closeDate);
+        if (!isNaN(date.getTime())) quarter = `Q${Math.floor(date.getMonth() / 3) + 1}`;
+      }
+
+      if (!year) return false;
+      const matchYear = year === b2bYear;
+      const matchQuarter = b2bQuarter === 'All' || !quarter || quarter === b2bQuarter;
+      return matchYear && matchQuarter;
     });
-  }, [config.kanbanProjects, b2bQuarter]);
+  }, [config.kanbanProjects, b2bQuarter, b2bYear]);
 
   const b2bMetrics = useMemo(() => {
     const activeProjectsRev = filteredProjects.filter((p: any) => p.stage !== 'Done' && p.stage !== 'Lost' && p.stage !== 'Freeze').reduce((acc: number, curr: any) => acc + (Number(curr.forecastedValue) || 0), 0);
@@ -333,6 +376,97 @@ export default function MinimalistDashboard() {
         realizationProgress: Math.round((doneProjectsRev / (activeProjectsRev + doneProjectsRev + potentialRevenue || 1)) * 100)
     };
   }, [filteredLeads, filteredProjects]);
+
+  const consolidatedRevenue = useMemo(() => {
+    const quarters = {
+      Q1: { b2cAcademy: 0, b2cPlatform: 0, b2b: 0, total: 0 },
+      Q2: { b2cAcademy: 0, b2cPlatform: 0, b2b: 0, total: 0 },
+      Q3: { b2cAcademy: 0, b2cPlatform: 0, b2b: 0, total: 0 },
+      Q4: { b2cAcademy: 0, b2cPlatform: 0, b2b: 0, total: 0 },
+      All: { b2cAcademy: 0, b2cPlatform: 0, b2b: 0, total: 0 },
+    };
+
+    const academyPayments = supabasePayYearData?.payments || [];
+    academyPayments.forEach((p: any) => {
+      const amount = Number(p.amount) || 0;
+      const dateStr = p.payment_date || p.created_at;
+      if (!dateStr) return;
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return;
+      
+      const qIndex = Math.floor(date.getMonth() / 3) + 1;
+      if (qIndex >= 1 && qIndex <= 4) {
+        const qKey = `Q${qIndex}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
+        
+        if (p.category === 'MAPID Academy') {
+          quarters[qKey].b2cAcademy += amount;
+          quarters.All.b2cAcademy += amount;
+        }
+        
+        if (p.invoice_id && p.invoice_id.toLowerCase().startsWith('bus-exp')) {
+          quarters[qKey].b2cPlatform += amount;
+          quarters.All.b2cPlatform += amount;
+        }
+      }
+    });
+
+    const onlinePayments = allPaymentsYear || [];
+    onlinePayments.forEach((p: any) => {
+      if (!(p.status === 'success' && p.payment_methode?.toLowerCase() === 'midtrans')) return;
+      const amount = Number(p.detail_amount?.total || p.total || 0);
+      const dateStr = p.date_in || p.createdAt;
+      if (!dateStr) return;
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return;
+
+      const qIndex = Math.floor(date.getMonth() / 3) + 1;
+      if (qIndex >= 1 && qIndex <= 4) {
+        const qKey = `Q${qIndex}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
+        quarters[qKey].b2cPlatform += amount;
+        quarters.All.b2cPlatform += amount;
+      }
+    });
+
+    const b2bProjects = config?.kanbanProjects || [];
+    b2bProjects.forEach((p: any) => {
+      if (['Lost', 'Freeze'].includes(p.stage)) return;
+      const amount = Number(p.forecastedValue) || 0;
+      
+      let year = p.closeYear;
+      let quarter = p.closeQuarter;
+      
+      if (!year && !quarter) {
+        if (!p.closeDate) return;
+        const date = new Date(p.closeDate);
+        if (isNaN(date.getTime())) return;
+        year = date.getFullYear().toString();
+        quarter = `Q${Math.floor(date.getMonth() / 3) + 1}`;
+      } else if (!year && p.closeDate) {
+        const date = new Date(p.closeDate);
+        if (!isNaN(date.getTime())) year = date.getFullYear().toString();
+      } else if (!quarter && p.closeDate) {
+        const date = new Date(p.closeDate);
+        if (!isNaN(date.getTime())) quarter = `Q${Math.floor(date.getMonth() / 3) + 1}`;
+      }
+
+      if (!year) return;
+      if (year === currentY.toString()) {
+        if (quarter && ['Q1', 'Q2', 'Q3', 'Q4'].includes(quarter)) {
+          const qKey = quarter as 'Q1' | 'Q2' | 'Q3' | 'Q4';
+          quarters[qKey].b2b += amount;
+        }
+        // Always add to All total for the matching year
+        quarters.All.b2b += amount;
+      }
+    });
+
+    const keys = ['Q1', 'Q2', 'Q3', 'Q4', 'All'] as const;
+    keys.forEach(k => {
+      quarters[k].total = quarters[k].b2cAcademy + quarters[k].b2cPlatform + quarters[k].b2b;
+    });
+
+    return quarters;
+  }, [supabasePayYearData, allPaymentsYear, config.kanbanProjects]);
 
   // Pre-hydration check
   if (!mounted) {
@@ -534,6 +668,99 @@ export default function MinimalistDashboard() {
 
               {/* Data Summary Cards */}
               <div className="space-y-6">
+                {/* Consolidated B2C & B2B Revenue Card */}
+                <div className="bg-zinc-900 text-white border border-zinc-850 p-6 rounded-3xl relative overflow-hidden group shadow-lg">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[50px] rounded-full -mr-8 -mt-8"></div>
+                  
+                  <div className="relative z-10 flex justify-between items-center mb-4">
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Consolidated Revenue</h4>
+                      <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">B2C + B2B Progress</span>
+                    </div>
+                    <select
+                      value={consolidatedQuarter}
+                      onChange={(e: any) => setConsolidatedQuarter(e.target.value)}
+                      className="bg-zinc-800 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg border border-zinc-700 outline-none focus:ring-1 focus:ring-zinc-650 transition"
+                    >
+                      <option value="All">All Quarters</option>
+                      <option value="Q1">Q1</option>
+                      <option value="Q2">Q2</option>
+                      <option value="Q3">Q3</option>
+                      <option value="Q4">Q4</option>
+                    </select>
+                  </div>
+
+                  <div className="relative z-10 mb-6">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-550">Selected Period Total</span>
+                    <div className="text-2xl font-black tracking-tight mt-0.5">
+                      {formatIDR(consolidatedRevenue[consolidatedQuarter].total)}
+                    </div>
+                  </div>
+
+                  {/* Breakdown details */}
+                  <div className="relative z-10 space-y-3 pt-4 border-t border-zinc-800 text-xs">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span className="text-[10px] font-bold text-zinc-450">B2C Academy</span>
+                      </div>
+                      <span className="font-mono text-[11px] font-black text-emerald-400">
+                        {formatIDR(consolidatedRevenue[consolidatedQuarter].b2cAcademy)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                        <span className="text-[10px] font-bold text-zinc-450">B2C Platform</span>
+                      </div>
+                      <span className="font-mono text-[11px] font-black text-blue-400">
+                        {formatIDR(consolidatedRevenue[consolidatedQuarter].b2cPlatform)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                        <span className="text-[10px] font-bold text-zinc-450">B2B Projects</span>
+                      </div>
+                      <span className="font-mono text-[11px] font-black text-indigo-400">
+                        {formatIDR(consolidatedRevenue[consolidatedQuarter].b2b)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Simple Distribution / Progress Visual */}
+                  {consolidatedRevenue[consolidatedQuarter].total > 0 && (
+                    <div className="relative z-10 mt-6 pt-4 border-t border-zinc-800">
+                      <div className="flex justify-between text-[8px] font-black uppercase text-zinc-500 mb-2">
+                        <span>Revenue Distribution</span>
+                        <span>B2C vs B2B</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-emerald-400"
+                          style={{
+                            width: `${(consolidatedRevenue[consolidatedQuarter].b2cAcademy / consolidatedRevenue[consolidatedQuarter].total) * 100}%`
+                          }}
+                        ></div>
+                        <div
+                          className="h-full bg-blue-400"
+                          style={{
+                            width: `${(consolidatedRevenue[consolidatedQuarter].b2cPlatform / consolidatedRevenue[consolidatedQuarter].total) * 100}%`
+                          }}
+                        ></div>
+                        <div
+                          className="h-full bg-indigo-400"
+                          style={{
+                            width: `${(consolidatedRevenue[consolidatedQuarter].b2b / consolidatedRevenue[consolidatedQuarter].total) * 100}%`
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {validTrendData.slice().reverse().slice(0, 2).map((hist: any, idx: number) => (
                   <div key={idx} className={`bg-white border border-zinc-200 p-6 rounded-2xl group relative ${idx === 0 ? 'ring-2 ring-zinc-900 ring-offset-2 shadow-lg' : 'opacity-60'}`}>
                     <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
@@ -709,17 +936,30 @@ export default function MinimalistDashboard() {
                   Revenue & Financial Pipeline
                 </p>
               </div>
-              <select
-                value={b2bQuarter}
-                onChange={(e: any) => setB2bQuarter(e.target.value)}
-                className="bg-white border border-zinc-200 text-xs font-black uppercase px-4 py-3 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all shadow-sm w-full md:w-auto"
-              >
-                <option value="All">All Quarters</option>
-                <option value="Q1">Q1 Performance</option>
-                <option value="Q2">Q2 Performance</option>
-                <option value="Q3">Q3 Performance</option>
-                <option value="Q4">Q4 Performance</option>
-              </select>
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <select
+                  value={b2bYear}
+                  onChange={(e: any) => setB2bYear(e.target.value)}
+                  className="bg-white border border-zinc-200 text-xs font-black uppercase px-4 py-3 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all shadow-sm w-full md:w-auto"
+                >
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                  <option value="2028">2028</option>
+                </select>
+                <select
+                  value={b2bQuarter}
+                  onChange={(e: any) => setB2bQuarter(e.target.value)}
+                  className="bg-white border border-zinc-200 text-xs font-black uppercase px-4 py-3 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all shadow-sm w-full md:w-auto"
+                >
+                  <option value="All">All Quarters</option>
+                  <option value="Q1">Q1 Performance</option>
+                  <option value="Q2">Q2 Performance</option>
+                  <option value="Q3">Q3 Performance</option>
+                  <option value="Q4">Q4 Performance</option>
+                </select>
+              </div>
             </header>
 
             {/* Financial Overview (KPI Metrics) */}

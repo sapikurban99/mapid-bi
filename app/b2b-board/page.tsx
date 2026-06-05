@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useGlobalData } from '../components/GlobalDataProvider';
 import { getConfig, SiteConfig, setConfig } from '../lib/config';
-import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck, CheckCircle, Activity, Zap, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck, CheckCircle, Activity, Zap, Info, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 // --- Filter Chip Dropdown Component ---
@@ -153,6 +153,12 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName, onAddNote }: an
                     </div>
                 )}
 
+                {(p.closeQuarter || p.closeYear) && (
+                    <div className="flex items-center gap-1.5 mb-2 text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded-lg w-fit">
+                        <Clock size={10} /> Target: {p.closeQuarter || ''} {p.closeYear || ''}
+                    </div>
+                )}
+
                 {p.proposalLink && (
                     <button onClick={(e) => { e.stopPropagation(); window.open(p.proposalLink, '_blank'); }} className="flex items-center gap-1.5 mb-2 text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg w-fit transition-colors">
                         <ExternalLink size={10} /> Open Document
@@ -217,6 +223,12 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor, onAddN
                 {l.demoDate && (
                     <div className="flex items-center gap-1.5 mb-2 text-[9px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded-lg w-fit">
                         <Calendar size={10} /> Demo: {new Date(l.demoDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                )}
+
+                {(l.closeQuarter || l.closeYear) && (
+                    <div className="flex items-center gap-1.5 mb-2 text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded-lg w-fit">
+                        <Clock size={10} /> Target: {l.closeQuarter || ''} {l.closeYear || ''}
                     </div>
                 )}
 
@@ -551,8 +563,8 @@ export default function B2BBoardPage() {
     const [submitting, setSubmitting] = useState(false);
     
     // Forms State
-    const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', probability: 0.4 });
-    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '' });
+    const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', probability: 0.4, closeYear: '', closeQuarter: '' });
+    const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '', closeYear: '', closeQuarter: '' });
     const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' });
 
     const [editingItemType, setEditingItemType] = useState<'Project' | 'Lead' | 'Partner' | null>(null);
@@ -772,7 +784,9 @@ export default function B2BBoardPage() {
                 stage: 'Technical Handover',
                 progress: 0,
                 priority: lead.priority || 'Medium',
-                notes: lead.notes || ''
+                notes: lead.notes || '',
+                closeYear: lead.closeYear || '',
+                closeQuarter: lead.closeQuarter || '',
             };
             const addRes = await fetch('/api/bi', {
                 method: 'POST',
@@ -925,8 +939,8 @@ export default function B2BBoardPage() {
                 {/* GLOBAL ACTION BAR */}
                 <div className="flex justify-between items-center mb-6 animate-in fade-in duration-300">
                     <div>
-                        {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
-                        {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
+                        {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', closeYear: '', closeQuarter: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
+                        {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', closeYear: '', closeQuarter: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
                         {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', stage: 'Sourcing', progress: 0, priority: 'Medium', notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
                         {activeTab === 'stats' && <button onClick={() => setEditingMember({ pseId: '', name: '', maxCapacity: 30, isActive: true, isExisting: false })} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-zinc-900 text-white hover:bg-zinc-800"><Plus size={14} /> Add PSE Member</button>}
                         {activeTab === 'calendar' && <button onClick={() => { setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '', syncToPrivateEmail: false }); setIsAddingAgenda(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-indigo-600 text-white hover:bg-indigo-700"><Plus size={14} /> Add Agenda</button>}
@@ -1488,6 +1502,29 @@ export default function B2BBoardPage() {
                                     <input type="date" value={newProject.closeDate || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, closeDate: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
                                 </div>
                             </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Close Quarter</label>
+                                    <select value={newProject.closeQuarter || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, closeQuarter: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select Quarter...</option>
+                                        <option value="Q1">Q1</option>
+                                        <option value="Q2">Q2</option>
+                                        <option value="Q3">Q3</option>
+                                        <option value="Q4">Q4</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Close Year</label>
+                                    <select value={newProject.closeYear || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, closeYear: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select Year...</option>
+                                        <option value="2024">2024</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                        <option value="2027">2027</option>
+                                        <option value="2028">2028</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div>
                                 <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Next Step</label>
                                 <input type="text" value={newProject.nextStep || ''} onChange={(e) => setNewProject((p: any) => ({ ...p, nextStep: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" />
@@ -1516,7 +1553,7 @@ export default function B2BBoardPage() {
                                     <Trash2 size={14} /> Delete
                                 </button>
                             ) : <div></div>}
-                            <button disabled={submitting} onClick={() => handleSaveData('Project', newProject, setNewProject, setIsAddingProject, () => setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', closeDate: '', probability: 0.4 }))} className="px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700">{submitting ? 'Saving...' : editingItemId ? 'Update Project' : 'Save Project'}</button>
+                            <button disabled={submitting} onClick={() => handleSaveData('Project', newProject, setNewProject, setIsAddingProject, () => setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', closeDate: '', probability: 0.4, closeYear: '', closeQuarter: '' }))} className="px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700">{submitting ? 'Saving...' : editingItemId ? 'Update Project' : 'Save Project'}</button>
                         </div>
                     </div>
                 </div>
@@ -1607,6 +1644,30 @@ export default function B2BBoardPage() {
                                 <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Last Interacted</label><input type="date" value={newLead.lastInteractedOn || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, lastInteractedOn: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900" /></div>
                             </div>
 
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Close Quarter</label>
+                                    <select value={newLead.closeQuarter || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, closeQuarter: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select Quarter...</option>
+                                        <option value="Q1">Q1</option>
+                                        <option value="Q2">Q2</option>
+                                        <option value="Q3">Q3</option>
+                                        <option value="Q4">Q4</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Close Year</label>
+                                    <select value={newLead.closeYear || ''} onChange={(e) => setNewLead((p: any) => ({ ...p, closeYear: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                        <option value="">Select Year...</option>
+                                        <option value="2024">2024</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                        <option value="2027">2027</option>
+                                        <option value="2028">2028</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             {/* Progress */}
                             <div>
                                 <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-1.5 uppercase group relative">
@@ -1636,7 +1697,7 @@ export default function B2BBoardPage() {
                                         <Trash2 size={14} /> Delete
                                     </button>
                                 ) : <div></div>}
-                                <button disabled={submitting} onClick={() => handleSaveData('Lead', newLead, setNewLead, setIsAddingLead, () => setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '' }))} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase rounded-xl hover:bg-emerald-700">{submitting ? 'Saving...' : editingItemId ? 'Update Lead' : 'Save Lead'}</button>
+                                <button disabled={submitting} onClick={() => handleSaveData('Lead', newLead, setNewLead, setIsAddingLead, () => setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, priority: 'Medium', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '', closeYear: '', closeQuarter: '' }))} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-black uppercase rounded-xl hover:bg-emerald-700">{submitting ? 'Saving...' : editingItemId ? 'Update Lead' : 'Save Lead'}</button>
                             </div>
                             {editingItemId && editingItemType === 'Lead' && (
                                 <button onClick={() => handleConvertToProject(newLead)} className="w-full py-3 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-800 transition-all shadow-lg flex items-center justify-center gap-2">

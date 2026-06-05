@@ -46,9 +46,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data });
     }
 
-    const data = await getAllBIData();
+    // Server-side timeout: race getAllBIData against a 90s deadline
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Server-side timeout: getAllBIData took >90s')), 90000)
+    );
+
+    const data = await Promise.race([getAllBIData(), timeoutPromise]);
     return NextResponse.json(data);
   } catch (error: any) {
+    console.error('[API /bi GET]', error.message);
     return NextResponse.json({
       isError: true,
       title: 'Supabase Fetch Error',

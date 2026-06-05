@@ -141,7 +141,16 @@ create table if not exists kanban_projects (
     priority text default 'Medium',
     notes text,
     created_at timestamp with time zone default now(),
-    updated_at timestamp with time zone default now()
+    updated_at timestamp with time zone default now(),
+    pic_sales text,
+    contact_name text,
+    contact_number text,
+    forecasted_value numeric default 0,
+    next_step text,
+    close_date date,
+    probability numeric default 0,
+    close_year text,
+    close_quarter text
 );
 
 -- 13. PSE Leads
@@ -155,7 +164,21 @@ create table if not exists pse_leads (
     priority text default 'Medium',
     notes text,
     created_at timestamp with time zone default now(),
-    updated_at timestamp with time zone default now()
+    updated_at timestamp with time zone default now(),
+    pic_sales text,
+    contact_name text,
+    contact_number text,
+    contact_email text,
+    forecasted_value numeric default 0,
+    probability numeric default 0,
+    demo_date date,
+    expected_close_date date,
+    last_interacted_on date,
+    next_step text,
+    proposal_link text,
+    partner_id uuid references pse_partners(id) on delete set null,
+    close_year text,
+    close_quarter text
 );
 
 -- 14. PSE Partners

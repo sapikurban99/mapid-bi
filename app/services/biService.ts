@@ -137,23 +137,39 @@ export async function getAllBIData() {
   }));
 
   // --- Kanban Data ---
-  const mappedKanbanProjects = (kanbanProjects || []).map(r => ({
-    id: r.id,
-    client: r.client,
-    projectName: r.project_name,
-    pseId: r.pse_id,
-    stage: r.stage,
-    progress: r.progress_pct,
-    priority: r.priority,
-    notes: r.notes || '',
-    picSales: r.pic_sales || '',
-    contactName: r.contact_name || '',
-    contactNumber: r.contact_number || '',
-    forecastedValue: r.forecasted_value || 0,
-    nextStep: r.next_step || '',
-    closeDate: r.close_date || '',
-    probability: r.probability || 0,
-  }));
+  function getFallbackYearAndQuarter(dateStr?: string) {
+    if (!dateStr) return { year: '', quarter: '' };
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return { year: '', quarter: '' };
+    const year = d.getFullYear().toString();
+    const quarter = `Q${Math.floor(d.getMonth() / 3) + 1}`;
+    return { year, quarter };
+  }
+
+  const mappedKanbanProjects = (kanbanProjects || []).map(r => {
+    const fallback = getFallbackYearAndQuarter(r.close_date);
+    return {
+      id: r.id,
+      client: r.client,
+      projectName: r.project_name,
+      pseId: r.pse_id,
+      stage: r.stage,
+      progress: r.progress_pct,
+      priority: r.priority,
+      notes: r.notes || '',
+      picSales: r.pic_sales || '',
+      contactName: r.contact_name || '',
+      contactNumber: r.contact_number || '',
+      forecastedValue: r.forecasted_value || 0,
+      nextStep: r.next_step || '',
+      closeDate: r.close_date || '',
+      probability: r.probability || 0,
+      closeYear: r.close_year || fallback.year,
+      closeQuarter: r.close_quarter || fallback.quarter,
+    };
+  });
+
+  const leadsToFreeze: string[] = [];
 
   const mappedKanbanLeads = (kanbanLeads || []).map(r => {
     let stage = r.stage || 'Lead Generation';
@@ -166,10 +182,11 @@ export async function getAllBIData() {
       
       if (lastInteract < oneMonthAgo) {
         stage = 'Freeze';
-        // Fire-and-forget update to DB to sync state
-        supabase.from('pse_leads').update({ stage: 'Freeze' }).eq('id', r.id).then();
+        leadsToFreeze.push(r.id);
       }
     }
+
+    const fallback = getFallbackYearAndQuarter(r.expected_close_date);
 
     return {
       id: r.id,
@@ -192,8 +209,17 @@ export async function getAllBIData() {
       nextStep: r.next_step || '',
       proposalLink: r.proposal_link || '',
       partnerId: r.partner_id || '',
+      closeYear: r.close_year || fallback.year,
+      closeQuarter: r.close_quarter || fallback.quarter,
     };
   });
+
+  // Batch auto-freeze update (fire-and-forget, single query)
+  if (leadsToFreeze.length > 0) {
+    supabase.from('pse_leads').update({ stage: 'Freeze' }).in('id', leadsToFreeze).then(() => {
+      console.log(`[AutoFreeze] Froze ${leadsToFreeze.length} inactive leads`);
+    });
+  }
 
   const mappedKanbanPartners = (kanbanPartners || []).map(r => ({
     id: r.id,
@@ -316,6 +342,8 @@ export async function addKanbanProject(payload: any) {
     next_step: payload.nextStep || null,
     close_date: payload.closeDate || null,
     probability: payload.probability || 0,
+    close_year: payload.closeYear || null,
+    close_quarter: payload.closeQuarter || null,
   }).select('id').single();
   if (error) throw new Error(error.message);
   return { success: true, newId: data.id };
@@ -337,6 +365,8 @@ export async function editKanbanProject(id: string, payload: any) {
     next_step: payload.nextStep || null,
     close_date: payload.closeDate || null,
     probability: payload.probability || 0,
+    close_year: payload.closeYear || null,
+    close_quarter: payload.closeQuarter || null,
   }).eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };
@@ -363,6 +393,8 @@ export async function addKanbanLead(payload: any) {
     next_step: payload.nextStep || null,
     proposal_link: payload.proposalLink || null,
     partner_id: payload.partnerId || null,
+    close_year: payload.closeYear || null,
+    close_quarter: payload.closeQuarter || null,
   }).select('id').single();
   if (error) throw new Error(error.message);
   return { success: true, newId: data.id };
@@ -389,6 +421,8 @@ export async function editKanbanLead(id: string, payload: any) {
     next_step: payload.nextStep || null,
     proposal_link: payload.proposalLink || null,
     partner_id: payload.partnerId || null,
+    close_year: payload.closeYear || null,
+    close_quarter: payload.closeQuarter || null,
   }).eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };

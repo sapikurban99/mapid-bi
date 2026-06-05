@@ -31,17 +31,32 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
         if (isLoading && silent) return;
 
         if (!silent) setIsLoading(true);
-        try {
-            console.log(`[GlobalSync] ${new Date().toLocaleTimeString()} - Syncing data...`);
-            const res = await fetch('/api/bi', {
-                // Increased sync timeout to 60 seconds to prevent timeout on slower networks/loads
-                signal: AbortSignal.timeout(60000) 
-            });
 
-            if (!res.ok) {
-                throw new Error(`Server responded with ${res.status}: ${res.statusText}`);
+        const MAX_RETRIES = 1;
+        const TIMEOUT_MS = 120000; // 120 seconds
+
+        const attemptFetch = async (attempt: number): Promise<Response> => {
+            try {
+                console.log(`[GlobalSync] ${new Date().toLocaleTimeString()} - Syncing data${attempt > 0 ? ` (retry #${attempt})` : ''}...`);
+                const res = await fetch('/api/bi', {
+                    signal: AbortSignal.timeout(TIMEOUT_MS)
+                });
+                if (!res.ok) {
+                    throw new Error(`Server responded with ${res.status}: ${res.statusText}`);
+                }
+                return res;
+            } catch (err: any) {
+                if (attempt < MAX_RETRIES) {
+                    console.warn(`[GlobalSync] Attempt ${attempt + 1} failed (${err.name === 'TimeoutError' ? 'timeout' : err.message}), retrying...`);
+                    await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+                    return attemptFetch(attempt + 1);
+                }
+                throw err;
             }
+        };
 
+        try {
+            const res = await attemptFetch(0);
             const json = await res.json();
 
             if (json && !json.isError && !json.error) {
@@ -76,7 +91,7 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
             }
         } catch (error: any) {
             if (error.name === 'TimeoutError') {
-                console.error('[GlobalSync] Sync timed out after 60s');
+                console.error('[GlobalSync] Sync timed out after 120s (with retry)');
             } else {
                 console.error('[GlobalSync] Failed to sync global data:', error.message || error);
             }

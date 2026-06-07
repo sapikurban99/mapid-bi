@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useGlobalData } from '../components/GlobalDataProvider';
 import { getConfig, SiteConfig, setConfig } from '../lib/config';
-import { Globe, Loader2, LayoutDashboard, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck, CheckCircle, Activity, Zap, Info, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Globe, Loader2, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck, CheckCircle, Activity, Zap, Info, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 // --- Filter Chip Dropdown Component ---
@@ -359,7 +359,6 @@ export default function B2BBoardPage() {
     const [showArchived, setShowArchived] = useState(false);
     const [showPointsInfo, setShowPointsInfo] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedQuarter, setSelectedQuarter] = useState<'All' | 'Q1' | 'Q2' | 'Q3' | 'Q4'>('All');
 
 
     // Dynamic filter state: Record<columnName, selectedValues[]>
@@ -587,7 +586,7 @@ export default function B2BBoardPage() {
     const [submitting, setSubmitting] = useState(false);
     
     // Forms State
-    const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', probability: 0.4, closeYear: '', closeQuarter: '' });
+    const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', probability: 0.4, closeYear: '', closeQuarter: '', closeDate: '' });
     const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '', closeYear: '', closeQuarter: '' });
     const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' });
 
@@ -624,9 +623,6 @@ export default function B2BBoardPage() {
         'Done': 1.0,
         'Lost': 0
     };
-
-    // CRM Status mapping - keep CRM status as-is for leads
-    const CRM_STATUSES = ['Lead', 'Contacted', 'Demo/Call of Interest', 'Feasibility Check', 'Proposal made', 'Negotiation', 'POC', 'Won', 'Lost', 'Fridge'];
 
     useEffect(() => {
         setLocalConfig(getConfig());
@@ -811,6 +807,12 @@ export default function B2BBoardPage() {
                 notes: lead.notes || '',
                 closeYear: lead.closeYear || '',
                 closeQuarter: lead.closeQuarter || '',
+                picSales: lead.picSales || '',
+                contactName: lead.contactName || '',
+                contactNumber: lead.contactNumber || '',
+                forecastedValue: Number(lead.forecastedValue) || 0,
+                nextStep: lead.nextStep || '',
+                probability: lead.probability || 0.4,
             };
             const addRes = await fetch('/api/bi', {
                 method: 'POST',
@@ -933,6 +935,28 @@ export default function B2BBoardPage() {
         }
     };
 
+    const handleUpdateMaxCapacity = async (pseId: string, maxCapacity: number) => {
+        const newVal = Math.max(1, Math.min(100, maxCapacity || 1));
+        setLocalConfig((prev: any) => {
+            if (!prev) return prev;
+            const n = JSON.parse(JSON.stringify(prev));
+            const idx = n.pseWorkloads?.findIndex((m: any) => m.pseId === pseId);
+            if (idx > -1) n.pseWorkloads[idx].maxCapacity = newVal;
+            setConfig({ pseWorkloads: n.pseWorkloads });
+            return n;
+        });
+        try {
+            await fetch('/api/bi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'updatePseMember', pseId, maxCapacity: newVal }),
+            });
+            syncData({ silent: true });
+        } catch {
+            // silently fail, optimistic update already applied
+        }
+    };
+
     return (
         <main className="min-h-screen bg-zinc-50 font-sans">
             <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 sticky top-0 z-40 transition-all">
@@ -963,7 +987,7 @@ export default function B2BBoardPage() {
                 {/* GLOBAL ACTION BAR */}
                 <div className="flex justify-between items-center mb-6 animate-in fade-in duration-300">
                     <div>
-                        {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', closeYear: '', closeQuarter: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
+                        {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', closeYear: '', closeQuarter: '', closeDate: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
                         {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', closeYear: '', closeQuarter: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
                         {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
                         {activeTab === 'stats' && <button onClick={() => setEditingMember({ pseId: '', name: '', maxCapacity: 30, isActive: true, isExisting: false })} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-zinc-900 text-white hover:bg-zinc-800"><Plus size={14} /> Add PSE Member</button>}
@@ -1212,7 +1236,18 @@ export default function B2BBoardPage() {
                                                     </button>
                                                 </div>
                                                 <div className="flex items-center gap-3">
-                                                    <span className="text-[10px] font-black text-zinc-300 uppercase tracking-tighter">{pse.totalPoints} / {pse.maxCapacity} PTS</span>
+                                                    <span className="text-[10px] font-black text-zinc-300 uppercase tracking-tighter flex items-center gap-1">
+                                                        {pse.totalPoints || 0} /
+                                                        <input
+                                                            type="number"
+                                                            value={pse.maxCapacity || 0}
+                                                            onChange={(e) => handleUpdateMaxCapacity(pse.pseId, Number(e.target.value))}
+                                                            className="w-10 text-center bg-zinc-100 border border-zinc-200 hover:border-zinc-400 rounded-md px-1 py-0.5 text-[10px] font-black text-zinc-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-300 outline-none transition"
+                                                            min={1}
+                                                            max={100}
+                                                        />
+                                                        PTS
+                                                    </span>
                                                     <span className={`${pse.loadPercentage > 90 ? 'text-rose-500' : pse.loadPercentage > 70 ? 'text-amber-500' : 'text-emerald-500'}`}>{pse.loadPercentage}%</span>
                                                 </div>
                                             </div>
@@ -1223,7 +1258,7 @@ export default function B2BBoardPage() {
                                                 <span>{pse.activeProjectsCount} Proj</span>
                                                 <span>{pse.activeLeadsCount} Lead</span>
                                                 <span>{pse.activePartnersCount} Ptnr</span>
-                                                <span className="ml-auto text-zinc-300">Max: {pse.maxCapacity || 30}pts</span>
+                                                <span className="ml-auto text-zinc-300">Limit: {pse.maxCapacity || 30}pts</span>
                                             </div>
                                         </div>
                                     ))}
@@ -1767,10 +1802,24 @@ export default function B2BBoardPage() {
                             
                             <div>
                                 <label className="flex justify-between items-center text-[10px] font-bold text-zinc-700 mb-3 uppercase tracking-widest">
-                                    <span>Max Points Capacity</span>
-                                    <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-xs">{editingMember.maxCapacity} Pts</span>
+                                    <span>Max Points Capacity (Limit)</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <input
+                                            type="number"
+                                            value={editingMember.maxCapacity}
+                                            onChange={(e) => setEditingMember({ ...editingMember, maxCapacity: Math.max(1, Math.min(100, Number(e.target.value) || 1)) })}
+                                            className="w-14 text-center bg-white border border-zinc-300 rounded-lg px-2 py-1 text-xs font-black text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                                            min={1}
+                                            max={100}
+                                        />
+                                        <span className="text-[10px] text-zinc-400">Pts</span>
+                                    </div>
                                 </label>
-                                <input type="range" min="5" max="50" step="5" value={editingMember.maxCapacity} onChange={(e) => setEditingMember({ ...editingMember, maxCapacity: Number(e.target.value) })} className="w-full accent-zinc-900 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer" />
+                                <input type="range" min="1" max="100" step="1" value={editingMember.maxCapacity} onChange={(e) => setEditingMember({ ...editingMember, maxCapacity: Number(e.target.value) })} className="w-full accent-zinc-900 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer" />
+                                <div className="flex justify-between mt-1 text-[8px] font-bold text-zinc-300 uppercase">
+                                    <span>1 pt</span>
+                                    <span>100 pts</span>
+                                </div>
                             </div>
 
                             <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">

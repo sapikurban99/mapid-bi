@@ -120,6 +120,8 @@ export default function MinimalistDashboard() {
   
   // Use config from global provider
   const [config, setConfigState] = useState(() => getConfig());
+  const configRef = useRef(config);
+  useEffect(() => { configRef.current = config; }, [config]);
 
   // B2C Revenue date range filter (default: current quarter)
   const getQuarterDates = (q: number, y: number) => {
@@ -183,7 +185,7 @@ export default function MinimalistDashboard() {
   const handleSaveEdit = async () => {
     if (!editModal) return;
     setSaveStatus('saving');
-    const newConfig = JSON.parse(JSON.stringify(config));
+    const newConfig = JSON.parse(JSON.stringify(configRef.current));
     if (!newConfig.biData) newConfig.biData = {};
     if (!newConfig.biData[editModal.section]) newConfig.biData[editModal.section] = [];
 
@@ -204,7 +206,7 @@ export default function MinimalistDashboard() {
 
   const handleDeleteItem = async (section: string, index: number) => {
     if (!confirm('Delete this item?')) return;
-    const newConfig = JSON.parse(JSON.stringify(config));
+    const newConfig = JSON.parse(JSON.stringify(configRef.current));
     if (newConfig.biData?.[section]) {
       newConfig.biData[section].splice(index, 1);
       setConfigState(newConfig);
@@ -260,13 +262,6 @@ export default function MinimalistDashboard() {
         }
       }
     }
-
-    // Identify Current Quarter (e.g., "Q2 2026")
-    const now = new Date();
-    const currentQuarterStr = `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`;
-
-
-
 
   }, [data, activeTab, mounted]);
 
@@ -505,9 +500,9 @@ export default function MinimalistDashboard() {
     }
   };
 
-  const formatTrendLabel = (label: string) => {
-    // Bersihkan format ISO String jika ada date
-    if (typeof label === 'string' && label.includes('T')) {
+  const formatTrendLabel = (label: any) => {
+    if (typeof label !== 'string') return String(label ?? '');
+    if (label.includes('T')) {
       const date = new Date(label);
       if (!isNaN(date.getTime())) {
         return new Intl.DateTimeFormat('id-ID', {
@@ -541,10 +536,6 @@ export default function MinimalistDashboard() {
   };
 
   // --- CALCULATIONS ---
-  const activeRevenueData = data?.revenue || [];
-
-
-
 
   // --- LOGIC GRAFIK SVG PROPORSIONAL ---
   const currentTrendData = (Array.isArray(data?.trends) ? data.trends : [])

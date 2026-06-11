@@ -862,9 +862,9 @@ export default function MinimalistDashboard() {
                     <Zap size={48} className="text-emerald-600" />
                   </div>
                   <h4 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-6">MAPID Platform</h4>
-                  <div className="flex items-end gap-2 mb-2">
-                    <span className="text-4xl font-black tracking-tighter text-zinc-900">Rp {(b2cMetrics.platform.actual / 1000000).toFixed(1)}M</span>
-                    <span className="text-xs font-bold text-zinc-400 mb-2">/ {(b2cMetrics.platform.target / 1000000).toFixed(0)}M</span>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
+                    <span className="text-2xl xl:text-3xl font-black tracking-tighter text-zinc-900 whitespace-nowrap">{formatIDR(b2cMetrics.platform.actual)}</span>
+                    <span className="text-[10px] xl:text-xs font-bold text-zinc-400 whitespace-nowrap">/ {formatIDR(b2cMetrics.platform.target)}</span>
                   </div>
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">{b2cMetrics.platform.percent}% COMPLETE</span>
@@ -881,9 +881,9 @@ export default function MinimalistDashboard() {
                     <BookOpen size={48} className="text-blue-600" />
                   </div>
                   <h4 className="text-sm font-black uppercase tracking-widest text-zinc-400 mb-6">MAPID Academy</h4>
-                  <div className="flex items-end gap-2 mb-2">
-                    <span className="text-4xl font-black tracking-tighter text-zinc-900">Rp {(b2cMetrics.academy.actual / 1000000).toFixed(1)}M</span>
-                    <span className="text-xs font-bold text-zinc-400 mb-2">/ {(b2cMetrics.academy.target / 1000000).toFixed(0)}M</span>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
+                    <span className="text-2xl xl:text-3xl font-black tracking-tighter text-zinc-900 whitespace-nowrap">{formatIDR(b2cMetrics.academy.actual)}</span>
+                    <span className="text-[10px] xl:text-xs font-bold text-zinc-400 whitespace-nowrap">/ {formatIDR(b2cMetrics.academy.target)}</span>
                   </div>
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">{b2cMetrics.academy.percent}% COMPLETE</span>
@@ -898,8 +898,8 @@ export default function MinimalistDashboard() {
                 <div className="bg-zinc-900 p-8 rounded-3xl shadow-xl shadow-zinc-200 relative overflow-hidden group">
                   <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-950 -z-0"></div>
                   <h4 className="text-sm font-black uppercase tracking-widest text-zinc-500 mb-6 relative z-10">Total B2C Performance</h4>
-                  <div className="flex items-end gap-2 mb-2 relative z-10">
-                    <span className="text-5xl font-black tracking-tighter text-white">Rp {(b2cMetrics.total.actual / 1000000).toFixed(1)}M</span>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3 relative z-10">
+                    <span className="text-3xl xl:text-4xl font-black tracking-tighter text-white whitespace-nowrap">{formatIDR(b2cMetrics.total.actual)}</span>
                   </div>
                   <div className="flex justify-between items-center mb-4 relative z-10">
                     <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">GLOBAL ACHIEVEMENT</span>

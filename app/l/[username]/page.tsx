@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { notFound } from 'next/navigation';
-import { ExternalLink, Share2 } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { Metadata } from 'next';
 
 type Profile = {
@@ -96,16 +96,6 @@ export default async function PublicLinkPage({ params }: { params: Promise<{ use
                 {/* Profile Info */}
                 <h1 className="text-2xl font-bold text-zinc-900 mb-2 text-center">{profile.display_name}</h1>
                 <p className="text-base text-zinc-600 text-center mb-8 max-w-sm">{profile.bio}</p>
-
-                {/* Action Buttons (Optional Share) */}
-                <div className="absolute top-4 right-4 sm:fixed sm:top-6 sm:right-6">
-                    <button 
-                        className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-zinc-600 hover:text-zinc-900 transition hover:shadow-lg"
-                        title="Share"
-                    >
-                        <Share2 size={18} />
-                    </button>
-                </div>
 
                 {/* Links */}
                 <div className="w-full flex flex-col gap-4">

@@ -87,6 +87,7 @@ export async function getAllBIData() {
     platform: r.platform,
     metric: r.metric,
     value: r.value,
+    created_at: r.created_at,
   }));
 
   const mappedUserGrowth = (userGrowth || []).map(r => ({

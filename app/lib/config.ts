@@ -26,6 +26,7 @@ export interface SocialItem {
     platform: string;
     metric: string;
     value: number;
+    created_at?: string;
 }
 
 export interface CampaignItem {

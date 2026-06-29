@@ -111,6 +111,7 @@ export async function getAllBIData() {
     format: r.format,
     link: r.link,
     desc: r.description,
+    team: r.team || '',
   }));
 
   const mappedAcademy = (academy || []).map(r => ({
@@ -176,13 +177,13 @@ export async function getAllBIData() {
   const mappedKanbanLeads = (kanbanLeads || []).map(r => {
     let stage = r.stage || 'Lead Generation';
     
-    // Auto-freeze logic
-    if (r.last_interacted_on && stage !== 'Closed Lost' && stage !== 'Closed Won' && stage !== 'Done' && stage !== 'Freeze') {
-      const lastInteract = new Date(r.last_interacted_on);
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    // Auto-freeze logic — freeze leads not updated in 2 weeks
+    if (r.updated_at && stage !== 'Closed Lost' && stage !== 'Closed Won' && stage !== 'Done' && stage !== 'Freeze') {
+      const lastUpdate = new Date(r.updated_at);
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
       
-      if (lastInteract < oneMonthAgo) {
+      if (lastUpdate < twoWeeksAgo) {
         stage = 'Freeze';
         leadsToFreeze.push(r.id);
       }
@@ -256,17 +257,13 @@ export async function getAllBIData() {
       p.pse_id === pse.id && !['Done', 'Lost', 'Freeze'].includes(p.stage)
     );
     const leadItems = (kanbanLeads || []).filter(l =>
-      l.pse_id === pse.id && l.is_closed === false && l.stage !== 'Freeze'
-    );
-    const partnerItems = (kanbanPartners || []).filter(p =>
-      p.pse_id === pse.id && p.is_active === true && p.stage !== 'Freeze'
+      l.pse_id === pse.id && l.is_closed === false && !['Freeze', 'Closed Lost'].includes(l.stage)
     );
 
     const projectPoints = projItems.reduce((sum, p) => sum + (3 * getWeight(p.project_type)), 0);
     const leadPoints = leadItems.reduce((sum, l) => sum + (1 * getWeight(l.project_type)), 0);
-    const partnerPoints = partnerItems.reduce((sum, p) => sum + (1 * getWeight(p.project_type)), 0);
 
-    const totalPoints = projectPoints + leadPoints + partnerPoints;
+    const totalPoints = projectPoints + leadPoints;
     const loadPercentage = maxCap > 0 ? Math.round((totalPoints / maxCap) * 100) : 0;
 
     return {
@@ -274,10 +271,8 @@ export async function getAllBIData() {
       name: pse.name,
       activeProjectsCount: projItems.length,
       activeLeadsCount: leadItems.length,
-      activePartnersCount: partnerItems.length,
       activeProjects: projectPoints, // For Charts
       activeLeads: leadPoints,        // For Charts
-      activePartners: partnerPoints,  // For Charts
       totalPoints,
       maxCapacity: maxCap,
       loadPercentage,
@@ -444,7 +439,7 @@ export async function updateKanbanLead(leadId: string, newStage: string) {
 export async function addKanbanPartner(payload: any) {
   const { data, error } = await supabase.from('pse_partners').insert({
     partner_name: payload.name,
-    pse_id: payload.pseId || null,
+    pse_id: null,
     is_active: true,
     type: payload.type,
     project_type: payload.projectType || 'data',
@@ -464,7 +459,7 @@ export async function addKanbanPartner(payload: any) {
 export async function editKanbanPartner(id: string, payload: any) {
   const { error } = await supabase.from('pse_partners').update({
     partner_name: payload.name,
-    pse_id: payload.pseId || null,
+    pse_id: null,
     is_active: payload.isActive !== undefined ? payload.isActive : true,
     type: payload.type,
     project_type: payload.projectType || 'data',
@@ -665,7 +660,7 @@ async function syncBiDataToTables(biData: any) {
     await replaceTable('projects', biData.projects.map((r: any) => ({ name: r.name, phase: r.phase, progress: r.progress, issue: r.issue })));
   }
   if (biData.docs) {
-    await replaceTable('docs', biData.docs.map((r: any) => ({ title: r.title, category: r.category, format: r.format, link: r.link, description: r.desc })));
+    await replaceTable('docs', biData.docs.map((r: any) => ({ title: r.title, category: r.category, format: r.format, link: r.link, description: r.desc, team: r.team || '' })));
   }
   if (biData.trends) {
     await replaceTable('trends', biData.trends.map((r: any) => ({ timeframe: r.category || 'month', label: r.label, revenue_m: r.revenue, dealsizeavg_m: r.dealSize })));

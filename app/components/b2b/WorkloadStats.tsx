@@ -16,7 +16,6 @@ export default function WorkloadStats({ config }: { config: SiteConfig }) {
         name: p.name,
         Projects: p.activeProjects,
         Leads: p.activeLeads,
-        Partners: p.activePartners,
         Total: p.totalPoints,
         Max: p.maxCapacity,
     }));
@@ -57,8 +56,7 @@ export default function WorkloadStats({ config }: { config: SiteConfig }) {
                                 <Tooltip cursor={{ fill: '#f4f4f5' }} contentStyle={{ borderRadius: '12px', border: '1px solid #e4e4e7', fontWeight: 'bold', fontSize: '12px' }} />
                                 <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
                                 <Bar dataKey="Projects" stackId="a" fill="#10b981" name="Projects (3pt × type)" />
-                                <Bar dataKey="Leads" stackId="a" fill="#f59e0b" name="Leads (1pt × type)" />
-                                <Bar dataKey="Partners" stackId="a" fill="#8b5cf6" name="Partners (1pt × type)" radius={[0, 4, 4, 0]} />
+                                <Bar dataKey="Leads" stackId="a" fill="#f59e0b" name="Leads (1pt × type)" radius={[0, 4, 4, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -77,7 +75,6 @@ export default function WorkloadStats({ config }: { config: SiteConfig }) {
                                 <th className="px-6 py-4">PSE Name</th>
                                 <th className="px-6 py-4 text-center">Projects</th>
                                 <th className="px-6 py-4 text-center">Leads</th>
-                                <th className="px-6 py-4 text-center">Partners</th>
                                 <th className="px-6 py-4 text-center">Total Points</th>
                                 <th className="px-6 py-4 w-48">Load %</th>
                             </tr>
@@ -88,7 +85,6 @@ export default function WorkloadStats({ config }: { config: SiteConfig }) {
                                     <td className="px-6 py-4 font-bold text-zinc-900">{pse.name}</td>
                                     <td className="px-6 py-4 text-center font-medium">{pse.activeProjects}</td>
                                     <td className="px-6 py-4 text-center font-medium">{pse.activeLeads}</td>
-                                    <td className="px-6 py-4 text-center font-medium">{pse.activePartners}</td>
                                     <td className="px-6 py-4 text-center font-black text-blue-600">{pse.totalPoints} <span className="text-[10px] text-zinc-400 font-medium ml-1">/ {pse.maxCapacity}</span></td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">

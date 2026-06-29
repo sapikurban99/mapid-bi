@@ -302,8 +302,7 @@ const PartnerCard = ({ partner: p, onEdit, onDelete, getPseName, getStageColor, 
                 <h3 className="font-bold text-purple-950 text-base mb-1">{p.name}</h3>
                 
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 mb-2">
-                    {p.picPartner && <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-widest"><UserCheck size={9} className="inline mr-0.5 -mt-0.5" /> PIC: <span className="text-amber-800">{p.picPartner}</span></p>}
-                    <p className="text-[10px] font-black text-purple-600/70 uppercase tracking-widest">PSE: <span className="text-purple-800">{getPseName(p.pseId)}</span></p>
+                    {p.picPartner && <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-widest"><UserCheck size={9} className="inline mr-0.5 -mt-0.5" /> Sales: <span className="text-amber-800">{p.picPartner}</span></p>}
                 </div>
 
                 {(p.contactName || p.contactNumber) && (
@@ -359,6 +358,7 @@ export default function B2BBoardPage() {
     const [showArchived, setShowArchived] = useState(false);
     const [showPointsInfo, setShowPointsInfo] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [pseDetailModal, setPseDetailModal] = useState<{ pseId: string; name: string; tab: 'projects' | 'leads' } | null>(null);
 
 
     // Dynamic filter state: Record<columnName, selectedValues[]>
@@ -588,7 +588,7 @@ export default function B2BBoardPage() {
     // Forms State
     const [newProject, setNewProject] = useState<any>({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactNumber: '', forecastedValue: 0, nextStep: '', probability: 0.4, closeYear: '', closeQuarter: '', closeDate: '' });
     const [newLead, setNewLead] = useState<any>({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', partnerId: '', closeYear: '', closeQuarter: '' });
-    const [newPartner, setNewPartner] = useState<any>({ name: '', pseId: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' });
+    const [newPartner, setNewPartner] = useState<any>({ name: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' });
 
     const [editingItemType, setEditingItemType] = useState<'Project' | 'Lead' | 'Partner' | null>(null);
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -684,7 +684,6 @@ export default function B2BBoardPage() {
         return {
             stages: [...new Set(partners.map((p: any) => p.stage || 'Sourcing'))].sort(),
             projectTypes: ['data', 'dev', 'survey'],
-            pse: [...new Set(partners.map((p: any) => getPseName(p.pseId)).filter(Boolean))].sort(),
             types: [...new Set(partners.map((p: any) => p.type).filter(Boolean))].sort(),
         };
     }, [config?.kanbanPartners]);
@@ -726,7 +725,6 @@ export default function B2BBoardPage() {
         return config?.kanbanPartners?.filter((p: any) => {
             if ((p.stage || 'Sourcing') !== stage) return false;
             if (filters.projectType && !filters.projectType.includes(p.projectType || 'data')) return false;
-            if (filters.pse && !filters.pse.includes(getPseName(p.pseId))) return false;
             if (filters.type && !filters.type.includes(p.type)) return false;
             if (!matchesSearch(p)) return false;
             return true;
@@ -989,7 +987,7 @@ export default function B2BBoardPage() {
                     <div>
                         {activeTab === 'projects' && <button onClick={() => { setEditingItemId(null); setNewProject({ client: '', projectName: '', pseId: '', stage: 'Technical Handover', progress: 0, projectType: 'data', notes: '', closeYear: '', closeQuarter: '', closeDate: '' }); setIsAddingProject(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-blue-600 text-white hover:bg-blue-700"><Plus size={14} /> Add Project</button>}
                         {activeTab === 'leads' && <button onClick={() => { setEditingItemId(null); setNewLead({ name: '', pseId: '', stage: 'Lead Generation', progress: 0, projectType: 'data', notes: '', picSales: '', contactName: '', contactEmail: '', contactNumber: '', forecastedValue: 0, probability: 0, demoDate: '', expectedCloseDate: '', lastInteractedOn: '', nextStep: '', proposalLink: '', closeYear: '', closeQuarter: '' }); setIsAddingLead(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-emerald-600 text-white hover:bg-emerald-700"><Plus size={14} /> Add Lead Support</button>}
-                        {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', pseId: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
+                        {activeTab === 'partners' && <button onClick={() => { setEditingItemId(null); setNewPartner({ name: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' }); setIsAddingPartner(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-purple-600 text-white hover:bg-purple-700"><Plus size={14} /> Add Partner</button>}
                         {activeTab === 'stats' && <button onClick={() => setEditingMember({ pseId: '', name: '', maxCapacity: 30, isActive: true, isExisting: false })} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-zinc-900 text-white hover:bg-zinc-800"><Plus size={14} /> Add PSE Member</button>}
                         {activeTab === 'calendar' && <button onClick={() => { setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '', syncToPrivateEmail: false }); setIsAddingAgenda(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-indigo-600 text-white hover:bg-indigo-700"><Plus size={14} /> Add Agenda</button>}
                     </div>
@@ -1052,7 +1050,6 @@ export default function B2BBoardPage() {
                                 <>
                                     <FilterChipDropdown label="Stage" options={getUniquePartnerValues.stages} selected={filters.stage || []} onChange={(v) => updateFilter('stage', v)} color="purple" />
                                     <FilterChipDropdown label="Type" options={getUniquePartnerValues.projectTypes} selected={filters.projectType || []} onChange={(v) => updateFilter('projectType', v)} color="rose" />
-                                    <FilterChipDropdown label="PSE" options={getUniquePartnerValues.pse} selected={filters.pse || []} onChange={(v) => updateFilter('pse', v)} color="zinc" />
                                     <FilterChipDropdown label="Partner Type" options={getUniquePartnerValues.types} selected={filters.type || []} onChange={(v) => updateFilter('type', v)} color="amber" />
                                 </>
                             )}
@@ -1215,8 +1212,7 @@ export default function B2BBoardPage() {
                                             <Tooltip cursor={{ fill: '#f4f4f5' }} labelStyle={{ color: "#18181b", fontWeight: 900, fontSize: "14px", marginBottom: "8px" }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }} />
                                             <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }} />
                                             <Bar dataKey="activeProjects" name="Projects (Weight)" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-                                            <Bar dataKey="activeLeads" name="Leads (Weight)" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                                            <Bar dataKey="activePartners" name="Partners (Weight)" stackId="a" fill="#a855f7" radius={[0, 4, 4, 0]} />
+                                            <Bar dataKey="activeLeads" name="Leads (Weight)" stackId="a" fill="#10b981" radius={[0, 4, 4, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -1255,9 +1251,8 @@ export default function B2BBoardPage() {
                                                 <div className={`h-full rounded-full transition-all duration-1000 ${pse.loadPercentage > 90 ? 'bg-rose-500' : pse.loadPercentage > 70 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${Math.min(pse.loadPercentage, 100)}%` }}></div>
                                             </div>
                                             <div className="flex gap-4 mt-2 text-[9px] font-black uppercase tracking-widest text-zinc-400">
-                                                <span>{pse.activeProjectsCount} Proj</span>
-                                                <span>{pse.activeLeadsCount} Lead</span>
-                                                <span>{pse.activePartnersCount} Ptnr</span>
+                                                <button onClick={() => setPseDetailModal({ pseId: pse.pseId, name: pse.name, tab: 'projects' })} className="hover:text-blue-600 hover:underline transition">{pse.activeProjectsCount} Proj</button>
+                                                <button onClick={() => setPseDetailModal({ pseId: pse.pseId, name: pse.name, tab: 'leads' })} className="hover:text-emerald-600 hover:underline transition">{pse.activeLeadsCount} Lead</button>
                                                 <span className="ml-auto text-zinc-300">Limit: {pse.maxCapacity || 30}pts</span>
                                             </div>
                                         </div>
@@ -1857,19 +1852,11 @@ export default function B2BBoardPage() {
                                 <div><label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase"><Phone size={10} className="inline mr-1 -mt-0.5" />Contact Number</label><input type="text" value={newPartner.contactNumber || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, contactNumber: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-medium text-zinc-900" /></div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC Sales</label>
-                                    <select value={newPartner.picPartner || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, picPartner: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                        <option value="">Select Sales...</option>{SALES_TEAM.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">PIC (PSE)</label>
-                                    <select value={newPartner.pseId} onChange={(e) => setNewPartner((p: any) => ({ ...p, pseId: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
-                                        <option value="">Select...</option>{config.pseWorkloads?.map(pse => <option key={pse.pseId} value={pse.pseId}>{pse.name}</option>)}
-                                    </select>
-                                </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-zinc-700 mb-1.5 uppercase">Sales</label>
+                                <select value={newPartner.picPartner || ''} onChange={(e) => setNewPartner((p: any) => ({ ...p, picPartner: e.target.value }))} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium text-zinc-900">
+                                    <option value="">Select Sales...</option>{SALES_TEAM.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -1912,7 +1899,7 @@ export default function B2BBoardPage() {
                                     <Trash2 size={14} /> Delete
                                 </button>
                             ) : <div></div>}
-                            <button disabled={submitting} onClick={() => handleSaveData('Partner', newPartner, setNewPartner, setIsAddingPartner, () => setNewPartner({ name: '', pseId: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '' }))} className="px-6 py-2.5 bg-purple-600 text-white text-xs font-black uppercase rounded-xl hover:bg-purple-700">{submitting ? 'Saving...' : editingItemId ? 'Update Partner' : 'Save Partner'}</button>
+                            <button disabled={submitting} onClick={() => handleSaveData('Partner', newPartner, setNewPartner, setIsAddingPartner, () => setNewPartner({ name: '', type: 'Technology', projectType: 'data', stage: 'Sourcing', progress: 0, notes: '', picPartner: '', contactName: '', contactNumber: '', nextStep: '' }))} className="px-6 py-2.5 bg-purple-600 text-white text-xs font-black uppercase rounded-xl hover:bg-purple-700">{submitting ? 'Saving...' : editingItemId ? 'Update Partner' : 'Save Partner'}</button>
                         </div>
                     </div>
                 </div>
@@ -2146,6 +2133,48 @@ export default function B2BBoardPage() {
                             <button onClick={() => setSelectedCalendarEvent(null)} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white transition-colors">
                                 Close
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== PSE DETAIL MODAL (Projects/Leads list) ========== */}
+            {pseDetailModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[80vh]">
+                        <div className="flex items-center justify-between p-6 border-b border-zinc-100">
+                            <div>
+                                <h3 className="text-lg font-black text-zinc-900">{pseDetailModal.name}</h3>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mt-1">
+                                    {pseDetailModal.tab === 'projects' ? 'Active Projects' : 'Active Leads'}
+                                </p>
+                            </div>
+                            <button onClick={() => setPseDetailModal(null)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto custom-scrollbar space-y-2">
+                            {(() => {
+                                const items = pseDetailModal.tab === 'projects'
+                                    ? (config?.kanbanProjects || []).filter((p: any) => p.pseId === pseDetailModal.pseId && !['Done', 'Lost', 'Freeze'].includes(p.stage))
+                                    : (config?.kanbanLeads || []).filter((l: any) => l.pseId === pseDetailModal.pseId && l.isClosed === false && !['Freeze', 'Closed Lost'].includes(l.stage));
+                                if (items.length === 0) {
+                                    return <div className="text-center py-8 text-zinc-300 italic text-xs">No active {pseDetailModal.tab}.</div>;
+                                }
+                                return items.map((item: any) => (
+                                    <div key={item.id} className={`p-3 rounded-xl border flex justify-between items-center ${pseDetailModal.tab === 'projects' ? 'bg-blue-50/50 border-blue-100' : 'bg-emerald-50/50 border-emerald-100'}`}>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-zinc-900 truncate">{pseDetailModal.tab === 'projects' ? (item.client || item.projectName) : item.name}</p>
+                                            <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-0.5">{item.stage}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {item.forecastedValue > 0 && <span className="text-[9px] font-black text-emerald-600">IDR {(item.forecastedValue / 1000000).toFixed(0)}M</span>}
+                                            <span className="text-[9px] font-black text-zinc-400">{item.progress || 0}%</span>
+                                        </div>
+                                    </div>
+                                ));
+                            })()}
+                        </div>
+                        <div className="p-6 border-t border-zinc-100 flex justify-end">
+                            <button onClick={() => setPseDetailModal(null)} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white transition-colors">Close</button>
                         </div>
                     </div>
                 </div>

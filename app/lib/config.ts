@@ -68,6 +68,7 @@ export interface DocItem {
     link: string;
     format: 'Doc' | 'Sheet' | 'Folder';
     category: string;
+    team?: string;
 }
 
 export interface TrendPoint {
@@ -196,10 +197,8 @@ export interface KanbanPSEWorkload {
     name: string;
     activeProjects: number; // Weighted Points sum
     activeLeads: number;    // Weighted Points sum
-    activePartners: number; // Weighted Points sum
     activeProjectsCount: number;
     activeLeadsCount: number;
-    activePartnersCount: number;
     totalPoints: number;
     maxCapacity: number;
     loadPercentage: number;

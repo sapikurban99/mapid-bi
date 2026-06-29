@@ -8,10 +8,11 @@ import Link from 'next/link';
 const BI_EDIT_CONFIG: Record<string, any> = {
   docs: {
     title: 'Document / Asset',
-    empty: { title: '', desc: '', category: '', format: 'File', link: '' },
+    empty: { title: '', desc: '', category: '', format: 'File', link: '', team: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'desc', label: 'Description', type: 'text' },
+      { key: 'team', label: 'Team', type: 'select', options: ['B2B', 'B2C', 'PSE'] },
       { key: 'category', label: 'Category', type: 'text' },
       { key: 'format', label: 'Format', type: 'select', options: ['Folder', 'Sheet', 'File'] },
       { key: 'link', label: 'URL Link', type: 'text' },
@@ -56,6 +57,7 @@ export default function GalleryConfigPage() {
   const { isLoading: globalIsLoading, syncData } = useGlobalData();
   const [config, setConfigState] = useState(() => getConfig());
   const [galleryCategory, setGalleryCategory] = useState('All');
+  const [teamFilter, setTeamFilter] = useState('All');
   
   const [editModal, setEditModal] = useState<{ section: string; index: number; data: any } | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -113,7 +115,8 @@ export default function GalleryConfigPage() {
   const uniqueGalleryCategories = ['All', ...Array.from(new Set(docsData.map((d: any) => d.category).filter(Boolean)))];
 
   const filteredDocs = docsData.filter((d: any) =>
-    galleryCategory === 'All' || d.category === galleryCategory
+    (galleryCategory === 'All' || d.category === galleryCategory) &&
+    (teamFilter === 'All' || d.team === teamFilter)
   );
 
   return (
@@ -138,6 +141,16 @@ export default function GalleryConfigPage() {
       </header>
 
       <div className="max-w-6xl mx-auto py-12 px-6">
+        {/* Team Tabs */}
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto hide-scrollbar">
+          {['All', 'B2B', 'B2C', 'PSE'].map(t => (
+            <button key={t} onClick={() => setTeamFilter(t)}
+              className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl border transition-all whitespace-nowrap ${teamFilter === t ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'}`}>
+              {t === 'All' ? 'All Teams' : t}
+            </button>
+          ))}
+        </div>
+
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Knowledge Base & Assets</h3>
           <div className="flex gap-3 items-center">
@@ -165,7 +178,10 @@ export default function GalleryConfigPage() {
                     <span className="p-3 bg-zinc-50 rounded-xl group-hover:bg-zinc-100 transition text-zinc-900">
                       {doc.format === 'Folder' ? <FolderOpen size={24} /> : doc.format === 'Sheet' ? <TableProperties size={24} /> : <FileText size={24} />}
                     </span>
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-300">{doc.category}</span>
+                    <div className="flex flex-col items-end gap-1">
+                      {doc.team && <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-zinc-900 text-white">{doc.team}</span>}
+                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-300">{doc.category}</span>
+                    </div>
                   </div>
                   <h4 className="text-xl font-black tracking-tight mb-2 leading-tight">{doc.title}</h4>
                   <p className="text-xs text-zinc-400 leading-relaxed mb-8 line-clamp-2 italic">{doc.desc}</p>

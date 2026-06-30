@@ -3,17 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/cron.js & next dev",
+    "dev": "next dev",
     "build": "next build",
-    "start": "node scripts/cron.js & next start",
+    "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.102.1",
     "dotenv": "^17.4.1",
+    "imapflow": "^1.4.3",
     "lucide-react": "^0.575.0",
+    "mailparser": "^3.9.12",
     "next": "16.1.6",
-    "node-cron": "^4.5.0",
     "pdf-parse": "^2.4.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^20",
     "@types/node-cron": "^3.0.11",
     "@types/react": "^19",

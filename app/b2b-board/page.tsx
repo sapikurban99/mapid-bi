@@ -4,6 +4,7 @@ import { useGlobalData } from '../components/GlobalDataProvider';
 import { getConfig, SiteConfig, setConfig } from '../lib/config';
 import { Globe, Loader2, Plus, X, Briefcase, Users, Target, BarChart3, Trash2, HelpCircle, Search, Filter, ChevronDown, ExternalLink, Phone, Mail, DollarSign, Calendar, UserCheck, CheckCircle, Activity, Zap, Info, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
+import ReactMarkdown from 'react-markdown';
 
 // --- Filter Chip Dropdown Component ---
 const FilterChipDropdown = ({ label, options, selected, onChange, color = 'blue' }: {
@@ -364,6 +365,8 @@ export default function B2BBoardPage() {
     const [emailStatusModal, setEmailStatusModal] = useState<{ clientName: string; itemType: 'Project' | 'Lead'; itemId: string } | null>(null);
     const [clientRawEmails, setClientRawEmails] = useState<any[]>([]);
     const [loadingEmails, setLoadingEmails] = useState(false);
+    const [aiSummary, setAiSummary] = useState<string | null>(null);
+    const [isSummarizing, setIsSummarizing] = useState(false);
 
 
     // Dynamic filter state: Record<columnName, selectedValues[]>
@@ -398,6 +401,7 @@ export default function B2BBoardPage() {
     const fetchEmailUpdates = async (clientName: string) => {
         setLoadingEmails(true);
         setClientRawEmails([]);
+        setAiSummary(null);
         try {
             const res = await fetch(`/api/bi/email-updates?client=${encodeURIComponent(clientName)}`);
             const data = await res.json();
@@ -408,6 +412,30 @@ export default function B2BBoardPage() {
             console.error('Failed to fetch email updates:', error);
         } finally {
             setLoadingEmails(false);
+        }
+    };
+
+    const handleGenerateSummary = async (clientName: string) => {
+        if (clientRawEmails.length === 0) return;
+        setIsSummarizing(true);
+        setAiSummary(null);
+        try {
+            const res = await fetch('/api/bi/ai-summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emails: clientRawEmails, clientName })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setAiSummary(data.summary);
+            } else {
+                alert('Failed to generate summary: ' + data.message);
+            }
+        } catch (error) {
+            console.error('AI Summary Error:', error);
+            alert('Failed to generate summary due to a network error.');
+        } finally {
+            setIsSummarizing(false);
         }
     };
 
@@ -2227,6 +2255,34 @@ export default function B2BBoardPage() {
                                 </div>
                             ) : (
                                 <div className="relative border-l-2 border-zinc-100 ml-3 space-y-8 pb-4">
+                                    <div className="pl-6 mb-6">
+                                        <button 
+                                            onClick={() => handleGenerateSummary(emailStatusModal.clientName)}
+                                            disabled={isSummarizing}
+                                            className="w-full flex items-center justify-center gap-2 bg-zinc-900 text-white py-3 px-4 rounded-xl hover:bg-zinc-800 disabled:opacity-50 transition-colors font-medium text-sm shadow-sm"
+                                        >
+                                            {isSummarizing ? (
+                                                <><Loader2 size={16} className="animate-spin" /> Menganalisis Percakapan...</>
+                                            ) : (
+                                                <>✨ Generate AI Summary</>
+                                            )}
+                                        </button>
+                                        
+                                        {aiSummary && (
+                                            <div className="mt-4 bg-zinc-50 border border-zinc-200 p-5 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                                        Groq AI Summary
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-zinc-800 leading-relaxed markdown-content">
+                                                    <ReactMarkdown>{aiSummary}</ReactMarkdown>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
                                     {clientRawEmails.map((email: any) => (
                                         <div key={email.id} className="relative pl-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                             <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-zinc-400 ring-4 ring-white"></div>

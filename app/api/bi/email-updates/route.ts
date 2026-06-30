@@ -28,15 +28,28 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, message: 'client param is required' }, { status: 400 });
     }
 
-    const rawEmailsRes = await supabase
-      .from('client_emails')
-      .select('*')
-      .eq('client_name', client)
-      .order('email_date', { ascending: true });
+    const [summaryRes, rawEmailsRes] = await Promise.all([
+      supabase.from('email_updates')
+        .select('summary, created_at')
+        .eq('client_name', client)
+        .order('created_at', { ascending: false })
+        .limit(1),
+      supabase.from('client_emails')
+        .select('*')
+        .eq('client_name', client)
+        .order('email_date', { ascending: true })
+    ]);
 
+    if (summaryRes.error) throw summaryRes.error;
     if (rawEmailsRes.error) throw rawEmailsRes.error;
     
-    return NextResponse.json({ success: true, raw_emails: rawEmailsRes.data || [] });
+    const latestSummary = summaryRes.data && summaryRes.data.length > 0 ? summaryRes.data[0].summary : null;
+
+    return NextResponse.json({ 
+      success: true, 
+      raw_emails: rawEmailsRes.data || [],
+      latest_summary: latestSummary 
+    });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

@@ -1,4 +1,9 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(request: Request) {
   try {
@@ -44,6 +49,20 @@ export async function POST(request: Request) {
 
     const data = await response.json();
     const summary = data.choices[0]?.message?.content || 'No summary generated.';
+
+    // Persist the summary to the database
+    const { error: insertError } = await supabase.from('email_updates').insert([
+      {
+        client_name: clientName,
+        summary: summary,
+        email_count: emails.length
+      }
+    ]);
+
+    if (insertError) {
+      console.error('Failed to save summary to DB:', insertError);
+      // We don't fail the request here so the user still gets the summary in the UI
+    }
 
     return NextResponse.json({ success: true, summary });
   } catch (error: any) {

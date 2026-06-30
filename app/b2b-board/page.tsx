@@ -407,6 +407,9 @@ export default function B2BBoardPage() {
             const data = await res.json();
             if (data.success) {
                 setClientRawEmails(data.raw_emails || []);
+                if (data.latest_summary) {
+                    setAiSummary(data.latest_summary);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch email updates:', error);
@@ -2263,6 +2266,8 @@ export default function B2BBoardPage() {
                                         >
                                             {isSummarizing ? (
                                                 <><Loader2 size={16} className="animate-spin" /> Menganalisis Percakapan...</>
+                                            ) : aiSummary ? (
+                                                <>🔄 Update AI Summary</>
                                             ) : (
                                                 <>✨ Generate AI Summary</>
                                             )}

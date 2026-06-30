@@ -1,0 +1,288 @@
+{
+  "name": "MAPID BI - Daily Email Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily 6AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BI_API_URL || 'http://localhost:3000' }}/api/bi/email-updates?clients=true",
+        "options": {}
+      },
+      "id": "fetch-clients",
+      "name": "Fetch Client Names",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (!response.success || !response.clients || response.clients.length === 0) {\n  return [];\n}\nreturn response.clients.map(client => ({ json: { client_name: client } }));"
+      },
+      "id": "split-clients",
+      "name": "Split Client Names",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "filter-active-clients",
+              "leftValue": "={{ $json.client_name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-active",
+      "name": "Filter Active Clients",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "mailbox": "INBOX",
+        "searchQuery": "=OR (FROM \"{{ $json.client_name }}\" SUBJECT \"{{ $json.client_name }}\") (TO \"{{ $json.client_name }}\" SUBJECT \"{{ $json.client_name }}\")",
+        "options": {
+          "forceUnique": true,
+          "limit": 50
+        }
+      },
+      "id": "search-emails",
+      "name": "Search Emails by Client",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.1,
+      "position": [1120, 300],
+      "credentials": {
+        "imap": {
+          "id": "REPLACE_WITH_YOUR_IMAP_CREDENTIAL_ID",
+          "name": "MAPID Email (IMAP)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const clientName = $('Split Client Names').first().json.client_name;\nconst emails = $input.all();\n\nif (!emails || emails.length === 0) {\n  return [{\n    json: {\n      client_name: clientName,\n      email_count: 0,\n      emails_text: 'No emails found for this client in the last 24 hours.',\n      period_start: new Date(Date.now() - 86400000).toISOString().split('T')[0],\n      period_end: new Date().toISOString().split('T')[0]\n    }\n  }];\n}\n\nconst periodStart = emails.reduce((min, e) => {\n  const d = e.json.date || e.json.created;\n  return d < min ? d : min;\n}, emails[0].json.date || emails[0].json.created);\n\nconst periodEnd = emails.reduce((max, e) => {\n  const d = e.json.date || e.json.created;\n  return d > max ? d : max;\n}, emails[0].json.date || emails[0].json.created);\n\nconst emailTexts = emails.map((e, i) => {\n  const from = e.json.from?.text || e.json.from || 'Unknown';\n  const to = e.json.to?.text || e.json.to || 'Unknown';\n  const subject = e.json.subject || 'No Subject';\n  const date = e.json.date || e.json.created || 'Unknown Date';\n  const body = (e.json.text || e.json.body || '').substring(0, 2000);\n  return `EMAIL ${i + 1}\\nFrom: ${from}\\nTo: ${to}\\nDate: ${date}\\nSubject: ${subject}\\nBody: ${body}`;\n}).join('\\n\\n---\\n\\n');\n\nreturn [{\n  json: {\n    client_name: clientName,\n    email_count: emails.length,\n    emails_text: emailTexts,\n    period_start: typeof periodStart === 'string' ? periodStart.split('T')[0] : new Date(periodStart).toISOString().split('T')[0],\n    period_end: typeof periodEnd === 'string' ? periodEnd.split('T')[0] : new Date(periodEnd).toISOString().split('T')[0]\n  }\n}];"
+      },
+      "id": "compile-emails",
+      "name": "Compile Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "content": "You are an AI assistant that summarizes business email conversations for CRM tracking.\n\nSummarize the following emails for client: {{ $json.client_name }}\n\nEmails:\n{{ $json.emails_text }}\n\nProvide a concise summary in Bahasa Indonesia covering:\n1. Status terkini proyek/komunikasi dengan client ini\n2. Poin-poin penting yang dibahas (keputusan, permintaan, kendala)\n3. Action items atau next steps yang disepakati\n4. Deadline atau timeline yang disebutkan\n5. Sentimen overall (positif/neutral/negatif)\n\nFormat: Ringkas, max 5-7 kalimat, langsung pada intinya."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "ai-summarize",
+      "name": "AI Summarize Emails",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.2,
+      "position": [1560, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const clientData = $('Compile Email Data').first().json;\nconst aiSummary = $input.first().json;\n\nconst summary = typeof aiSummary === 'string' ? aiSummary : (aiSummary.message?.content || aiSummary.text || JSON.stringify(aiSummary));\n\nreturn [{\n  json: {\n    client_name: clientData.client_name,\n    summary: summary,\n    email_count: clientData.email_count,\n    period_start: clientData.period_start,\n    period_end: clientData.period_end\n  }\n}];"
+      },
+      "id": "format-output",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 50,
+        "options": {}
+      },
+      "id": "batch-items",
+      "name": "Batch Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BI_API_URL || 'http://localhost:3000' }}/api/bi/email-updates",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ updates: [$json] }) }}",
+        "options": {}
+      },
+      "id": "post-to-bi",
+      "name": "POST to BI Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 300]
+    }
+  ],
+  "connections": {
+    "Daily 6AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Client Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Client Names": {
+      "main": [
+        [
+          {
+            "node": "Split Client Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Client Names": {
+      "main": [
+        [
+          {
+            "node": "Filter Active Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Active Clients": {
+      "main": [
+        [
+          {
+            "node": "Search Emails by Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Emails by Client": {
+      "main": [
+        [
+          {
+            "node": "Compile Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Email Data": {
+      "main": [
+        [
+          {
+            "node": "AI Summarize Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Summarize Emails": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Output": {
+      "main": [
+        [
+          {
+            "node": "Batch Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Items": {
+      "main": [
+        [
+          {
+            "node": "POST to BI Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jakarta"
+  },
+  "tags": [
+    {
+      "name": "MAPID BI"
+    },
+    {
+      "name": "Email Automation"
+    }
+  ]
+}

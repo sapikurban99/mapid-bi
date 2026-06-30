@@ -975,3 +975,82 @@ export async function deleteWaBlastGroup(groupName: string) {
   return { success: true };
 }
 
+// ========================================
+// Email Updates (n8n scraping results)
+// ========================================
+
+export async function getClientNames() {
+  const [projectsRes, leadsRes] = await Promise.all([
+    supabase.from('kanban_projects').select('client'),
+    supabase.from('pse_leads').select('lead_name'),
+  ]);
+  const projectClients = (projectsRes.data || []).map(r => r.client).filter(Boolean);
+  const leadNames = (leadsRes.data || []).map(r => r.lead_name).filter(Boolean);
+  return [...new Set([...projectClients, ...leadNames])];
+}
+
+export async function getEmailUpdatesByClient(clientName: string) {
+  const { data, error } = await supabase
+    .from('email_updates')
+    .select('*')
+    .eq('client_name', clientName)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function getRawClientEmails(clientName: string) {
+  const { data, error } = await supabase
+    .from('client_emails')
+    .select('*')
+    .eq('client_name', clientName)
+    .order('email_date', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function addEmailUpdate(payload: {
+  client_name: string;
+  project_id?: string | null;
+  lead_id?: string | null;
+  summary: string;
+  email_count?: number;
+  period_start?: string | null;
+  period_end?: string | null;
+}) {
+  const { data, error } = await supabase.from('email_updates').insert({
+    client_name: payload.client_name,
+    project_id: payload.project_id || null,
+    lead_id: payload.lead_id || null,
+    summary: payload.summary,
+    email_count: payload.email_count || 0,
+    period_start: payload.period_start || null,
+    period_end: payload.period_end || null,
+  }).select('id').single();
+  if (error) throw new Error(error.message);
+  return { success: true, newId: data.id };
+}
+
+export async function addEmailUpdatesBatch(updates: Array<{
+  client_name: string;
+  project_id?: string | null;
+  lead_id?: string | null;
+  summary: string;
+  email_count?: number;
+  period_start?: string | null;
+  period_end?: string | null;
+}>) {
+  const rows = updates.map(u => ({
+    client_name: u.client_name,
+    project_id: u.project_id || null,
+    lead_id: u.lead_id || null,
+    summary: u.summary,
+    email_count: u.email_count || 0,
+    period_start: u.period_start || null,
+    period_end: u.period_end || null,
+  }));
+  const { error } = await supabase.from('email_updates').insert(rows);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+

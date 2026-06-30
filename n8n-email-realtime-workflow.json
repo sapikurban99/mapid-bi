@@ -1,0 +1,256 @@
+{
+  "name": "MAPID BI - Real-time Email Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "mailbox": "INBOX",
+        "options": {
+          "customEmailConfig": "idle"
+        }
+      },
+      "id": "email-trigger",
+      "name": "New Email Trigger",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "credentials": {
+        "imap": {
+          "id": "REPLACE_WITH_YOUR_IMAP_CREDENTIAL_ID",
+          "name": "MAPID Email (IMAP)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $input.first().json;\nconst from = email.from?.text || email.from || '';\nconst to = email.to?.text || email.to || '';\nconst subject = email.subject || '';\nconst body = (email.text || email.body || '').substring(0, 5000);\nconst date = email.date || email.created || new Date().toISOString();\n\n// Extract potential client names from From/To/Subject\nconst extractNames = (text) => {\n  if (!text) return [];\n  // Get display names and email local parts\n  const names = [];\n  const displayNames = text.match(/\"([^\"]+)\"/g) || [];\n  displayNames.forEach(n => names.push(n.replace(/\"/g, '')));\n  const emails = text.match(/<([^>]+)>/g) || [];\n  emails.forEach(e => {\n    const local = e.replace(/[<>]/g, '').split('@')[0];\n    if (local && !names.some(n => n.toLowerCase() === local.toLowerCase())) {\n      names.push(local);\n    }\n  });\n  return names;\n};\n\nconst potentialClients = [\n  ...extractNames(from),\n  ...extractNames(to),\n];\n\n// Clean up subject for matching\nconst cleanSubject = subject.replace(/^(re:|fw:|fwd:)/i, '').trim();\n\nreturn [{\n  json: {\n    from,\n    to,\n    subject,\n    cleanSubject,\n    body,\n    date,\n    potentialClients: [...new Set(potentialClients)]\n  }\n}];"
+      },
+      "id": "parse-email",
+      "name": "Parse Email Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BI_API_URL || 'http://localhost:3000' }}/api/bi/email-updates?clients=true",
+        "options": {}
+      },
+      "id": "fetch-clients",
+      "name": "Fetch Known Clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const emailData = $('Parse Email Content').first().json;\nconst clientsData = $('Fetch Known Clients').first().json;\n\nconst knownClients = clientsData.clients || [];\nconst potentialClients = emailData.potentialClients || [];\nconst cleanSubject = emailData.cleanSubject || '';\nconst from = emailData.from || '';\nconst to = emailData.to || '';\nconst allText = `${from} ${to} ${cleanSubject}`.toLowerCase();\n\n// Match against known clients (fuzzy)\nconst matchedClients = knownClients.filter(client => {\n  const clientLower = client.toLowerCase();\n  // Direct match in any field\n  if (allText.includes(clientLower)) return true;\n  // Match potential names\n  if (potentialClients.some(p => p.toLowerCase().includes(clientLower))) return true;\n  // Match last name (e.g. 'PT MAPID' matches 'MAPID')\n  const words = clientLower.split(/\\s+/);\n  if (words.length > 1 && words.some(w => w.length > 3 && allText.includes(w))) return true;\n  return false;\n});\n\nif (matchedClients.length === 0) {\n  // No match found - try to create entry with subject as identifier\n  return [{\n    json: {\n      ...emailData,\n      matchedClients: [],\n      noMatch: true\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...emailData,\n    matchedClients,\n    noMatch: false\n  }\n}];"
+      },
+      "id": "match-clients",
+      "name": "Match to Known Clients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-match",
+              "leftValue": "={{ $json.noMatch }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-matched",
+      "name": "Has Client Match?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const emailData = $('Match to Known Clients').first().json;\nconst matchedClients = emailData.matchedClients || [];\n\n// Create one entry per matched client\nreturn matchedClients.map(client => ({\n  json: {\n    client_name: client,\n    from: emailData.from,\n    to: emailData.to,\n    subject: emailData.subject,\n    body: emailData.body,\n    date: emailData.date\n  }\n}));"
+      },
+      "id": "split-matches",
+      "name": "Split Matched Clients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "content": "You are an AI assistant that summarizes business email conversations for CRM tracking.\n\nA new email has been received for client: {{ $json.client_name }}\n\nEmail Details:\nFrom: {{ $json.from }}\nTo: {{ $json.to }}\nDate: {{ $json.date }}\nSubject: {{ $json.subject }}\n\nBody:\n{{ $json.body }}\n\nProvide a concise status update summary in Bahasa Indonesia, max 3-5 kalimat:\n1. Topik utama email ini\n2. Action item atau next step jika ada\n3. Sentimen (positif/neutral/negatif)\n\nFokus pada informasi yang relevan untuk tracking proyek."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "ai-summarize",
+      "name": "AI Summarize",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.2,
+      "position": [1560, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const clientData = $('Split Matched Clients').first().json;\nconst aiSummary = $input.first().json;\n\nconst summary = typeof aiSummary === 'string' ? aiSummary : (aiSummary.message?.content || aiSummary.text || JSON.stringify(aiSummary));\n\nconst today = new Date().toISOString().split('T')[0];\n\nreturn [{\n  json: {\n    client_name: clientData.client_name,\n    summary: summary,\n    email_count: 1,\n    period_start: today,\n    period_end: today\n  }\n}];"
+      },
+      "id": "format-output",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BI_API_URL || 'http://localhost:3000' }}/api/bi/email-updates",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ updates: [$json] }) }}",
+        "options": {}
+      },
+      "id": "post-to-bi",
+      "name": "POST to BI Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 300]
+    }
+  ],
+  "connections": {
+    "New Email Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email Content": {
+      "main": [
+        [
+          {
+            "node": "Fetch Known Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Known Clients": {
+      "main": [
+        [
+          {
+            "node": "Match to Known Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match to Known Clients": {
+      "main": [
+        [
+          {
+            "node": "Has Client Match?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Client Match?": {
+      "main": [
+        [
+          {
+            "node": "Split Matched Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Matched Clients": {
+      "main": [
+        [
+          {
+            "node": "AI Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Summarize": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Output": {
+      "main": [
+        [
+          {
+            "node": "POST to BI Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jakarta"
+  },
+  "tags": [
+    {
+      "name": "MAPID BI"
+    },
+    {
+      "name": "Email Real-time"
+    }
+  ]
+}

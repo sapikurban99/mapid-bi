@@ -122,7 +122,7 @@ const getTypeStyle = (type?: string) => {
 };
 
 // --- Sub-components (Cards) ---
-const ProjectCard = ({ project: p, onEdit, onDelete, getPseName, onAddNote }: any) => {
+const ProjectCard = ({ project: p, onEdit, onDelete, getPseName, onAddNote, onEmailStatus }: any) => {
     const isDone = p.stage === 'Done';
     const isLost = p.stage === 'Lost';
     const isFrozen = p.stage === 'Freeze';
@@ -140,6 +140,7 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName, onAddNote }: an
                 <div className="flex flex-col gap-1 items-end text-right">
                     <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md whitespace-nowrap inline-block ${isDone ? 'bg-emerald-200 text-emerald-800' : isLost ? 'bg-rose-200 text-rose-800' : isFrozen ? 'bg-slate-200 text-slate-800' : 'bg-blue-100 text-blue-800'}`}>{p.stage}</span>
                     <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${tStyle.chip}`}>{tStyle.label} · {tStyle.mult}</span>
+                    <button onClick={(e) => { e.stopPropagation(); onEmailStatus('Project', p); }} className="text-[8px] font-black uppercase tracking-widest text-zinc-400 hover:text-blue-600 transition-colors mt-0.5 flex items-center gap-0.5"><Mail size={8} /> Email</button>
                 </div>
             </div>
             <div onClick={() => onEdit('Project', p)}>
@@ -201,7 +202,7 @@ const ProjectCard = ({ project: p, onEdit, onDelete, getPseName, onAddNote }: an
     );
 };
 
-const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor, onAddNote }: any) => {
+const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor, onAddNote, onEmailStatus }: any) => {
     const isLost = l.stage === 'Closed Lost';
     const isFrozen = l.stage === 'Freeze';
     const hasValue = l.forecastedValue && l.forecastedValue > 0;
@@ -218,6 +219,7 @@ const LeadCard = ({ lead: l, onEdit, onDelete, getPseName, getStageColor, onAddN
                 <div className="flex flex-col gap-1 items-end text-right">
                     <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border whitespace-nowrap inline-block ${isLost ? 'bg-rose-200 text-rose-800' : isFrozen ? 'bg-slate-200 text-slate-800 border-slate-300' : getStageColor(l.stage)}`}>{l.stage}</span>
                     <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${tStyle.chip}`}>{tStyle.label} · {tStyle.mult}</span>
+                    <button onClick={(e) => { e.stopPropagation(); onEmailStatus('Lead', l); }} className="text-[8px] font-black uppercase tracking-widest text-zinc-400 hover:text-emerald-600 transition-colors mt-0.5 flex items-center gap-0.5"><Mail size={8} /> Email</button>
                 </div>
             </div>
             <div onClick={() => onEdit('Lead', l)}>
@@ -359,6 +361,9 @@ export default function B2BBoardPage() {
     const [showPointsInfo, setShowPointsInfo] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [pseDetailModal, setPseDetailModal] = useState<{ pseId: string; name: string; tab: 'projects' | 'leads' } | null>(null);
+    const [emailStatusModal, setEmailStatusModal] = useState<{ clientName: string; itemType: 'Project' | 'Lead'; itemId: string } | null>(null);
+    const [clientRawEmails, setClientRawEmails] = useState<any[]>([]);
+    const [loadingEmails, setLoadingEmails] = useState(false);
 
 
     // Dynamic filter state: Record<columnName, selectedValues[]>
@@ -387,6 +392,22 @@ export default function B2BBoardPage() {
             console.error('Failed to fetch calendar:', error);
         } finally {
             setLoadingCalendar(false);
+        }
+    };
+
+    const fetchEmailUpdates = async (clientName: string) => {
+        setLoadingEmails(true);
+        setClientRawEmails([]);
+        try {
+            const res = await fetch(`/api/bi/email-updates?client=${encodeURIComponent(clientName)}`);
+            const data = await res.json();
+            if (data.success) {
+                setClientRawEmails(data.raw_emails || []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch email updates:', error);
+        } finally {
+            setLoadingEmails(false);
         }
     };
 
@@ -1095,7 +1116,7 @@ export default function B2BBoardPage() {
                                         <span className="bg-white border border-zinc-200 text-zinc-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredProjects(stage).length}</span>
                                     </div>
                                     <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                        {getFilteredProjects(stage).map((p: any) => <ProjectCard key={p.id} project={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} onAddNote={handleAddNote} />)}
+                                        {getFilteredProjects(stage).map((p: any) => <ProjectCard key={p.id} project={p} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} onAddNote={handleAddNote} onEmailStatus={(type: string, item: any) => { setEmailStatusModal({ clientName: item.client || item.projectName, itemType: type as 'Project' | 'Lead', itemId: item.id }); fetchEmailUpdates(item.client || item.projectName); }} />)}
                                     </div>
                                 </div>
                             );
@@ -1141,7 +1162,7 @@ export default function B2BBoardPage() {
                                         <span className="bg-white border border-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md text-[10px] shadow-sm">{getFilteredLeads(stage).length}</span>
                                     </div>
                                     <div className="p-3 flex-1 space-y-3 overflow-y-auto custom-scrollbar">
-                                        {getFilteredLeads(stage).map((l: any) => <LeadCard key={l.id} lead={l} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} onAddNote={handleAddNote} />)}
+                                        {getFilteredLeads(stage).map((l: any) => <LeadCard key={l.id} lead={l} onEdit={openEditModal} onDelete={handleDeleteData} getPseName={getPseName} getStageColor={getStageColor} onAddNote={handleAddNote} onEmailStatus={(type: string, item: any) => { setEmailStatusModal({ clientName: item.name, itemType: type as 'Project' | 'Lead', itemId: item.id }); fetchEmailUpdates(item.name); }} />)}
                                     </div>
                                 </div>
                             );
@@ -2175,6 +2196,64 @@ export default function B2BBoardPage() {
                         </div>
                         <div className="p-6 border-t border-zinc-100 flex justify-end">
                             <button onClick={() => setPseDetailModal(null)} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white transition-colors">Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== EMAIL STATUS MODAL ========== */}
+            {emailStatusModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+                        <div className="flex items-center justify-between p-6 border-b border-zinc-100">
+                            <div>
+                                <h3 className="text-lg font-black text-zinc-900">{emailStatusModal.clientName}</h3>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mt-1">
+                                    Email Status — {emailStatusModal.itemType}
+                                </p>
+                            </div>
+                            <button onClick={() => setEmailStatusModal(null)} className="p-2 bg-zinc-200/60 hover:bg-zinc-200 text-zinc-900 rounded-full transition-colors"><X size={16} /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 max-h-[60vh]">
+                            {loadingEmails ? (
+                                <div className="flex items-center justify-center py-12 text-zinc-400">
+                                    <Loader2 size={20} className="animate-spin mr-2" />
+                                    <span className="text-xs font-bold uppercase tracking-widest">Loading emails...</span>
+                                </div>
+                            ) : clientRawEmails.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Mail size={32} className="mx-auto text-zinc-200 mb-3" />
+                                    <p className="text-xs text-zinc-400 italic">No email history found.</p>
+                                </div>
+                            ) : (
+                                <div className="relative border-l-2 border-zinc-100 ml-3 space-y-8 pb-4">
+                                    {clientRawEmails.map((email: any) => (
+                                        <div key={email.id} className="relative pl-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-zinc-400 ring-4 ring-white"></div>
+                                            <div className="bg-white border border-zinc-200 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
+                                                <div className="absolute top-0 left-0 w-1 h-full bg-zinc-200 group-hover:bg-zinc-800 transition-colors"></div>
+                                                <div className="flex items-start justify-between gap-4 mb-2">
+                                                    <div>
+                                                        <h4 className="font-bold text-sm text-zinc-900">{email.subject || '(No Subject)'}</h4>
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mt-0.5">
+                                                            From: <span className="text-zinc-600">{email.from_addr}</span>
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-[9px] font-black bg-zinc-100 text-zinc-600 px-2 py-1 rounded-lg whitespace-nowrap">
+                                                        {new Date(email.email_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <div className="bg-zinc-50 rounded-xl p-3 text-xs text-zinc-600 leading-relaxed max-h-32 overflow-y-auto custom-scrollbar border border-zinc-100">
+                                                    {email.body ? email.body.trim() : <span className="italic text-zinc-400">Empty body</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-6 border-t border-zinc-100 flex justify-end">
+                            <button onClick={() => setEmailStatusModal(null)} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white transition-colors">Close</button>
                         </div>
                     </div>
                 </div>

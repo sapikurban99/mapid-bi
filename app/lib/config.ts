@@ -206,6 +206,18 @@ export interface KanbanPSEWorkload {
     isExisting?: boolean;
 }
 
+export interface EmailUpdate {
+    id: string;
+    client_name: string;
+    project_id?: string | null;
+    lead_id?: string | null;
+    summary: string;
+    email_count: number;
+    period_start?: string | null;
+    period_end?: string | null;
+    created_at: string;
+}
+
 export interface SiteConfig {
     // Branding
     sidebarTitle: string;

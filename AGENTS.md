@@ -26,7 +26,7 @@ No test framework is configured.
 |---|---|
 | `app/services/biService.ts` | **All** Supabase queries live here (~1000 lines). CRUD for every table. |
 | `app/lib/config.ts` | TypeScript interfaces + admin-configurable settings (localStorage cache + Supabase `admin_config` table). |
-| `app/api/bi/route.ts` | Central API route — dispatches to `biService` functions by `action` param. |
+| `app/api/bi/route.ts` | Central API route — dispatches to `biService` functions by `action` param. GET has a 90s server-side timeout. |
 | `app/api/bi/email-updates/route.ts` | Email updates API — `GET ?clients=true` (list clients), `GET ?client=X` (history), `POST` (n8n webhook receiver). |
 | `app/components/GlobalDataProvider.tsx` | Root context — fetches `/api/bi` on mount, provides `syncData()`. |
 | `app/components/SidebarNav.tsx` | Sidebar — all navigation routes defined here. |
@@ -46,6 +46,24 @@ Supabase DB
 
 Most pages are `'use client'` and read data from `useGlobalData()` or `getConfig()`.
 
+### Routes (from SidebarNav)
+
+- `/` — Strategy & RACI
+- `/dashboard` — BI Dashboard
+- `/kpi-dashboard` — KPI Dashboard
+- `/b2b-performance` — B2B Performance
+- `/growth` — Platform Performance
+- `/academy-performance` — Academy Performance
+- `/social-media-performance` — Social Media Performance
+- `/b2b-board` — B2B Delivery & Ops
+- `/daily-standup` — Daily Standup
+- `/b2c-campaigns` — B2C Campaigns
+- `/crm-wa` — WA CRM & Blast
+- `/kpi-config` — KPI Config
+- `/links-setup` — Public Links
+- `/gallery-config` — Gallery & Assets
+- `/pricing-list` — Pricing List
+
 ### Email Scraping System
 
 Two-part system for tracking client email status:
@@ -62,6 +80,17 @@ python scripts/email-historical-scraper.py
 ```
 
 The `email_updates` table stores historical scrape results per client (summary, email_count, period dates, created_at).
+
+### Scripts Directory
+
+Utility scripts for data migration and extraction:
+
+- `scripts/migrate.js` — general data migration
+- `scripts/migrate-crm.mjs` — CRM-specific migration
+- `scripts/migrate-standup.mjs` — standup data migration
+- `scripts/update-kanban-progress.mjs` — kanban progress updater
+- `scripts/import_payments.js` — payment data import
+- `scripts/extract-pdf.cjs` / `extract-pdf.mjs` — PDF extraction utilities
 
 ### Authentication
 

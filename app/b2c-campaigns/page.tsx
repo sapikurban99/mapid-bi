@@ -70,7 +70,6 @@ const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: a
                     <option value="" disabled>Select {f.label}</option>
                     {f.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
-                  {/* Show custom text field if 'Other' is explicitly selected or if current data has a non-matching string */}
                   {(data?.[f.key] === 'Other' || (data?.[f.key] && !f.options.includes(data?.[f.key]))) && (
                     <input 
                       type="text" 
@@ -100,15 +99,18 @@ const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: a
 export default function B2CCampaignsPage() {
   const { isLoading: globalIsLoading, syncData } = useGlobalData();
   const [config, setConfigState] = useState(() => getConfig());
-  const [b2cPeriod, setB2cPeriod] = useState('All');
-  const [activeTab, setActiveTab] = useState<'Overview' | 'Calendar'>('Overview');
+  const [activeQuarter, setActiveQuarter] = useState<1 | 2 | 3 | 4>(Math.ceil((new Date().getMonth() + 1) / 3) as 1 | 2 | 3 | 4);
+  const [campaignPage, setCampaignPage] = useState(1);
+  const [contentPage, setContentPage] = useState(1);
+  const CAMPAIGNS_PER_PAGE = 5;
+  const CONTENTS_PER_PAGE = 5;
+  const [activeTab, setActiveTab] = useState<'Overview' | 'ContentCalendar' | 'CampaignCalendar' | 'Budget'>('Overview');
+  const [calendarView, setCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [calendarDate, setCalendarDate] = useState(new Date());
-  const [calendarFilter, setCalendarFilter] = useState<'all' | 'campaign' | 'content'>('all');
   
   const [editModal, setEditModal] = useState<{ section: string; index: number; data: any } | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // Re-read config when global data finishes loading
   useEffect(() => {
     setConfigState(getConfig());
   }, [globalIsLoading]);
@@ -141,7 +143,6 @@ export default function B2CCampaignsPage() {
     setConfigLS(newConfig);
     await saveConfigToSupabase(newConfig);
     await syncData({ silent: true });
-    // Re-read config after sync to get fresh data from Supabase
     setConfigState(getConfig());
     setEditModal(null);
     setSaveStatus('saved');
@@ -166,10 +167,41 @@ export default function B2CCampaignsPage() {
 
   const campaigns = config.biData?.campaigns || [];
   const contents = config.biData?.contents || [];
-  const uniqueB2cPeriods = ['All', ...Array.from(new Set(campaigns.map((c: any) => c.period).filter(Boolean)))];
-  const filteredCampaigns = campaigns.filter((c: any) => b2cPeriod === 'All' || c.period === b2cPeriod);
 
-  // Budget calculations
+  const quarterRanges = useMemo(() => {
+    const year = new Date().getFullYear();
+    return {
+      1: { start: `${year}-01-01`, end: `${year}-03-31`, label: `Q1 ${year}`, range: `01/01/${year} – 31/03/${year}` },
+      2: { start: `${year}-04-01`, end: `${year}-06-30`, label: `Q2 ${year}`, range: `01/04/${year} – 30/06/${year}` },
+      3: { start: `${year}-07-01`, end: `${year}-09-30`, label: `Q3 ${year}`, range: `01/07/${year} – 30/09/${year}` },
+      4: { start: `${year}-10-01`, end: `${year}-12-31`, label: `Q4 ${year}`, range: `01/10/${year} – 31/12/${year}` },
+    };
+  }, []);
+
+  const currentQuarter = quarterRanges[activeQuarter];
+
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter((c: any) => {
+      const campStart = c.startDate;
+      const campEnd = c.endDate || c.startDate;
+      if (!campStart) return false;
+      return campStart <= currentQuarter.end && campEnd >= currentQuarter.start;
+    });
+  }, [campaigns, currentQuarter]);
+
+  const totalCampaignPages = Math.max(1, Math.ceil(filteredCampaigns.length / CAMPAIGNS_PER_PAGE));
+  const paginatedCampaigns = filteredCampaigns.slice((campaignPage - 1) * CAMPAIGNS_PER_PAGE, campaignPage * CAMPAIGNS_PER_PAGE);
+
+  const filteredContents = useMemo(() => {
+    return contents.filter((c: any) => {
+      if (!c.date) return false;
+      return c.date <= currentQuarter.end && c.date >= currentQuarter.start;
+    });
+  }, [contents, currentQuarter]);
+
+  const totalContentPages = Math.max(1, Math.ceil(filteredContents.length / CONTENTS_PER_PAGE));
+  const paginatedContents = filteredContents.slice((contentPage - 1) * CONTENTS_PER_PAGE, contentPage * CONTENTS_PER_PAGE);
+
   const budgetData = config.biData?.budget || [];
   const totalSpent = budgetData.reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
   const maxBudget = (config as any).b2cTotalBudget || 100000000;
@@ -182,10 +214,31 @@ export default function B2CCampaignsPage() {
   }, {} as Record<string, number>);
   const sortedCategories = Object.entries(spentByCategory).sort((a: any, b: any) => b[1] - a[1]);
 
-  // Calendar logic (using precise logic derived from B2B module)
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
   const nextMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
   const prevMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
+  const nextWeek = () => {
+    const d = new Date(calendarDate);
+    d.setDate(d.getDate() + 7);
+    setCalendarDate(d);
+  };
+  const prevWeek = () => {
+    const d = new Date(calendarDate);
+    d.setDate(d.getDate() - 7);
+    setCalendarDate(d);
+  };
+  const nextDay = () => {
+    const d = new Date(calendarDate);
+    d.setDate(d.getDate() + 1);
+    setCalendarDate(d);
+  };
+  const prevDay = () => {
+    const d = new Date(calendarDate);
+    d.setDate(d.getDate() - 1);
+    setCalendarDate(d);
+  };
 
   const calendarGrid = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -207,15 +260,11 @@ export default function B2CCampaignsPage() {
     }
     for (let i = 1; i <= daysInMonth; i++) {
       const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      grid.push({
-        day: i,
-        isCurrentMonth: true,
-        dateStr: dStr
-      });
+      grid.push({ day: i, isCurrentMonth: true, dateStr: dStr });
     }
     const totalCells = Math.ceil(grid.length / 7) * 7;
-    const remaining = totalCells - grid.length;
-    for (let i = 1; i <= remaining; i++) {
+    const remainingCells = totalCells - grid.length;
+    for (let i = 1; i <= remainingCells; i++) {
       const nD = new Date(year, month + 1, i);
       grid.push({
         day: i,
@@ -226,48 +275,232 @@ export default function B2CCampaignsPage() {
     return grid;
   }, [calendarDate]);
 
-  const combinedEvents = useMemo(() => {
+  const weekDays = useMemo(() => {
+    const start = new Date(calendarDate);
+    start.setDate(start.getDate() - start.getDay());
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      days.push({
+        day: d.getDate(),
+        dayName: dayNamesShort[d.getDay()],
+        dateStr: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+        isToday: new Date().toLocaleDateString('id-ID') === d.toLocaleDateString('id-ID'),
+      });
+    }
+    return days;
+  }, [calendarDate]);
+
+  const dayHours = useMemo(() => {
+    return Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+  }, []);
+
+  const weekDateRange = useMemo(() => {
+    const start = new Date(calendarDate);
+    start.setDate(start.getDate() - start.getDay());
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    const startStr = start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+    const endStr = end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `${startStr} – ${endStr}`;
+  }, [calendarDate]);
+
+  const campaignEvents = useMemo(() => {
     const list: any[] = [];
-    
-    // 1. Map campaigns
     campaigns.forEach((c: any, idx: number) => {
-      if (!c.startDate || !c.endDate) return;
+      if (!c.startDate) return;
       list.push({
         id: `camp-${idx}`,
         origIdx: idx,
         title: c.name,
         type: 'campaign',
         startDate: c.startDate,
-        endDate: c.endDate,
+        endDate: c.endDate || c.startDate,
         status: c.status,
         color: c.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
              : c.status === 'Planned' ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' 
              : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200'
       });
     });
+    return list;
+  }, [campaigns]);
 
-    // 2. Map contents
+  const contentEvents = useMemo(() => {
+    const list: any[] = [];
     contents.forEach((c: any, idx: number) => {
       if (!c.date) return;
       const isPublished = c.status === 'Published';
       list.push({
         id: `cont-${idx}`,
         origIdx: idx,
-        title: `📱 [${c.account || c.platform}] ${c.title}`,
+        title: c.title,
         type: 'content',
         startDate: c.date,
         endDate: c.date,
         status: c.status,
-        color: isPublished ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 font-extrabold'
-             : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 font-extrabold'
+        account: c.account,
+        platform: c.platform,
+        color: isPublished ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+             : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
       });
     });
+    return list;
+  }, [contents]);
 
-    return list.filter(item => {
-      if (calendarFilter === 'all') return true;
-      return item.type === calendarFilter;
+  const getEventsByDate = (dateStr: string, events: any[]) => {
+    return events.filter(evt => {
+      if (evt.type === 'content') return evt.startDate === dateStr;
+      const cur = new Date(dateStr);
+      const st = new Date(evt.startDate); st.setHours(0,0,0,0);
+      const en = new Date(evt.endDate); en.setHours(23,59,59,999);
+      return cur >= st && cur <= en;
     });
-  }, [campaigns, contents, calendarFilter]);
+  };
+
+  const getCalendarNavLabel = () => {
+    if (calendarView === 'month') return `${monthNames[calendarDate.getMonth()]} ${calendarDate.getFullYear()}`;
+    if (calendarView === 'week') return weekDateRange;
+    return calendarDate.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+  const renderCalendarNav = () => (
+    <div className="flex items-center gap-4">
+      <button onClick={calendarView === 'month' ? prevMonth : calendarView === 'week' ? prevWeek : prevDay} className="p-2 hover:bg-zinc-100 rounded-xl transition"><ChevronLeft size={20} /></button>
+      <span className="font-black text-lg min-w-[200px] text-center">{getCalendarNavLabel()}</span>
+      <button onClick={calendarView === 'month' ? nextMonth : calendarView === 'week' ? nextWeek : nextDay} className="p-2 hover:bg-zinc-100 rounded-xl transition"><ChevronRight size={20} /></button>
+    </div>
+  );
+
+  const renderViewToggle = () => (
+    <div className="flex items-center gap-1.5 bg-zinc-100 p-1.5 rounded-xl border border-zinc-200">
+      {(['month', 'week', 'day'] as const).map(v => (
+        <button key={v} onClick={() => setCalendarView(v)}
+          className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${calendarView === v ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}>
+          {v}
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderMonthCalendar = (events: any[], section: string, defaultDataFn: (dateStr: string) => any) => (
+    <div className="grid grid-cols-7 gap-px bg-zinc-200 border border-zinc-200 rounded-xl overflow-hidden">
+      {dayNamesShort.map(day => (
+        <div key={day} className="bg-zinc-50 py-3 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">{day}</div>
+      ))}
+      {calendarGrid.map((cell, idx) => {
+        const cellEvents = getEventsByDate(cell.dateStr, events);
+        const isToday = new Date().toLocaleDateString('id-ID') === new Date(cell.dateStr).toLocaleDateString('id-ID');
+        return (
+          <div key={idx}
+            onClick={() => cell.isCurrentMonth && openEditModal(section, -1, defaultDataFn(cell.dateStr))}
+            className={`bg-white min-h-[120px] p-2 border-t border-zinc-100 transition hover:bg-zinc-50/80 cursor-pointer group/day ${cell.isCurrentMonth ? '' : 'opacity-40'}`}>
+            <div className="flex justify-between items-center mb-2">
+              <div className={`text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-zinc-900 text-white' : 'text-zinc-600 group-hover/day:bg-zinc-100'}`}>
+                {cell.day}
+              </div>
+              {cell.isCurrentMonth && (
+                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-300 opacity-0 group-hover/day:opacity-100 transition">+ ADD</span>
+              )}
+            </div>
+            <div className="space-y-1 max-h-[85px] overflow-y-auto hide-scrollbar">
+              {cellEvents.map((evt: any) => (
+                <div key={evt.id}
+                  onClick={(e) => { e.stopPropagation(); openEditModal(evt.type === 'campaign' ? 'campaigns' : 'contents', evt.origIdx); }}
+                  className={`text-[9px] font-bold px-2 py-1 rounded truncate border hover:scale-105 transition-all ${evt.color}`}
+                  title={`${evt.title} (Click to Edit)`}>
+                  {evt.type === 'content' && <span className="opacity-60">📱 </span>}{evt.title}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderWeekCalendar = (events: any[], section: string, defaultDataFn: (dateStr: string) => any) => (
+    <div className="border border-zinc-200 rounded-xl overflow-hidden">
+      <div className="grid grid-cols-7 gap-px bg-zinc-200">
+        {weekDays.map(d => (
+          <div key={d.dateStr} className={`py-3 text-center border-b border-zinc-200 ${d.isToday ? 'bg-zinc-900 text-white' : 'bg-zinc-50'}`}>
+            <div className="text-[10px] font-black uppercase tracking-widest">{d.dayName}</div>
+            <div className={`text-lg font-black ${d.isToday ? 'text-white' : 'text-zinc-900'}`}>{d.day}</div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-px bg-zinc-100">
+        {weekDays.map(d => {
+          const dayEvents = getEventsByDate(d.dateStr, events);
+          return (
+            <div key={d.dateStr}
+              onClick={() => openEditModal(section, -1, defaultDataFn(d.dateStr))}
+              className="bg-white min-h-[400px] p-2 cursor-pointer hover:bg-zinc-50/80 transition">
+              <div className="space-y-1">
+                {dayEvents.map((evt: any) => (
+                  <div key={evt.id}
+                    onClick={(e) => { e.stopPropagation(); openEditModal(evt.type === 'campaign' ? 'campaigns' : 'contents', evt.origIdx); }}
+                    className={`text-[9px] font-bold px-2 py-1.5 rounded border truncate hover:scale-105 transition-all ${evt.color}`}
+                    title={`${evt.title} (Click to Edit)`}>
+                    {evt.type === 'content' && <span className="opacity-60">📱 </span>}{evt.title}
+                    <span className="block text-[8px] opacity-60 mt-0.5">{evt.status}</span>
+                  </div>
+                ))}
+                {dayEvents.length === 0 && d.isToday && (
+                  <div className="text-[9px] text-zinc-300 font-bold text-center mt-8">Click to add</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderDayCalendar = (events: any[], section: string, defaultDataFn: (dateStr: string) => any) => {
+    const dateStr = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}-${String(calendarDate.getDate()).padStart(2, '0')}`;
+    const dayEvents = getEventsByDate(dateStr, events);
+    const isToday = new Date().toLocaleDateString('id-ID') === calendarDate.toLocaleDateString('id-ID');
+
+    return (
+      <div className="border border-zinc-200 rounded-xl overflow-hidden">
+        <div className={`px-6 py-4 border-b border-zinc-200 ${isToday ? 'bg-zinc-900 text-white' : 'bg-zinc-50'}`}>
+          <div className="text-[10px] font-black uppercase tracking-widest opacity-60">{dayNamesShort[calendarDate.getDay()]}</div>
+          <div className={`text-2xl font-black ${isToday ? 'text-white' : 'text-zinc-900'}`}>{calendarDate.getDate()}</div>
+        </div>
+        <div className="grid grid-cols-[60px_1fr] gap-px bg-zinc-100">
+          {dayHours.map((hour, i) => (
+            <div key={hour} className="bg-zinc-50 py-3 px-2 text-[10px] font-bold text-zinc-400 text-right">{hour}</div>
+          )).concat([<div key="all-day" className="bg-white col-span-2" />])}
+        </div>
+        <div className="p-4 space-y-2 bg-white min-h-[300px]">
+          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-3">Events</div>
+          {dayEvents.length === 0 ? (
+            <button onClick={() => openEditModal(section, -1, defaultDataFn(dateStr))}
+              className="w-full p-4 border-2 border-dashed border-zinc-200 rounded-xl text-xs font-bold text-zinc-400 hover:border-zinc-400 hover:text-zinc-600 transition text-center">
+              Click to add event
+            </button>
+          ) : dayEvents.map((evt: any) => (
+            <div key={evt.id}
+              onClick={() => openEditModal(evt.type === 'campaign' ? 'campaigns' : 'contents', evt.origIdx)}
+              className={`p-3 rounded-xl border cursor-pointer hover:scale-[1.01] transition-all flex items-center justify-between ${evt.color}`}>
+              <div>
+                <div className="text-xs font-bold">{evt.type === 'content' && '📱 '}{evt.title}</div>
+                <div className="text-[9px] opacity-60 mt-0.5">{evt.status}{evt.account ? ` • ${evt.account}` : ''}</div>
+              </div>
+              <ChevronRight size={14} className="opacity-40" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCalendar = (events: any[], section: string, defaultDataFn: (dateStr: string) => any) => {
+    if (calendarView === 'month') return renderMonthCalendar(events, section, defaultDataFn);
+    if (calendarView === 'week') return renderWeekCalendar(events, section, defaultDataFn);
+    return renderDayCalendar(events, section, defaultDataFn);
+  };
 
   return (
     <main className="min-h-screen bg-zinc-50 font-sans pb-24 text-zinc-900">
@@ -286,337 +519,404 @@ export default function B2CCampaignsPage() {
             <Link href="/dashboard" className="px-3 sm:px-4 py-2 bg-zinc-100 hover:bg-zinc-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2">
               <ArrowLeft size={14} /> Back
             </Link>
-            <button onClick={() => openEditModal('contents')} className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-700 transition shadow-lg">
-              <Plus size={12} /> Konten
-            </button>
-            <button onClick={() => openEditModal('campaigns')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
-              <Plus size={12} /> Campaign
-            </button>
+            {activeTab === 'Overview' && (
+              <button onClick={() => openEditModal('campaigns')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
+                <Plus size={12} /> Campaign
+              </button>
+            )}
+            {activeTab === 'ContentCalendar' && (
+              <>
+                <button onClick={() => openEditModal('contents')} className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-700 transition shadow-lg">
+                  <Plus size={12} /> Konten
+                </button>
+                {renderViewToggle()}
+              </>
+            )}
+            {activeTab === 'CampaignCalendar' && (
+              <>
+                <button onClick={() => openEditModal('campaigns')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
+                  <Plus size={12} /> Campaign
+                </button>
+                {renderViewToggle()}
+              </>
+            )}
+            {activeTab === 'Budget' && (
+              <>
+                <button onClick={() => {
+                  const newBudget = prompt('Enter new total budget limit (Rp):', maxBudget.toString());
+                  if (newBudget && !isNaN(Number(newBudget))) {
+                    const newConfig = { ...config, b2cTotalBudget: Number(newBudget) } as any;
+                    setConfigState(newConfig);
+                    setConfigLS(newConfig);
+                    saveConfigToSupabase(newConfig);
+                  }
+                }} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 text-zinc-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-50 transition">
+                  <Edit2 size={12} /> Set Limit
+                </button>
+                <button onClick={() => openEditModal('budget')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
+                  <Plus size={12} /> Add Spent
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto py-8 sm:py-12 px-4 sm:px-6 space-y-12">
+      <div className="max-w-6xl mx-auto py-8 sm:py-12 px-4 sm:px-6 space-y-8">
         {/* Tabs */}
-        <div className="flex gap-6 border-b border-zinc-200">
-            <button onClick={() => setActiveTab('Overview')} className={`pb-3 text-xs font-black tracking-widest uppercase transition-all ${activeTab === 'Overview' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600 border-b-2 border-transparent'}`}>
-                <LayoutGrid size={14} className="inline mr-2 mb-0.5" /> Overview
+        <div className="flex gap-6 border-b border-zinc-200 overflow-x-auto hide-scrollbar">
+          {[
+            { key: 'Overview', icon: LayoutGrid, label: 'Overview' },
+            { key: 'ContentCalendar', icon: CalendarIcon, label: 'Content Calendar' },
+            { key: 'CampaignCalendar', icon: CalendarIcon, label: 'Campaign Calendar' },
+            { key: 'Budget', icon: Wallet, label: 'Budget' },
+          ].map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+              className={`pb-3 text-xs font-black tracking-widest uppercase transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === tab.key ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600 border-b-2 border-transparent'}`}>
+              <tab.icon size={14} /> {tab.label}
             </button>
-            <button onClick={() => setActiveTab('Calendar')} className={`pb-3 text-xs font-black tracking-widest uppercase transition-all ${activeTab === 'Calendar' ? 'border-b-2 border-zinc-900 text-zinc-900' : 'text-zinc-400 hover:text-zinc-600 border-b-2 border-transparent'}`}>
-                <CalendarIcon size={14} className="inline mr-2 mb-0.5" /> Calendar View
-            </button>
+          ))}
         </div>
 
+        {/* === OVERVIEW TAB === */}
         {activeTab === 'Overview' && (
-          <div className="space-y-12 animate-in fade-in">
-            {/* === CAMPAIGNS SECTION === */}
+          <div className="space-y-8 animate-in fade-in">
+            {/* Summary Metrics */}
+            {(() => {
+              const publishedCount = filteredContents.filter((c: any) => c.status === 'Published').length;
+              const activeCampaigns = filteredCampaigns.filter((c: any) => c.status === 'Active').length;
+              const totalLeads = filteredCampaigns.reduce((acc: number, c: any) => acc + (Number(c.leads) || 0), 0);
+              const metrics = [
+                { label: 'Content Published', value: `${publishedCount}/${filteredContents.length}`, sub: `${filteredContents.length - publishedCount} remaining`, color: 'bg-purple-600', icon: '📱' },
+                { label: 'Active Campaigns', value: activeCampaigns, sub: `of ${filteredCampaigns.length} total`, color: 'bg-emerald-600', icon: '🎯' },
+                { label: 'Total Leads', value: totalLeads.toLocaleString('id-ID'), sub: `from ${activeCampaigns} active`, color: 'bg-blue-600', icon: '📊' },
+                { label: 'Budget Spent', value: formatIDR(totalSpent), sub: `${budgetUsagePercent.toFixed(1)}% of ${formatIDR(maxBudget)}`, color: 'bg-zinc-900', icon: '💰' },
+              ];
+              return (
+                <section>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+                    {metrics.map((m) => (
+                      <div key={m.label} className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-2xl hover:border-zinc-300 transition">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className={`w-7 h-7 ${m.color} rounded-lg flex items-center justify-center text-white text-xs`}>{m.icon}</div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">{m.label}</span>
+                        </div>
+                        <div className="text-2xl font-black tracking-tighter text-zinc-900">{m.value}</div>
+                        <div className="text-[10px] font-bold text-zinc-400 mt-1">{m.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
+
             <section>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-200 pb-4 mb-6 gap-3">
-            <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-zinc-900">Campaign Overview</h3>
-            {uniqueB2cPeriods.length > 2 && (
-              <select value={b2cPeriod} onChange={(e) => setB2cPeriod(e.target.value)}
-                className="bg-white border text-xs text-zinc-500 border-zinc-200 font-bold p-2 px-3 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none w-full sm:w-auto">
-                {uniqueB2cPeriods.map((p: any) => <option key={p} value={p}>{p === 'All' ? 'All Periods' : p}</option>)}
-              </select>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {filteredCampaigns.length === 0 ? (
-              <div className="col-span-full text-center p-8 bg-zinc-50 border border-zinc-200 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest">No campaigns for selected period</div>
-            ) : filteredCampaigns.map((camp: any, idx: number) => {
-              const origIdx = campaigns.indexOf(camp);
-              return (
-                <div key={idx} className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl transition hover:border-zinc-400 group relative">
-                  <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                    <button onClick={() => openEditModal('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
-                    <button onClick={() => handleDeleteItem('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-zinc-900">Campaign Overview</h3>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-1.5 bg-zinc-100 p-1.5 rounded-xl border border-zinc-200">
+                    {([1, 2, 3, 4] as const).map(q => (
+                      <button key={q} onClick={() => { setActiveQuarter(q); setCampaignPage(1); setContentPage(1); }}
+                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeQuarter === q ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}>
+                        Q{q}
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex justify-between items-start mb-6">
-                    <h4 className="font-bold text-zinc-900 text-sm leading-tight pr-8">{camp.name}</h4>
-                    <div className={`text-[8px] px-2 py-0.5 font-black uppercase rounded border flex-shrink-0 ${camp.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : camp.status === 'Planned' ? 'border-blue-200 bg-blue-50 text-blue-600' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>
-                      {camp.status}
+                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-500">
+                    <span>{currentQuarter.range}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Campaign Table */}
+              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                      <tr>
+                        <th className="px-4 sm:px-6 py-4">Campaign</th>
+                        <th className="px-4 sm:px-6 py-4 hidden sm:table-cell">Period</th>
+                        <th className="px-4 sm:px-6 py-4">Status</th>
+                        <th className="px-4 sm:px-6 py-4 text-right">Leads</th>
+                        <th className="px-4 sm:px-6 py-4 text-right hidden sm:table-cell">Conv.</th>
+                        <th className="px-4 sm:px-6 py-4 hidden md:table-cell">Dates</th>
+                        <th className="px-3 sm:px-4 py-4 w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {paginatedCampaigns.length === 0 ? (
+                        <tr><td colSpan={7} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No campaigns for Q{activeQuarter}</td></tr>
+                      ) : paginatedCampaigns.map((camp: any) => {
+                        const origIdx = campaigns.indexOf(camp);
+                        return (
+                          <tr key={origIdx} className="hover:bg-zinc-50 transition group">
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 font-bold text-zinc-900 text-xs sm:text-sm">{camp.name}</td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 text-xs text-zinc-500 font-bold hidden sm:table-cell">{camp.period || '-'}</td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5">
+                              <span className={`text-[8px] px-2 py-0.5 font-black uppercase rounded border ${camp.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : camp.status === 'Planned' ? 'border-blue-200 bg-blue-50 text-blue-600' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>
+                                {camp.status}
+                              </span>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 text-right font-mono font-bold text-zinc-900 text-xs sm:text-sm">{(camp.leads || 0).toLocaleString('id-ID')}</td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 text-right font-mono font-bold text-zinc-900 text-xs sm:text-sm hidden sm:table-cell">{camp.conversion}%</td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 text-[10px] font-bold text-zinc-400 hidden md:table-cell whitespace-nowrap">
+                              {camp.startDate ? `${formatDate(camp.startDate)}${camp.endDate ? ` – ${formatDate(camp.endDate)}` : ''}` : '-'}
+                            </td>
+                            <td className="px-3 sm:px-4 py-4 sm:py-5">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <button onClick={() => openEditModal('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                                <button onClick={() => handleDeleteItem('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalCampaignPages > 1 && (
+                  <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-t border-zinc-100 bg-zinc-50">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                      {(campaignPage - 1) * CAMPAIGNS_PER_PAGE + 1}–{Math.min(campaignPage * CAMPAIGNS_PER_PAGE, filteredCampaigns.length)} of {filteredCampaigns.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setCampaignPage(p => Math.max(1, p - 1))} disabled={campaignPage === 1}
+                        className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                        Prev
+                      </button>
+                      {Array.from({ length: totalCampaignPages }, (_, i) => i + 1).map(page => (
+                        <button key={page} onClick={() => setCampaignPage(page)}
+                          className={`w-8 h-8 text-[10px] font-black rounded-lg transition ${campaignPage === page ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}>
+                          {page}
+                        </button>
+                      ))}
+                      <button onClick={() => setCampaignPage(p => Math.min(totalCampaignPages, p + 1))} disabled={campaignPage === totalCampaignPages}
+                        className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                        Next
+                      </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 border-t border-zinc-100 pt-4">
-                    <div><div className="text-[9px] text-zinc-400 uppercase font-bold">Leads</div><div className="text-xl font-black">{(camp.leads || 0).toLocaleString('id-ID')}</div></div>
-                    <div className="text-right"><div className="text-[9px] text-zinc-400 uppercase font-bold">Conv. Rate</div><div className="text-xl font-black text-zinc-900">{camp.conversion}%</div></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* === BUDGET DISBURSEMENT SECTION === */}
-        <section className="pt-8 border-t border-zinc-200">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-            <div>
-              <h3 className="text-lg sm:text-xl font-black tracking-tight leading-tight">Budget Disbursement</h3>
-              <p className="text-xs sm:text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</p>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <button onClick={() => {
-                const newBudget = prompt('Enter new total budget limit (Rp):', maxBudget.toString());
-                if (newBudget && !isNaN(Number(newBudget))) {
-                  const newConfig = { ...config, b2cTotalBudget: Number(newBudget) } as any;
-                  setConfigState(newConfig);
-                  setConfigLS(newConfig);
-                  saveConfigToSupabase(newConfig);
-                }
-              }} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 text-zinc-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-50 transition">
-                <Edit2 size={12} /> Set Limit
-              </button>
-              <button onClick={() => openEditModal('budget')} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">
-                <Plus size={12} /> Add Spent
-              </button>
-            </div>
-          </div>
-
-          {/* Budget Overview Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {/* Total Budget */}
-            <div className="bg-zinc-900 text-white p-5 sm:p-6 rounded-2xl shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet size={48} /></div>
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Budget Limit</h4>
-              <div className="text-xl sm:text-2xl font-black tracking-tighter text-white">{formatIDR(maxBudget)}</div>
-              <div className="mt-3 border-t border-white/10 pt-3">
-                <div className="flex justify-between text-[10px] font-bold text-zinc-400 mb-1.5">
-                  <span>USAGE</span>
-                  <span className="text-white">{budgetUsagePercent.toFixed(1)}%</span>
-                </div>
-                <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-700 ${budgetUsagePercent > 90 ? 'bg-rose-500' : budgetUsagePercent > 70 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${budgetUsagePercent}%` }} />
-                </div>
+                )}
               </div>
-            </div>
+            </section>
 
-            {/* Total Spent */}
-            <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingDown size={48} /></div>
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Total Disbursed</h4>
-              <div className="text-xl sm:text-2xl font-black tracking-tighter text-emerald-600">{formatIDR(totalSpent)}</div>
-              <div className="text-[10px] font-bold text-zinc-400 mt-2">{budgetData.length} transaction{budgetData.length !== 1 ? 's' : ''}</div>
-            </div>
-
-            {/* Remaining */}
-            <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm">
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Remaining</h4>
-              <div className={`text-xl sm:text-2xl font-black tracking-tighter ${remaining >= 0 ? 'text-zinc-900' : 'text-rose-600'}`}>{formatIDR(remaining)}</div>
-              <div className="text-[10px] font-bold text-zinc-400 mt-2">{remaining >= 0 ? 'Available' : 'Over Budget!'}</div>
-            </div>
-
-            {/* Top Category */}
-            {sortedCategories.length > 0 && (
-              <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Top Category</h4>
-                <div className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900">{formatIDR(sortedCategories[0][1] as number)}</div>
-                <div className="text-[10px] font-bold text-zinc-400 mt-2 uppercase">{sortedCategories[0][0]} • {totalSpent > 0 ? (((sortedCategories[0][1] as number) / totalSpent) * 100).toFixed(1) : 0}%</div>
-              </div>
-            )}
-          </div>
-
-          {/* Category Breakdown (if more than 1 category) */}
-          {sortedCategories.length > 1 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-              {sortedCategories.map(([cat, amount]: any) => (
-                <div key={cat} className="bg-white border border-zinc-100 p-4 rounded-xl hover:border-zinc-300 transition">
-                  <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">{cat}</div>
-                  <div className="text-sm font-black tracking-tight text-zinc-900">{formatIDR(amount)}</div>
-                  <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden mt-2">
-                    <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${totalSpent > 0 ? (amount / totalSpent) * 100 : 0}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Disbursement History Table */}
-          <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                  <tr>
-                    <th className="px-4 sm:px-6 py-4">Date</th>
-                    <th className="px-4 sm:px-6 py-4">Category</th>
-                    <th className="px-4 sm:px-6 py-4 hidden sm:table-cell min-w-[180px]">Description</th>
-                    <th className="px-4 sm:px-6 py-4 text-right">Amount</th>
-                    <th className="px-3 sm:px-4 py-4 w-16"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {budgetData.length === 0 ? (
-                    <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending recorded</td></tr>
-                  ) : (
-                    budgetData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => {
-                      const origIdx = budgetData.indexOf(row);
-                      return (
-                        <tr key={idx} className="hover:bg-zinc-50 transition group">
-                          <td className="px-4 sm:px-6 py-4 sm:py-5 font-bold whitespace-nowrap text-xs sm:text-sm">{formatDate(row.date)}</td>
-                          <td className="px-4 sm:px-6 py-4 sm:py-5">
-                            <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span>
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 sm:py-5 text-zinc-500 font-medium italic hidden sm:table-cell">{row.description || '-'}</td>
-                          <td className="px-4 sm:px-6 py-4 sm:py-5 text-right font-mono font-bold text-zinc-900 text-xs sm:text-sm whitespace-nowrap">{formatIDR(row.amount)}</td>
-                          <td className="px-3 sm:px-4 py-4 sm:py-5">
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                              <button onClick={() => openEditModal('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
-                              <button onClick={() => handleDeleteItem('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-        </div>
-        )}
-
-        {activeTab === 'Calendar' && (
-          <div className="animate-in fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Calendar Main Visual */}
-              <div className="lg:col-span-9 bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-sm">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-6 border-b border-zinc-100">
-                  <div>
-                    <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">Activities Calendar</h3>
-                    <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Manage your schedule across campaigns and media</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-zinc-100 p-1.5 rounded-xl border border-zinc-200 overflow-x-auto hide-scrollbar">
-                    <button onClick={() => setCalendarFilter('all')} className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${calendarFilter === 'all' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}>All</button>
-                    <button onClick={() => setCalendarFilter('campaign')} className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${calendarFilter === 'campaign' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}>Campaigns</button>
-                    <button onClick={() => setCalendarFilter('content')} className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${calendarFilter === 'content' ? 'bg-purple-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}>Konten</button>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <button onClick={prevMonth} className="p-2 hover:bg-zinc-100 rounded-xl transition"><ChevronLeft size={20} /></button>
-                    <span className="font-black text-lg min-w-[150px] text-center">{monthNames[calendarDate.getMonth()]} {calendarDate.getFullYear()}</span>
-                    <button onClick={nextMonth} className="p-2 hover:bg-zinc-100 rounded-xl transition"><ChevronRight size={20} /></button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-7 gap-px bg-zinc-200 border border-zinc-200 rounded-xl overflow-hidden">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="bg-zinc-50 py-3 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">{day}</div>
-                  ))}
-                  
-                  {calendarGrid.map((cell, idx) => {
-                    const cellEvents = combinedEvents.filter(evt => {
-                      if (evt.type === 'content') return evt.startDate === cell.dateStr;
-                      // Campaign date range filtering
-                      const cur = new Date(cell.dateStr);
-                      const st = new Date(evt.startDate); st.setHours(0,0,0,0);
-                      const en = new Date(evt.endDate); en.setHours(23,59,59,999);
-                      return cur >= st && cur <= en;
-                    });
-
-                    const isToday = new Date().toLocaleDateString('id-ID') === new Date(cell.dateStr).toLocaleDateString('id-ID');
-
-                    return (
-                      <div 
-                        key={idx} 
-                        onClick={() => {
-                          if (cell.isCurrentMonth) {
-                            if (calendarFilter === 'campaign') {
-                              openEditModal('campaigns', -1, { startDate: cell.dateStr, endDate: cell.dateStr });
-                            } else {
-                              openEditModal('contents', -1, { date: cell.dateStr });
-                            }
-                          }
-                        }}
-                        className={`bg-white min-h-[120px] p-2 border-t border-zinc-100 transition hover:bg-zinc-50/80 cursor-pointer group/day ${cell.isCurrentMonth ? '' : 'opacity-40'}`}
-                      >
-                        <div className="flex justify-between items-center mb-2">
-                          <div className={`text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-zinc-900 text-white' : 'text-zinc-600 group-hover/day:bg-zinc-100'}`}>
-                            {cell.day}
-                          </div>
-                          {cell.isCurrentMonth && (
-                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-300 opacity-0 group-hover/day:opacity-100 transition">+ ADD</span>
-                          )}
-                        </div>
-                        <div className="space-y-1 max-h-[85px] overflow-y-auto hide-scrollbar">
-                          {cellEvents.map((evt) => (
-                            <div 
-                              key={evt.id} 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditModal(evt.type === 'campaign' ? 'campaigns' : 'contents', evt.origIdx);
-                              }}
-                              className={`text-[9px] font-bold px-2 py-1 rounded truncate border hover:scale-105 transition-all ${evt.color}`} 
-                              title={`${evt.title} (Click to Edit)`}
-                            >
-                              {evt.title}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+            {/* Content Overview */}
+            <section>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-200 pb-4 mb-6 gap-3">
+                <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-zinc-900">Content Overview</h3>
+                <div className="flex items-center gap-2 text-xs font-bold text-zinc-500">
+                  <span>{currentQuarter.range}</span>
                 </div>
               </div>
 
-              {/* Enhanced Sidebar: Segmented Info Lists */}
-              <div className="lg:col-span-3 space-y-6">
-                {/* Segment 1: Konten Section */}
-                <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm">
-                  <div className="flex justify-between items-center mb-4 border-b border-zinc-50 pb-2">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-purple-600">Recent Konten</h4>
-                    <button onClick={() => openEditModal('contents')} className="p-1 hover:bg-purple-50 text-purple-600 rounded transition"><Plus size={14}/></button>
-                  </div>
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                    {contents.length === 0 ? (
-                      <p className="text-xs text-zinc-300 italic text-center py-4">No content records yet</p>
-                    ) : (
-                      contents.slice().reverse().map((item: any) => {
+              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                      <tr>
+                        <th className="px-4 sm:px-6 py-4">Title</th>
+                        <th className="px-4 sm:px-6 py-4 hidden sm:table-cell">Platform</th>
+                        <th className="px-4 sm:px-6 py-4 hidden sm:table-cell">Account</th>
+                        <th className="px-4 sm:px-6 py-4 hidden md:table-cell">Type</th>
+                        <th className="px-4 sm:px-6 py-4">Status</th>
+                        <th className="px-4 sm:px-6 py-4 hidden sm:table-cell">Publish Date</th>
+                        <th className="px-4 sm:px-6 py-4 hidden md:table-cell">PIC</th>
+                        <th className="px-3 sm:px-4 py-4 w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {paginatedContents.length === 0 ? (
+                        <tr><td colSpan={8} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No content for Q{activeQuarter}</td></tr>
+                      ) : paginatedContents.map((item: any) => {
                         const origIdx = contents.indexOf(item);
                         return (
-                          <div key={`sidebar-c-${origIdx}`} onClick={() => openEditModal('contents', origIdx)} className="p-3 bg-purple-50/50 hover:bg-purple-50 rounded-2xl border border-purple-100/50 transition cursor-pointer">
-                            <div className="flex justify-between gap-2 items-start mb-1">
-                              <p className="text-xs font-bold text-zinc-900 leading-tight line-clamp-2">{item.title}</p>
-                              <span className="text-[7px] font-black bg-purple-100 text-purple-800 px-1 rounded shrink-0">{item.platform}</span>
-                            </div>
-                            <div className="flex justify-between text-[9px] mt-2 font-medium text-zinc-500">
-                              <span>{formatDate(item.date)}</span>
-                              <span className={`uppercase font-bold text-[8px] ${item.status === 'Published' ? 'text-emerald-600' : 'text-amber-600'}`}>{item.status}</span>
-                            </div>
-                          </div>
+                          <tr key={origIdx} className="hover:bg-zinc-50 transition group">
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 font-bold text-zinc-900 text-xs sm:text-sm max-w-[200px] truncate" title={item.title}>{item.title}</td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 hidden sm:table-cell">
+                              <span className="text-[8px] px-2 py-0.5 font-black uppercase rounded border border-purple-200 bg-purple-50 text-purple-600">{item.platform}</span>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 text-xs text-zinc-500 font-bold hidden sm:table-cell">{item.account || '-'}</td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 text-[10px] font-bold text-zinc-400 hidden md:table-cell">{item.contentType || '-'}</td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5">
+                              <span className={`text-[8px] px-2 py-0.5 font-black uppercase rounded border ${item.status === 'Published' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : item.status === 'Scheduled' ? 'border-blue-200 bg-blue-50 text-blue-600' : item.status === 'Finalized' ? 'border-violet-200 bg-violet-50 text-violet-600' : 'border-amber-200 bg-amber-50 text-amber-600'}`}>
+                                {item.status}
+                              </span>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 text-[10px] font-bold text-zinc-400 hidden sm:table-cell whitespace-nowrap">{formatDate(item.date)}</td>
+                            <td className="px-4 sm:px-6 py-4 sm:py-5 text-xs text-zinc-500 font-bold hidden md:table-cell">{item.pic || '-'}</td>
+                            <td className="px-3 sm:px-4 py-4 sm:py-5">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <button onClick={() => openEditModal('contents', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                                <button onClick={() => handleDeleteItem('contents', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                              </div>
+                            </td>
+                          </tr>
                         );
-                      })
-                    )}
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {totalContentPages > 1 && (
+                  <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-t border-zinc-100 bg-zinc-50">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                      {(contentPage - 1) * CONTENTS_PER_PAGE + 1}–{Math.min(contentPage * CONTENTS_PER_PAGE, filteredContents.length)} of {filteredContents.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setContentPage(p => Math.max(1, p - 1))} disabled={contentPage === 1}
+                        className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                        Prev
+                      </button>
+                      {Array.from({ length: totalContentPages }, (_, i) => i + 1).map(page => (
+                        <button key={page} onClick={() => setContentPage(page)}
+                          className={`w-8 h-8 text-[10px] font-black rounded-lg transition ${contentPage === page ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}>
+                          {page}
+                        </button>
+                      ))}
+                      <button onClick={() => setContentPage(p => Math.min(totalContentPages, p + 1))} disabled={contentPage === totalContentPages}
+                        className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+        {activeTab === 'ContentCalendar' && (
+          <div className="animate-in fade-in">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">Content Calendar</h3>
+                <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Manage your content schedule</p>
+              </div>
+              {renderCalendarNav()}
+            </div>
+            {renderCalendar(contentEvents, 'contents', (dateStr: string) => ({ date: dateStr }))}
+          </div>
+        )}
+
+        {/* === CAMPAIGN CALENDAR TAB === */}
+        {activeTab === 'CampaignCalendar' && (
+          <div className="animate-in fade-in">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight text-zinc-900">Campaign Calendar</h3>
+                <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Track campaign periods and timelines</p>
+              </div>
+              {renderCalendarNav()}
+            </div>
+            {renderCalendar(campaignEvents, 'campaigns', (dateStr: string) => ({ startDate: dateStr, endDate: dateStr }))}
+          </div>
+        )}
+
+        {/* === BUDGET TAB === */}
+        {activeTab === 'Budget' && (
+          <div className="space-y-8 animate-in fade-in">
+            <section>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-black tracking-tight leading-tight">Budget Disbursement</h3>
+                  <p className="text-xs sm:text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="bg-zinc-900 text-white p-5 sm:p-6 rounded-2xl shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet size={48} /></div>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Budget Limit</h4>
+                  <div className="text-xl sm:text-2xl font-black tracking-tighter text-white">{formatIDR(maxBudget)}</div>
+                  <div className="mt-3 border-t border-white/10 pt-3">
+                    <div className="flex justify-between text-[10px] font-bold text-zinc-400 mb-1.5">
+                      <span>USAGE</span>
+                      <span className="text-white">{budgetUsagePercent.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-700 ${budgetUsagePercent > 90 ? 'bg-rose-500' : budgetUsagePercent > 70 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${budgetUsagePercent}%` }} />
+                    </div>
                   </div>
                 </div>
 
-                {/* Segment 2: Campaigns List */}
-                <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4">Campaign Monitor</h4>
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                    {campaigns.length === 0 ? (
-                      <p className="text-xs text-zinc-300 italic text-center py-4">No active campaigns found</p>
-                    ) : (
-                      campaigns.map((camp: any, idx: number) => {
-                        const hasDates = camp.startDate && camp.endDate;
-                        return (
-                          <div key={`sidebar-camp-${idx}`} onClick={() => openEditModal('campaigns', idx)} className={`p-3 rounded-2xl border transition cursor-pointer hover:border-zinc-400 ${hasDates ? 'bg-zinc-50 border-zinc-100' : 'bg-rose-50/50 border-rose-100'}`}>
-                            <div className="flex justify-between items-start gap-2 mb-1">
-                              <h5 className="font-bold text-xs text-zinc-900 leading-tight line-clamp-2">{camp.name}</h5>
-                              <span className={`text-[8px] px-1.5 py-0.5 font-black uppercase rounded border shrink-0 ${camp.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : camp.status === 'Planned' ? 'border-blue-200 bg-blue-50 text-blue-600' : 'bg-zinc-100 text-zinc-400 border-zinc-200'}`}>{camp.status}</span>
-                            </div>
-                            {hasDates ? (
-                              <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">{formatDate(camp.startDate)} - {formatDate(camp.endDate)}</p>
-                            ) : (
-                              <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest mt-1 flex items-center gap-1">⚠️ No Date</p>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
+                <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingDown size={48} /></div>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Total Disbursed</h4>
+                  <div className="text-xl sm:text-2xl font-black tracking-tighter text-emerald-600">{formatIDR(totalSpent)}</div>
+                  <div className="text-[10px] font-bold text-zinc-400 mt-2">{budgetData.length} transaction{budgetData.length !== 1 ? 's' : ''}</div>
+                </div>
+
+                <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Remaining</h4>
+                  <div className={`text-xl sm:text-2xl font-black tracking-tighter ${remaining >= 0 ? 'text-zinc-900' : 'text-rose-600'}`}>{formatIDR(remaining)}</div>
+                  <div className="text-[10px] font-bold text-zinc-400 mt-2">{remaining >= 0 ? 'Available' : 'Over Budget!'}</div>
+                </div>
+
+                {sortedCategories.length > 0 && (
+                  <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Top Category</h4>
+                    <div className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900">{formatIDR(sortedCategories[0][1] as number)}</div>
+                    <div className="text-[10px] font-bold text-zinc-400 mt-2 uppercase">{sortedCategories[0][0]} • {totalSpent > 0 ? (((sortedCategories[0][1] as number) / totalSpent) * 100).toFixed(1) : 0}%</div>
                   </div>
+                )}
+              </div>
+
+              {sortedCategories.length > 1 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+                  {sortedCategories.map(([cat, amount]: any) => (
+                    <div key={cat} className="bg-white border border-zinc-100 p-4 rounded-xl hover:border-zinc-300 transition">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">{cat}</div>
+                      <div className="text-sm font-black tracking-tight text-zinc-900">{formatIDR(amount)}</div>
+                      <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden mt-2">
+                        <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${totalSpent > 0 ? (amount / totalSpent) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                      <tr>
+                        <th className="px-4 sm:px-6 py-4">Date</th>
+                        <th className="px-4 sm:px-6 py-4">Category</th>
+                        <th className="px-4 sm:px-6 py-4 hidden sm:table-cell min-w-[180px]">Description</th>
+                        <th className="px-4 sm:px-6 py-4 text-right">Amount</th>
+                        <th className="px-3 sm:px-4 py-4 w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {budgetData.length === 0 ? (
+                        <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending recorded</td></tr>
+                      ) : (
+                        budgetData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => {
+                          const origIdx = budgetData.indexOf(row);
+                          return (
+                            <tr key={idx} className="hover:bg-zinc-50 transition group">
+                              <td className="px-4 sm:px-6 py-4 sm:py-5 font-bold whitespace-nowrap text-xs sm:text-sm">{formatDate(row.date)}</td>
+                              <td className="px-4 sm:px-6 py-4 sm:py-5">
+                                <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span>
+                              </td>
+                              <td className="px-4 sm:px-6 py-4 sm:py-5 text-zinc-500 font-medium italic hidden sm:table-cell">{row.description || '-'}</td>
+                              <td className="px-4 sm:px-6 py-4 sm:py-5 text-right font-mono font-bold text-zinc-900 text-xs sm:text-sm whitespace-nowrap">{formatIDR(row.amount)}</td>
+                              <td className="px-3 sm:px-4 py-4 sm:py-5">
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                  <button onClick={() => openEditModal('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                                  <button onClick={() => handleDeleteItem('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
+            </section>
           </div>
         )}
       </div>

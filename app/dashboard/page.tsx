@@ -128,9 +128,13 @@ export default function MinimalistDashboard() {
     const startMonth = (q - 1) * 3;
     const start = new Date(y, startMonth, 1);
     const end = new Date(y, startMonth + 3, 0); // last day of quarter
+    const fmt = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: fmt(start),
+      end: fmt(end),
     };
   };
   const currentQ = Math.ceil((new Date().getMonth() + 1) / 3);

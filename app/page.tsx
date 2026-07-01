@@ -21,9 +21,15 @@ export default function StrategyHome() {
     const startMonth = (q - 1) * 3;
     const start = new Date(y, startMonth, 1);
     const end = new Date(y, startMonth + 3, 0); // last day of quarter
+    
+    const fmt = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: fmt(start),
+      end: fmt(end),
     };
   };
   const currentQ = Math.ceil((new Date().getMonth() + 1) / 3);
@@ -33,9 +39,9 @@ export default function StrategyHome() {
   const [revenueEndDate, setRevenueEndDate] = useState(defaultDates.end);
 
   const selectedQuarterStr = useMemo(() => {
-    const sd = new Date(revenueStartDate);
-    const q = Math.ceil((sd.getMonth() + 1) / 3);
-    return `Q${q} ${sd.getFullYear()}`;
+    const [y, m] = revenueStartDate.split('-');
+    const q = Math.ceil(parseInt(m || '1', 10) / 3);
+    return `Q${q} ${y}`;
   }, [revenueStartDate]);
 
   // Fetch Academy revenue directly from Supabase via /api/bi (not from localStorage)
@@ -71,8 +77,17 @@ export default function StrategyHome() {
       .filter((p: any) => p.status === 'success' && p.payment_methode?.toLowerCase() === 'midtrans')
       .reduce((sum: number, p: any) => sum + (p.detail_amount?.total || p.total || 0), 0) + manualPlatformActual;
 
-    const academyTarget = 60000000;
-    const platformTarget = 40000000;
+    const monthStr = revenueStartDate.split('-')[1];
+    const q = Math.ceil(parseInt(monthStr || '1', 10) / 3);
+
+    let academyTarget = 60000000;
+    let platformTarget = 40000000;
+
+    if (q === 3 || q === 4) {
+      // Total 200M target, maintaining the previous 60/40 ratio between Academy and Platform
+      academyTarget = 120000000;
+      platformTarget = 80000000;
+    }
 
     return {
       academy: { 
@@ -92,7 +107,7 @@ export default function StrategyHome() {
       },
       isLoading: academyLoading || platformLoading,
     };
-  }, [supabasePayData, allPayments, academyLoading, platformLoading]);
+  }, [supabasePayData, allPayments, academyLoading, platformLoading, revenueStartDate]);
 
   return (
     <div className="bg-zinc-50 min-h-screen text-zinc-900 font-sans pb-24 selection:bg-zinc-900 selection:text-white">
@@ -144,19 +159,15 @@ export default function StrategyHome() {
             {/* CEO Root */}
             <div className="border-2 border-zinc-900 bg-white px-10 py-4 text-lg font-black tracking-[0.2em] uppercase z-10 rounded-xl shadow-lg">CEO</div>
 
-            {/* Connector Lines */}
-            <div className="w-[2px] bg-zinc-900 h-10"></div>
-            <div className="h-[2px] bg-zinc-900 w-[60%] md:w-[50%]"></div>
-            <div className="flex justify-between w-[60%] md:w-[50%] h-8">
-              <div className="border-l-2 border-zinc-900"></div><div className="border-r-2 border-zinc-900"></div>
-            </div>
+            {/* Connector Line */}
+            <div className="w-[2px] bg-zinc-900 h-12"></div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-12 w-full mt-0">
+            <div className="flex flex-col items-center w-full mt-0">
               {/* Pillar 1: HOB */}
-              <div className="flex flex-col items-center w-full max-w-sm mx-auto">
+              <div className="flex flex-col items-center w-full max-w-4xl mx-auto">
                 <div
                   onClick={() => setActiveRole('hob')}
-                  className={`border-2 p-8 w-full text-center cursor-pointer transition-all rounded-2xl ${activeRole === 'hob' ? 'bg-zinc-900 text-white border-zinc-900 scale-105 shadow-xl' : 'bg-white border-zinc-200 hover:border-zinc-900 hover:shadow-lg'}`}
+                  className={`border-2 p-8 w-full max-w-sm text-center cursor-pointer transition-all rounded-2xl ${activeRole === 'hob' ? 'bg-zinc-900 text-white border-zinc-900 scale-105 shadow-xl' : 'bg-white border-zinc-200 hover:border-zinc-900 hover:shadow-lg'}`}
                 >
                   <h3 className="font-black text-xl mb-1">Head of Business</h3>
                   <p className={`text-xs font-bold tracking-widest ${activeRole === 'hob' ? 'text-zinc-400' : 'text-zinc-400'} uppercase`}>Hadi</p>
@@ -164,18 +175,18 @@ export default function StrategyHome() {
 
                 <div className="w-[2px] bg-zinc-200 h-8"></div>
 
-                <div className="grid grid-cols-2 gap-4 w-full">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
                   {/* Growth Team Branch */}
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col items-center gap-3 w-full">
                     <div
                       onClick={() => setActiveRole('dwi')}
-                      className={`border-2 p-4 text-center cursor-pointer transition-all rounded-xl ${activeRole === 'dwi' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white border-zinc-200 hover:border-zinc-900'}`}
+                      className={`border-2 p-4 text-center cursor-pointer transition-all rounded-xl w-full ${activeRole === 'dwi' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white border-zinc-200 hover:border-zinc-900'}`}
                     >
                       <h4 className="text-sm font-black mb-1">Growth Lead</h4>
                       <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Dwi</p>
                     </div>
                     {/* Sub-team */}
-                    <div className="flex flex-col gap-2 pl-4 border-l-2 border-zinc-100 ml-4">
+                    <div className="flex flex-col gap-2 pl-4 border-l-2 border-zinc-100 ml-0 w-[90%]">
                       {['wina', 'annisa', 'fariz'].map((name) => (
                         <div
                           key={name}
@@ -189,34 +200,36 @@ export default function StrategyHome() {
                   </div>
 
                   {/* PSE Team Branch */}
-                  <div
-                    onClick={() => setActiveRole('pse_team')}
-                    className={`border-2 p-4 text-center cursor-pointer transition-all rounded-xl h-fit ${activeRole === 'pse_team' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white border-zinc-200 hover:border-zinc-900'}`}
-                  >
-                    <h4 className="text-sm font-black mb-1">PSE Team</h4>
-                    <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Zhafran, Lossa, Amel</p>
+                  <div className="flex flex-col items-center w-full">
+                    <div
+                      onClick={() => setActiveRole('pse_team')}
+                      className={`border-2 p-4 text-center cursor-pointer transition-all rounded-xl w-full h-fit ${activeRole === 'pse_team' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white border-zinc-200 hover:border-zinc-900'}`}
+                    >
+                      <h4 className="text-sm font-black mb-1">PSE Team</h4>
+                      <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Zhafran, Lossa, Amel</p>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Pillar 2: Enterprise Lead */}
-              <div className="flex flex-col items-center w-full max-w-sm mx-auto">
-                <div
-                  onClick={() => setActiveRole('enterprise_lead')}
-                  className={`border-2 p-8 w-full text-center cursor-pointer transition-all rounded-2xl ${activeRole === 'enterprise_lead' ? 'bg-zinc-900 text-white border-zinc-900 scale-105 shadow-xl' : 'bg-white border-zinc-200 hover:border-zinc-900 hover:shadow-lg'}`}
-                >
-                  <h3 className="font-black text-xl mb-1">Enterprise Lead</h3>
-                  <p className={`text-xs font-bold tracking-widest ${activeRole === 'enterprise_lead' ? 'text-zinc-400' : 'text-zinc-400'} uppercase`}>Andrew</p>
-                </div>
+                  {/* Enterprise Branch */}
+                  <div className="flex flex-col items-center gap-3 w-full">
+                    <div
+                      onClick={() => setActiveRole('enterprise_lead')}
+                      className={`border-2 p-4 text-center cursor-pointer transition-all rounded-xl w-full ${activeRole === 'enterprise_lead' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white border-zinc-200 hover:border-zinc-900'}`}
+                    >
+                      <h4 className="text-sm font-black mb-1">Enterprise Lead</h4>
+                      <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Andrew</p>
+                    </div>
 
-                <div className="w-[2px] bg-zinc-200 h-8"></div>
-
-                <div
-                  onClick={() => setActiveRole('sales_enterprise')}
-                  className={`border-2 p-6 w-full max-w-[240px] text-center cursor-pointer transition-all rounded-xl ${activeRole === 'sales_enterprise' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white border-zinc-200 hover:border-zinc-900'}`}
-                >
-                  <h4 className="text-sm font-black mb-1">Sales Enterprise</h4>
-                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">Rani & Titan</p>
+                    {/* Sales Enterprise under Enterprise Lead */}
+                    <div className="flex flex-col gap-2 pl-4 border-l-2 border-zinc-100 ml-0 w-[90%]">
+                      <div
+                        onClick={() => setActiveRole('sales_enterprise')}
+                        className={`border p-3 text-center text-xs cursor-pointer transition-all rounded-lg font-black uppercase tracking-wider ${activeRole === 'sales_enterprise' ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white border-zinc-200 hover:border-zinc-900'}`}
+                      >
+                        Sales Ent (Rani & Titan)
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

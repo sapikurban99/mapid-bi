@@ -42,15 +42,19 @@ export default function GrowthIntelligencePage() {
     useEffect(() => { setMounted(true); }, []);
 
     // --- QUARTER FILTER LOGIC ---
-    const getQuarterDates = (q: number, y: number) => {
-        const startMonth = (q - 1) * 3;
-        const start = new Date(y, startMonth, 1);
-        const end = new Date(y, startMonth + 3, 0);
-        return {
-            start: start.toISOString().split('T')[0],
-            end: end.toISOString().split('T')[0],
-        };
+  const getQuarterDates = (q: number, y: number) => {
+    const startMonth = (q - 1) * 3;
+    const start = new Date(y, startMonth, 1);
+    const end = new Date(y, startMonth + 3, 0);
+    const fmt = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     };
+    return {
+      start: fmt(start),
+      end: fmt(end),
+    };
+  };
     const currentQ = Math.ceil((new Date().getMonth() + 1) / 3);
     const currentY = new Date().getFullYear();
     const defaultDates = getQuarterDates(currentQ, currentY);

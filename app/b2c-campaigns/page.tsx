@@ -107,8 +107,10 @@ export default function B2CCampaignsPage() {
   const [activeQuarter, setActiveQuarter] = useState<1 | 2 | 3 | 4>(Math.ceil((new Date().getMonth() + 1) / 3) as 1 | 2 | 3 | 4);
   const [campaignPage, setCampaignPage] = useState(1);
   const [contentPage, setContentPage] = useState(1);
+  const [budgetPage, setBudgetPage] = useState(1);
   const CAMPAIGNS_PER_PAGE = 5;
   const CONTENTS_PER_PAGE = 5;
+  const BUDGET_PER_PAGE = 10;
   const [activeTab, setActiveTab] = useState<'Overview' | 'ContentCalendar' | 'CampaignCalendar' | 'Budget'>('Overview');
   const [calendarView, setCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -207,6 +209,16 @@ export default function B2CCampaignsPage() {
 
   const totalContentPages = Math.max(1, Math.ceil(filteredContents.length / CONTENTS_PER_PAGE));
   const paginatedContents = filteredContents.slice((contentPage - 1) * CONTENTS_PER_PAGE, contentPage * CONTENTS_PER_PAGE);
+
+  const filteredBudget = useMemo(() => {
+    return (config.biData?.budget || []).filter((b: any) => {
+      if (!b.date) return false;
+      return b.date <= currentQuarter.end && b.date >= currentQuarter.start;
+    });
+  }, [config.biData?.budget, currentQuarter]);
+
+  const totalBudgetPages = Math.max(1, Math.ceil(filteredBudget.length / BUDGET_PER_PAGE));
+  const paginatedBudget = filteredBudget.slice((budgetPage - 1) * BUDGET_PER_PAGE, budgetPage * BUDGET_PER_PAGE);
 
   const budgetData = config.biData?.budget || [];
   const totalSpent = budgetData.reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
@@ -587,16 +599,34 @@ export default function B2CCampaignsPage() {
         {/* === OVERVIEW TAB === */}
         {activeTab === 'Overview' && (
           <div className="space-y-8 animate-in fade-in">
+            {/* Global Quarter Filter */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-zinc-900">Overview</h3>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-zinc-100 p-1.5 rounded-xl border border-zinc-200">
+                  {([1, 2, 3, 4] as const).map(q => (
+                    <button key={q} onClick={() => { setActiveQuarter(q); setCampaignPage(1); setContentPage(1); setBudgetPage(1); }}
+                      className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeQuarter === q ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}>
+                      Q{q}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs font-bold text-zinc-500">{currentQuarter.range}</span>
+              </div>
+            </div>
+
             {/* Summary Metrics */}
             {(() => {
               const publishedCount = filteredContents.filter((c: any) => c.status === 'Published').length;
               const activeCampaigns = filteredCampaigns.filter((c: any) => c.status === 'Active').length;
               const totalLeads = filteredCampaigns.reduce((acc: number, c: any) => acc + (Number(c.leads) || 0), 0);
+              const filteredBudgetTotal = filteredBudget.reduce((acc: number, b: any) => acc + (Number(b.amount) || 0), 0);
+              const filteredBudgetPct = maxBudget > 0 ? Math.min((filteredBudgetTotal / maxBudget) * 100, 100) : 0;
               const metrics = [
                 { label: 'Content Published', value: `${publishedCount}/${filteredContents.length}`, sub: `${filteredContents.length - publishedCount} remaining`, color: 'bg-purple-600', icon: '📱' },
                 { label: 'Active Campaigns', value: activeCampaigns, sub: `of ${filteredCampaigns.length} total`, color: 'bg-emerald-600', icon: '🎯' },
                 { label: 'Total Leads', value: totalLeads.toLocaleString('id-ID'), sub: `from ${activeCampaigns} active`, color: 'bg-blue-600', icon: '📊' },
-                { label: 'Budget Spent', value: formatIDR(totalSpent), sub: `${budgetUsagePercent.toFixed(1)}% of ${formatIDR(maxBudget)}`, color: 'bg-zinc-900', icon: '💰' },
+                { label: 'Budget Spent', value: formatIDR(filteredBudgetTotal), sub: `${filteredBudgetPct.toFixed(1)}% of ${formatIDR(maxBudget)}`, color: 'bg-zinc-900', icon: '💰' },
               ];
               return (
                 <section>
@@ -619,19 +649,6 @@ export default function B2CCampaignsPage() {
             <section>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-200 pb-4 mb-6 gap-3">
                 <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-zinc-900">Campaign Overview</h3>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-1.5 bg-zinc-100 p-1.5 rounded-xl border border-zinc-200">
-                    {([1, 2, 3, 4] as const).map(q => (
-                      <button key={q} onClick={() => { setActiveQuarter(q); setCampaignPage(1); setContentPage(1); }}
-                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeQuarter === q ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}>
-                        Q{q}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-500">
-                    <span>{currentQuarter.range}</span>
-                  </div>
-                </div>
               </div>
 
               {/* Campaign Table */}
@@ -710,11 +727,8 @@ export default function B2CCampaignsPage() {
 
             {/* Content Overview */}
             <section>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-200 pb-4 mb-6 gap-3">
+              <div className="border-b border-zinc-200 pb-4 mb-6">
                 <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-zinc-900">Content Overview</h3>
-                <div className="flex items-center gap-2 text-xs font-bold text-zinc-500">
-                  <span>{currentQuarter.range}</span>
-                </div>
               </div>
 
               <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
@@ -822,107 +836,155 @@ export default function B2CCampaignsPage() {
         {/* === BUDGET TAB === */}
         {activeTab === 'Budget' && (
           <div className="space-y-8 animate-in fade-in">
-            <section>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-                <div>
-                  <h3 className="text-lg sm:text-xl font-black tracking-tight leading-tight">Budget Disbursement</h3>
-                  <p className="text-xs sm:text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="bg-zinc-900 text-white p-5 sm:p-6 rounded-2xl shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet size={48} /></div>
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Budget Limit</h4>
-                  <div className="text-xl sm:text-2xl font-black tracking-tighter text-white">{formatIDR(maxBudget)}</div>
-                  <div className="mt-3 border-t border-white/10 pt-3">
-                    <div className="flex justify-between text-[10px] font-bold text-zinc-400 mb-1.5">
-                      <span>USAGE</span>
-                      <span className="text-white">{budgetUsagePercent.toFixed(1)}%</span>
+            {(() => {
+              const filteredTotalSpent = filteredBudget.reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
+              const filteredRemaining = maxBudget - filteredTotalSpent;
+              const filteredUsagePercent = maxBudget > 0 ? Math.min((filteredTotalSpent / maxBudget) * 100, 100) : 0;
+              const filteredSpentByCat = filteredBudget.reduce((acc: any, item: any) => {
+                const cat = item.category || 'Other';
+                acc[cat] = (acc[cat] || 0) + (Number(item.amount) || 0);
+                return acc;
+              }, {} as Record<string, number>);
+              const filteredSortedCats = Object.entries(filteredSpentByCat).sort((a: any, b: any) => b[1] - a[1]);
+              return (
+              <section>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-black tracking-tight leading-tight">Budget Disbursement</h3>
+                    <p className="text-xs sm:text-sm text-zinc-400 font-bold uppercase tracking-widest">Operational Spending Overview</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-1.5 bg-zinc-100 p-1.5 rounded-xl border border-zinc-200">
+                      {([1, 2, 3, 4] as const).map(q => (
+                        <button key={q} onClick={() => { setActiveQuarter(q); setBudgetPage(1); }}
+                          className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap ${activeQuarter === q ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}>
+                          Q{q}
+                        </button>
+                      ))}
                     </div>
-                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-700 ${budgetUsagePercent > 90 ? 'bg-rose-500' : budgetUsagePercent > 70 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${budgetUsagePercent}%` }} />
-                    </div>
+                    <div className="text-xs font-bold text-zinc-500">{currentQuarter.range}</div>
                   </div>
                 </div>
 
-                <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingDown size={48} /></div>
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Total Disbursed</h4>
-                  <div className="text-xl sm:text-2xl font-black tracking-tighter text-emerald-600">{formatIDR(totalSpent)}</div>
-                  <div className="text-[10px] font-bold text-zinc-400 mt-2">{budgetData.length} transaction{budgetData.length !== 1 ? 's' : ''}</div>
-                </div>
-
-                <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Remaining</h4>
-                  <div className={`text-xl sm:text-2xl font-black tracking-tighter ${remaining >= 0 ? 'text-zinc-900' : 'text-rose-600'}`}>{formatIDR(remaining)}</div>
-                  <div className="text-[10px] font-bold text-zinc-400 mt-2">{remaining >= 0 ? 'Available' : 'Over Budget!'}</div>
-                </div>
-
-                {sortedCategories.length > 0 && (
-                  <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Top Category</h4>
-                    <div className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900">{formatIDR(sortedCategories[0][1] as number)}</div>
-                    <div className="text-[10px] font-bold text-zinc-400 mt-2 uppercase">{sortedCategories[0][0]} • {totalSpent > 0 ? (((sortedCategories[0][1] as number) / totalSpent) * 100).toFixed(1) : 0}%</div>
-                  </div>
-                )}
-              </div>
-
-              {sortedCategories.length > 1 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-                  {sortedCategories.map(([cat, amount]: any) => (
-                    <div key={cat} className="bg-white border border-zinc-100 p-4 rounded-xl hover:border-zinc-300 transition">
-                      <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">{cat}</div>
-                      <div className="text-sm font-black tracking-tight text-zinc-900">{formatIDR(amount)}</div>
-                      <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden mt-2">
-                        <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${totalSpent > 0 ? (amount / totalSpent) * 100 : 0}%` }} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  <div className="bg-zinc-900 text-white p-5 sm:p-6 rounded-2xl shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet size={48} /></div>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Budget Limit</h4>
+                    <div className="text-xl sm:text-2xl font-black tracking-tighter text-white">{formatIDR(maxBudget)}</div>
+                    <div className="mt-3 border-t border-white/10 pt-3">
+                      <div className="flex justify-between text-[10px] font-bold text-zinc-400 mb-1.5">
+                        <span>USAGE</span>
+                        <span className="text-white">{filteredUsagePercent.toFixed(1)}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-700 ${filteredUsagePercent > 90 ? 'bg-rose-500' : filteredUsagePercent > 70 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${filteredUsagePercent}%` }} />
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
 
-              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
-                      <tr>
-                        <th className="px-4 sm:px-6 py-4">Date</th>
-                        <th className="px-4 sm:px-6 py-4">Category</th>
-                        <th className="px-4 sm:px-6 py-4 hidden sm:table-cell min-w-[180px]">Description</th>
-                        <th className="px-4 sm:px-6 py-4 text-right">Amount</th>
-                        <th className="px-3 sm:px-4 py-4 w-16"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {budgetData.length === 0 ? (
-                        <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending recorded</td></tr>
-                      ) : (
-                        budgetData.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => {
-                          const origIdx = budgetData.indexOf(row);
-                          return (
-                            <tr key={idx} className="hover:bg-zinc-50 transition group">
-                              <td className="px-4 sm:px-6 py-4 sm:py-5 font-bold whitespace-nowrap text-xs sm:text-sm">{formatDate(row.date)}</td>
-                              <td className="px-4 sm:px-6 py-4 sm:py-5">
-                                <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4 sm:py-5 text-zinc-500 font-medium italic hidden sm:table-cell">{row.description || '-'}</td>
-                              <td className="px-4 sm:px-6 py-4 sm:py-5 text-right font-mono font-bold text-zinc-900 text-xs sm:text-sm whitespace-nowrap">{formatIDR(row.amount)}</td>
-                              <td className="px-3 sm:px-4 py-4 sm:py-5">
-                                <div className="flex items-center gap-1">
-                                  <button onClick={() => openEditModal('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
-                                  <button onClick={() => handleDeleteItem('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
+                  <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingDown size={48} /></div>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Total Disbursed</h4>
+                    <div className="text-xl sm:text-2xl font-black tracking-tighter text-emerald-600">{formatIDR(filteredTotalSpent)}</div>
+                    <div className="text-[10px] font-bold text-zinc-400 mt-2">{filteredBudget.length} transaction{filteredBudget.length !== 1 ? 's' : ''}</div>
+                  </div>
+
+                  <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Remaining</h4>
+                    <div className={`text-xl sm:text-2xl font-black tracking-tighter ${filteredRemaining >= 0 ? 'text-zinc-900' : 'text-rose-600'}`}>{formatIDR(filteredRemaining)}</div>
+                    <div className="text-[10px] font-bold text-zinc-400 mt-2">{filteredRemaining >= 0 ? 'Available' : 'Over Budget!'}</div>
+                  </div>
+
+                  {filteredSortedCats.length > 0 && (
+                    <div className="bg-white border border-zinc-200 p-5 sm:p-6 rounded-2xl shadow-sm">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2">Top Category</h4>
+                      <div className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900">{formatIDR(filteredSortedCats[0][1] as number)}</div>
+                      <div className="text-[10px] font-bold text-zinc-400 mt-2 uppercase">{filteredSortedCats[0][0]} • {filteredTotalSpent > 0 ? (((filteredSortedCats[0][1] as number) / filteredTotalSpent) * 100).toFixed(1) : 0}%</div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </section>
+
+                {filteredSortedCats.length > 1 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+                    {filteredSortedCats.map(([cat, amount]: any) => (
+                      <div key={cat} className="bg-white border border-zinc-100 p-4 rounded-xl hover:border-zinc-300 transition">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">{cat}</div>
+                        <div className="text-sm font-black tracking-tight text-zinc-900">{formatIDR(amount)}</div>
+                        <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden mt-2">
+                          <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${filteredTotalSpent > 0 ? (amount / filteredTotalSpent) * 100 : 0}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-zinc-50 text-[10px] text-zinc-500 border-b border-zinc-200 uppercase font-black tracking-widest">
+                        <tr>
+                          <th className="px-4 sm:px-6 py-4">Date</th>
+                          <th className="px-4 sm:px-6 py-4">Category</th>
+                          <th className="px-4 sm:px-6 py-4 hidden sm:table-cell min-w-[180px]">Description</th>
+                          <th className="px-4 sm:px-6 py-4 text-right">Amount</th>
+                          <th className="px-3 sm:px-4 py-4 w-16"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {paginatedBudget.length === 0 ? (
+                          <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-400 font-bold text-xs uppercase tracking-widest">No spending for Q{activeQuarter}</td></tr>
+                        ) : (
+                          paginatedBudget.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime() || 0).map((row: any, idx: number) => {
+                            const origIdx = (config.biData?.budget || []).indexOf(row);
+                            return (
+                              <tr key={idx} className="hover:bg-zinc-50 transition group">
+                                <td className="px-4 sm:px-6 py-4 sm:py-5 font-bold whitespace-nowrap text-xs sm:text-sm">{formatDate(row.date)}</td>
+                                <td className="px-4 sm:px-6 py-4 sm:py-5">
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2 py-1 rounded inline-block whitespace-nowrap">{row.category}</span>
+                                </td>
+                                <td className="px-4 sm:px-6 py-4 sm:py-5 text-zinc-500 font-medium italic hidden sm:table-cell">{row.description || '-'}</td>
+                                <td className="px-4 sm:px-6 py-4 sm:py-5 text-right font-mono font-bold text-zinc-900 text-xs sm:text-sm whitespace-nowrap">{formatIDR(row.amount)}</td>
+                                <td className="px-3 sm:px-4 py-4 sm:py-5">
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => openEditModal('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
+                                    <button onClick={() => handleDeleteItem('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {totalBudgetPages > 1 && (
+                    <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-t border-zinc-100 bg-zinc-50">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                        {(budgetPage - 1) * BUDGET_PER_PAGE + 1}–{Math.min(budgetPage * BUDGET_PER_PAGE, filteredBudget.length)} of {filteredBudget.length}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setBudgetPage(p => Math.max(1, p - 1))} disabled={budgetPage === 1}
+                          className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                          Prev
+                        </button>
+                        {Array.from({ length: totalBudgetPages }, (_, i) => i + 1).map(page => (
+                          <button key={page} onClick={() => setBudgetPage(page)}
+                            className={`w-8 h-8 text-[10px] font-black rounded-lg transition ${budgetPage === page ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}>
+                            {page}
+                          </button>
+                        ))}
+                        <button onClick={() => setBudgetPage(p => Math.min(totalBudgetPages, p + 1))} disabled={budgetPage === totalBudgetPages}
+                          className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+              );
+            })()}
           </div>
         )}
       </div>

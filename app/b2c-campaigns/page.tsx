@@ -47,7 +47,7 @@ const BI_EDIT_CONFIG: Record<string, any> = {
 const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 const formatDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
-const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: any) => {
+const EditModal = ({ isOpen, onClose, onSave, onDelete, title, fields, data, onChange }: any) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-150">
@@ -87,7 +87,12 @@ const EditModal = ({ isOpen, onClose, onSave, title, fields, data, onChange }: a
             </div>
           ))}
         </div>
-        <div className="p-6 border-t border-zinc-100 flex gap-3">
+        <div className="p-6 border-t border-zinc-100 flex gap-2">
+          {onDelete && (
+            <button onClick={onDelete} className="px-4 py-3 bg-rose-50 text-rose-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-rose-100 transition border border-rose-200">
+              <Trash2 size={12} className="inline mr-1.5" /> Delete
+            </button>
+          )}
           <button onClick={onClose} className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 transition">Cancel</button>
           <button onClick={onSave} className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg">Save Changes</button>
         </div>
@@ -151,6 +156,7 @@ export default function B2CCampaignsPage() {
 
   const handleDeleteItem = async (section: string, index: number) => {
     if (!confirm('Delete this item?')) return;
+    setEditModal(null);
     setSaveStatus('saving');
     const newConfig = JSON.parse(JSON.stringify(config));
     if (newConfig.biData?.[section]) {
@@ -663,7 +669,7 @@ export default function B2CCampaignsPage() {
                               {camp.startDate ? `${formatDate(camp.startDate)}${camp.endDate ? ` – ${formatDate(camp.endDate)}` : ''}` : '-'}
                             </td>
                             <td className="px-3 sm:px-4 py-4 sm:py-5">
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                              <div className="flex items-center gap-1">
                                 <button onClick={() => openEditModal('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
                                 <button onClick={() => handleDeleteItem('campaigns', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
                               </div>
@@ -747,7 +753,7 @@ export default function B2CCampaignsPage() {
                             <td className="px-4 sm:px-6 py-4 sm:py-5 text-[10px] font-bold text-zinc-400 hidden sm:table-cell whitespace-nowrap">{formatDate(item.date)}</td>
                             <td className="px-4 sm:px-6 py-4 sm:py-5 text-xs text-zinc-500 font-bold hidden md:table-cell">{item.pic || '-'}</td>
                             <td className="px-3 sm:px-4 py-4 sm:py-5">
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                              <div className="flex items-center gap-1">
                                 <button onClick={() => openEditModal('contents', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
                                 <button onClick={() => handleDeleteItem('contents', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
                               </div>
@@ -903,7 +909,7 @@ export default function B2CCampaignsPage() {
                               <td className="px-4 sm:px-6 py-4 sm:py-5 text-zinc-500 font-medium italic hidden sm:table-cell">{row.description || '-'}</td>
                               <td className="px-4 sm:px-6 py-4 sm:py-5 text-right font-mono font-bold text-zinc-900 text-xs sm:text-sm whitespace-nowrap">{formatIDR(row.amount)}</td>
                               <td className="px-3 sm:px-4 py-4 sm:py-5">
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <div className="flex items-center gap-1">
                                   <button onClick={() => openEditModal('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 size={12} /></button>
                                   <button onClick={() => handleDeleteItem('budget', origIdx)} className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><Trash2 size={12} /></button>
                                 </div>
@@ -921,7 +927,7 @@ export default function B2CCampaignsPage() {
         )}
       </div>
 
-      <EditModal isOpen={!!editModal} onClose={() => setEditModal(null)} onSave={handleSaveEdit} title={`${editModal?.index! >= 0 ? 'Edit' : 'Add'} ${BI_EDIT_CONFIG[editModal?.section!]?.title}`} fields={BI_EDIT_CONFIG[editModal?.section!]?.fields || []} data={editModal?.data} onChange={handleEditField} />
+      <EditModal isOpen={!!editModal} onClose={() => setEditModal(null)} onSave={handleSaveEdit} onDelete={editModal?.index! >= 0 ? () => handleDeleteItem(editModal!.section, editModal!.index!) : undefined} title={`${editModal?.index! >= 0 ? 'Edit' : 'Add'} ${BI_EDIT_CONFIG[editModal?.section!]?.title}`} fields={BI_EDIT_CONFIG[editModal?.section!]?.fields || []} data={editModal?.data} onChange={handleEditField} />
 
       {saveStatus !== 'idle' && (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4 duration-200">

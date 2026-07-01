@@ -75,9 +75,9 @@ export async function GET() {
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
     const { data: existingMails } = await supabase
       .from('client_emails')
-      .select('message_id')
+      .select('subject')
       .gte('email_date', threeDaysAgo.toISOString());
-    const existingMsgIds = new Set((existingMails || []).map(m => m.message_id));
+    const existingSubjects = new Set((existingMails || []).map(m => m.subject));
 
     let lock = await client.getMailboxLock('INBOX');
     let matchedEmails = [];
@@ -95,9 +95,8 @@ export async function GET() {
           try {
             const parsed = (await simpleParser(message.source || Buffer.from(''))) as any;
             const subject = parsed.subject || '';
-            const msgId = parsed.messageId || String(message.uid);
             
-            if (existingMsgIds.has(msgId)) continue; // skip duplicates
+            if (existingSubjects.has(subject)) continue; // skip duplicates
 
             // Check if subject contains any client name (case insensitive)
             const subjectLower = subject.toLowerCase();
@@ -113,13 +112,11 @@ export async function GET() {
             if (matchedClient) {
               matchedEmails.push({
                 client_name: matchedClient,
-                message_id: msgId,
                 subject: parsed.subject,
                 from_addr: parsed.from?.text || '',
                 to_addr: parsed.to?.text || '',
                 email_date: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
-                body: parsed.text || '',
-                folder: 'INBOX'
+                body: parsed.text || ''
               });
             }
           } catch (e) {

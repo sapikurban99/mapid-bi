@@ -105,8 +105,6 @@ export function GlobalDataProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (pathname !== '/login' && !hasFetched) {
             syncData();
-            // Fire and forget auto-sync emails for the day
-            fetch('/api/bi/sync-emails').catch(err => console.error('Auto email sync error:', err));
         }
     }, [pathname, hasFetched]);
 

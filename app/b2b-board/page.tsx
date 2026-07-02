@@ -367,6 +367,25 @@ export default function B2BBoardPage() {
     const [loadingEmails, setLoadingEmails] = useState(false);
     const [aiSummary, setAiSummary] = useState<string | null>(null);
     const [isSummarizing, setIsSummarizing] = useState(false);
+    const [isSyncingGlobalEmails, setIsSyncingGlobalEmails] = useState(false);
+    const [syncEmailModalOpen, setSyncEmailModalOpen] = useState(false);
+    const [syncProgress, setSyncProgress] = useState(0);
+    const [syncResultEmails, setSyncResultEmails] = useState<any[] | null>(null);
+
+    // Trickle progress for email sync
+    useEffect(() => {
+        if (!isSyncingGlobalEmails) return;
+        setSyncProgress(0);
+        const interval = setInterval(() => {
+            setSyncProgress(prev => {
+                // Trickle up to 90% while waiting
+                if (prev >= 90) return prev;
+                const increment = Math.random() * 5 + 2; // 2 to 7 percent jump
+                return Math.min(prev + increment, 90);
+            });
+        }, 800);
+        return () => clearInterval(interval);
+    }, [isSyncingGlobalEmails]);
 
 
     // Dynamic filter state: Record<columnName, selectedValues[]>
@@ -1044,17 +1063,45 @@ export default function B2BBoardPage() {
                         {activeTab === 'calendar' && <button onClick={() => { setNewAgenda({ title: '', description: '', startDate: '', endDate: '', startTime: '', endTime: '', attachmentLink: '', syncToPrivateEmail: false }); setIsAddingAgenda(true); }} className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg bg-indigo-600 text-white hover:bg-indigo-700"><Plus size={14} /> Add Agenda</button>}
                     </div>
 
-                    <button
-                        onClick={async () => {
-                            setLoadingBiData(true);
-                            await syncData();
-                            setLocalConfig(getConfig());
-                            setLoadingBiData(false);
-                        }}
-                        disabled={loadingBiData || globalIsLoading}
-                        className={`flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-sm ${loadingBiData || globalIsLoading ? 'bg-zinc-200 text-zinc-500 cursor-wait' : 'bg-white border border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50'}`}>
-                        {loadingBiData || globalIsLoading ? <><Loader2 size={14} className="animate-spin" /> Syncing</> : <><Globe size={14} /> Sync Data</>}
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={async () => {
+                                setSyncEmailModalOpen(true);
+                                setIsSyncingGlobalEmails(true);
+                                setSyncResultEmails(null);
+                                try {
+                                    const res = await fetch('/api/bi/sync-emails');
+                                    const data = await res.json();
+                                    if (data.success) {
+                                        setSyncProgress(100);
+                                        setSyncResultEmails(data.emails || []);
+                                    } else {
+                                        setSyncResultEmails([]);
+                                        alert(`Failed to sync: ${data.message || data.error}`);
+                                    }
+                                } catch (e: any) {
+                                    setSyncResultEmails([]);
+                                    alert('Error syncing emails: ' + e.message);
+                                } finally {
+                                    setIsSyncingGlobalEmails(false);
+                                }
+                            }}
+                            disabled={isSyncingGlobalEmails}
+                            className={`flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-sm ${isSyncingGlobalEmails ? 'bg-zinc-200 text-zinc-500 cursor-wait' : 'bg-white border border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50'}`}>
+                            {isSyncingGlobalEmails ? <><Loader2 size={14} className="animate-spin" /> Syncing Emails...</> : <><Mail size={14} /> Sync Emails</>}
+                        </button>
+                        <button
+                            onClick={async () => {
+                                setLoadingBiData(true);
+                                await syncData();
+                                setLocalConfig(getConfig());
+                                setLoadingBiData(false);
+                            }}
+                            disabled={loadingBiData || globalIsLoading}
+                            className={`flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-sm ${loadingBiData || globalIsLoading ? 'bg-zinc-200 text-zinc-500 cursor-wait' : 'bg-white border border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50'}`}>
+                            {loadingBiData || globalIsLoading ? <><Loader2 size={14} className="animate-spin" /> Syncing</> : <><Globe size={14} /> Sync Data</>}
+                        </button>
+                    </div>
                 </div>
 
                 {/* DYNAMIC FILTER BAR */}
@@ -2315,6 +2362,71 @@ export default function B2BBoardPage() {
                         </div>
                         <div className="p-6 border-t border-zinc-100 flex justify-end">
                             <button onClick={() => setEmailStatusModal(null)} className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white transition-colors">Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {syncEmailModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="flex items-center justify-between p-5 bg-blue-600 text-white">
+                            <div>
+                                <h2 className="text-lg font-black tracking-tight flex items-center gap-2"><Mail size={20} /> Email Sync Tracker</h2>
+                                <p className="text-xs font-bold text-blue-100 uppercase tracking-widest mt-0.5">Fetching latest client communications</p>
+                            </div>
+                            {(!isSyncingGlobalEmails && syncResultEmails) && (
+                                <button onClick={() => setSyncEmailModalOpen(false)} className="p-2 hover:bg-blue-700 rounded-xl transition-colors"><X size={18} /></button>
+                            )}
+                        </div>
+                        <div className="p-6">
+                            {isSyncingGlobalEmails ? (
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center text-sm font-bold text-zinc-600">
+                                        <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin text-blue-500" /> Scanning IMAP server...</span>
+                                        <span>{Math.round(syncProgress)}%</span>
+                                    </div>
+                                    <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-blue-500 rounded-full transition-all duration-300 ease-out" 
+                                            style={{ width: `${syncProgress}%` }}
+                                        ></div>
+                                    </div>
+                                    <p className="text-xs text-zinc-400 text-center font-medium mt-4">Connecting to Mail Server securely...</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                            <CheckCircle size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-black text-zinc-900">Sync Complete!</h3>
+                                            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Found {syncResultEmails?.length || 0} new emails</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3 max-h-[40vh] overflow-y-auto custom-scrollbar">
+                                        {(!syncResultEmails || syncResultEmails.length === 0) ? (
+                                            <p className="text-center text-sm font-medium text-zinc-500 py-6">No new client emails found since last sync.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {syncResultEmails.map((em: any, idx: number) => (
+                                                    <div key={idx} className="bg-white p-3 rounded-lg border border-zinc-200 shadow-sm flex flex-col gap-1">
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <span className="text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">{em.client}</span>
+                                                            <span className="text-[10px] font-bold text-zinc-400 whitespace-nowrap">{new Date(em.date).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <p className="text-xs font-bold text-zinc-800 line-clamp-2 leading-snug">{em.subject}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="pt-2">
+                                        <button onClick={() => setSyncEmailModalOpen(false)} className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-colors shadow-lg shadow-zinc-200">Close</button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

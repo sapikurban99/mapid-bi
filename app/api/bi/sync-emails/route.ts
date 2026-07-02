@@ -12,31 +12,20 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    // 1. Check admin_config for the lock/sync status
+    console.log('[Email Sync] Starting manual sync...');
+    
+    // 1. Get last sync timestamp
     const { data: configData } = await supabase
       .from('admin_config')
       .select('value')
-      .eq('key', 'last_email_sync')
+      .eq('key', 'last_email_sync_timestamp')
       .single();
-
-    if (configData?.value === todayStr) {
-      return NextResponse.json({ success: true, message: 'Already synced today.' });
+      
+    let lastSyncDate = new Date();
+    lastSyncDate.setDate(lastSyncDate.getDate() - 1); // default yesterday
+    if (configData?.value) {
+      lastSyncDate = new Date(configData.value);
     }
-
-    // 2. Acquire lock (set to today)
-    const { error: upsertError } = await supabase.from('admin_config').upsert({
-      key: 'last_email_sync',
-      value: todayStr,
-      description: 'Tracks the last date the auto-email scraper ran'
-    });
-    
-    if (upsertError) {
-      console.warn('Failed to acquire lock for email sync:', upsertError);
-    }
-
-    console.log('[Email Sync] Starting daily sync...');
 
     // 3. Get all active client names
     const [projectsRes, leadsRes] = await Promise.all([
@@ -66,10 +55,10 @@ export async function GET() {
 
     await client.connect();
 
-    // 5. Search emails since yesterday
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    
+    // 5. Search emails since last sync
+    const searchDate = new Date(lastSyncDate);
+    searchDate.setHours(0, 0, 0, 0); // IMAP since is date-only
+
     // We get a list of existing message_ids from the last 3 days to prevent duplicates
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
@@ -83,8 +72,8 @@ export async function GET() {
     let matchedEmails = [];
 
     try {
-      // Search INBOX for emails since yesterday
-      const searchRes = await client.search({ since: yesterday });
+      // Search INBOX for emails since the date of our last sync
+      const searchRes = await client.search({ since: searchDate });
       
       if (searchRes && typeof searchRes !== 'boolean' && searchRes.length > 0) {
         const seqs = searchRes.join(',');
@@ -95,15 +84,21 @@ export async function GET() {
           try {
             const parsed = (await simpleParser(message.source || Buffer.from(''))) as any;
             const subject = parsed.subject || '';
+            const body = parsed.text || '';
+            const from = parsed.from?.text || '';
+            const to = parsed.to?.text || '';
+            const emailDate = parsed.date ? new Date(parsed.date) : new Date();
+
+            if (emailDate <= lastSyncDate) continue; // Skip emails older than our last sync exact time
             
             if (existingSubjects.has(subject)) continue; // skip duplicates
 
-            // Check if subject contains any client name (case insensitive)
-            const subjectLower = subject.toLowerCase();
+            // Check if subject, body, from, or to contains any client name (case insensitive)
+            const combinedText = `${subject} ${body} ${from} ${to}`.toLowerCase();
             let matchedClient = null;
             
             for (const cName of allClients) {
-              if (subjectLower.includes(cName.toLowerCase())) {
+              if (combinedText.includes(cName.toLowerCase())) {
                 matchedClient = cName;
                 break;
               }
@@ -115,7 +110,7 @@ export async function GET() {
                 subject: parsed.subject,
                 from_addr: parsed.from?.text || '',
                 to_addr: parsed.to?.text || '',
-                email_date: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
+                email_date: emailDate.toISOString(),
                 body: parsed.text || ''
               });
             }
@@ -142,10 +137,18 @@ export async function GET() {
       console.log('[Email Sync] No new matching emails found.');
     }
 
+    // Update last sync timestamp to now
+    await supabase.from('admin_config').upsert({
+      key: 'last_email_sync_timestamp',
+      value: new Date().toISOString(),
+      description: 'Exact timestamp of the last email sync'
+    });
+
     return NextResponse.json({ 
       success: true, 
       message: 'Sync completed', 
-      processed: matchedEmails.length 
+      processed: matchedEmails.length,
+      emails: matchedEmails.map(m => ({ subject: m.subject, client: m.client_name, date: m.email_date }))
     });
 
   } catch (error: any) {
